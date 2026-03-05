@@ -1,9 +1,22 @@
 const BASE_URL = "http://localhost:5000/api";
 
-export const createTrade = async (tradeData) => {
+// Helper to get base URL based on market
+const getBaseUrl = (marketType) => {
+  if (marketType === 'Indian_Market') {
+    return `${BASE_URL}/indian`;
+  }
+  return BASE_URL;
+};
+
+export const createTrade = async (tradeData, marketType = 'Forex') => {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(`${BASE_URL}/trades`, {
+  // Use dedicated Indian Market endpoint if applicable
+  const baseUrl = marketType === 'Indian_Market'
+    ? `${BASE_URL}/indian`
+    : BASE_URL;
+
+  const res = await fetch(`${baseUrl}/trades`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -14,7 +27,7 @@ export const createTrade = async (tradeData) => {
 
   // Parse response - throw error if not OK
   const data = await res.json();
-  
+
   if (!res.ok) {
     throw new Error(data.message || "Failed to create trade");
   }
@@ -24,11 +37,15 @@ export const createTrade = async (tradeData) => {
 
 
 
-export const getTrades = async () => {
-
+export const getTrades = async (marketType = 'Forex') => {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(`${BASE_URL}/trades`, {
+  // Use dedicated Indian Market endpoint if applicable
+  const baseUrl = marketType === 'Indian_Market'
+    ? `${BASE_URL}/indian`
+    : BASE_URL;
+
+  const res = await fetch(`${baseUrl}/trades?marketType=${marketType}`, {
     headers: {
       Authorization: `Bearer ${token}`
     }

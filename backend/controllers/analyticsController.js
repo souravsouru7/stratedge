@@ -7,9 +7,18 @@ const Trade = require("../models/Trade");
 exports.getSummary = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query).sort({ createdAt: -1 });
 
     const totalTrades = trades.length;
@@ -52,9 +61,18 @@ exports.getSummary = async (req, res) => {
 exports.getWeeklyStats = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query);
     const weekly = {};
 
@@ -79,9 +97,18 @@ exports.getWeeklyStats = async (req, res) => {
 exports.getRiskRewardAnalysis = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query);
 
     const tradesWithRR = trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice);
@@ -166,9 +193,18 @@ exports.getRiskRewardAnalysis = async (req, res) => {
 exports.getTradeDistribution = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query);
 
     // By Currency Pair
@@ -253,9 +289,18 @@ exports.getTradeDistribution = async (req, res) => {
 exports.getPerformanceMetrics = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query).sort({ createdAt: 1 });
 
     const winningTrades = trades.filter(t => t.profit > 0);
@@ -305,9 +350,18 @@ exports.getPerformanceMetrics = async (req, res) => {
 exports.getTimeAnalysis = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query);
 
     // By Month
@@ -481,9 +535,18 @@ exports.getTimeAnalysis = async (req, res) => {
 exports.getTradeQuality = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query);
 
     const rrRanges = [
@@ -553,9 +616,18 @@ exports.getTradeQuality = async (req, res) => {
 exports.getDrawdownAnalysis = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query).sort({ createdAt: 1 });
 
     if (trades.length === 0) {
@@ -604,9 +676,18 @@ exports.getDrawdownAnalysis = async (req, res) => {
 exports.getAIInsights = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query);
 
     if (trades.length < 5) {
@@ -755,9 +836,18 @@ exports.getAIInsights = async (req, res) => {
 exports.getAdvancedAnalytics = async (req, res) => {
   try {
     const { marketType } = req.query;
-    const query = { user: req.user._id };
-    if (marketType) query.marketType = marketType;
-
+    
+    // marketType is REQUIRED for proper data isolation
+    if (!marketType) {
+      return res.status(400).json({ message: "marketType query parameter is required (Forex or Indian_Market)" });
+    }
+    
+    const validMarkets = ["Forex", "Indian_Market"];
+    if (!validMarkets.includes(marketType)) {
+      return res.status(400).json({ message: "marketType must be Forex or Indian_Market" });
+    }
+    
+    const query = { user: req.user._id, marketType };
     const trades = await Trade.find(query).sort({ createdAt: 1 });
 
     const totalTrades = trades.length;

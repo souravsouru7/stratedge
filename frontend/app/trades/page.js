@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getTrades, deleteTrade } from "@/services/tradeApi";
 import Link from "next/link";
+import MarketSwitcher from "@/components/MarketSwitcher";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -50,7 +51,7 @@ function CandlestickBackground() {
       ctx.strokeStyle = "rgba(0,0,0,0.04)";
       ctx.lineWidth = 1;
       for (let i = 1; i < 7; i++) {
-        ctx.beginPath(); ctx.moveTo(0,(H/7)*i); ctx.lineTo(W,(H/7)*i); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, (H / 7) * i); ctx.lineTo(W, (H / 7) * i); ctx.stroke();
       }
 
       candles.forEach((c, i) => {
@@ -66,46 +67,46 @@ function CandlestickBackground() {
 
       // MA line
       const ma = candles.map((_, i) => {
-        const sl = candles.slice(Math.max(0,i-5),i+1);
-        return sl.reduce((a,c) => a+c.close,0)/sl.length;
+        const sl = candles.slice(Math.max(0, i - 5), i + 1);
+        return sl.reduce((a, c) => a + c.close, 0) / sl.length;
       });
       ctx.strokeStyle = "rgba(184,134,11,0.3)";
-      ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+      ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
       ctx.beginPath();
-      ma.forEach((p,i) => { const x=i*32+16,y=toY(p); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+      ma.forEach((p, i) => { const x = i * 32 + 16, y = toY(p); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
       ctx.stroke(); ctx.setLineDash([]);
     };
     draw();
     window.addEventListener("resize", draw);
     return () => window.removeEventListener("resize", draw);
   }, []);
-  return <canvas id="trade-bg-canvas" style={{ position:"fixed", inset:0, width:"100%", height:"100%", opacity:1, zIndex:0, pointerEvents:"none" }}/>;
+  return <canvas id="trade-bg-canvas" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", opacity: 1, zIndex: 0, pointerEvents: "none" }} />;
 }
 
 /* ─────────────────────────────────────────
    TICKER TAPE — dark strip on light bg
 ───────────────────────────────────────── */
 const tickers = [
-  {sym:"BTC",val:"+2.34%",bull:true},{sym:"ETH",val:"-1.12%",bull:false},
-  {sym:"AAPL",val:"+0.87%",bull:true},{sym:"TSLA",val:"+4.20%",bull:true},
-  {sym:"NVDA",val:"-0.55%",bull:false},{sym:"GOLD",val:"+0.62%",bull:true},
-  {sym:"SPY",val:"+0.31%",bull:true},{sym:"OIL",val:"-2.18%",bull:false},
-  {sym:"AMZN",val:"+1.05%",bull:true},{sym:"USD/JPY",val:"-0.33%",bull:false},
+  { sym: "BTC", val: "+2.34%", bull: true }, { sym: "ETH", val: "-1.12%", bull: false },
+  { sym: "AAPL", val: "+0.87%", bull: true }, { sym: "TSLA", val: "+4.20%", bull: true },
+  { sym: "NVDA", val: "-0.55%", bull: false }, { sym: "GOLD", val: "+0.62%", bull: true },
+  { sym: "SPY", val: "+0.31%", bull: true }, { sym: "OIL", val: "-2.18%", bull: false },
+  { sym: "AMZN", val: "+1.05%", bull: true }, { sym: "USD/JPY", val: "-0.33%", bull: false },
 ];
 function TickerTape() {
   const items = [...tickers, ...tickers];
   return (
     <div style={{
-      overflow:"hidden", background:"#0F1923",
-      borderBottom:"3px solid #0D9E6E",
-      padding:"7px 0", whiteSpace:"nowrap", position:"relative", zIndex:10,
+      overflow: "hidden", background: "#0F1923",
+      borderBottom: "3px solid #0D9E6E",
+      padding: "7px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10,
     }}>
-      <div style={{ display:"inline-flex", gap:"48px", animation:"ticker 32s linear infinite" }}>
-        {items.map((t,i) => (
-          <span key={i} style={{ fontSize:"11px", fontFamily:"'JetBrains Mono',monospace", letterSpacing:"0.04em" }}>
-            <span style={{ color:"#94A3B8", marginRight:6 }}>{t.sym}</span>
+      <div style={{ display: "inline-flex", gap: "48px", animation: "ticker 32s linear infinite" }}>
+        {items.map((t, i) => (
+          <span key={i} style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>
+            <span style={{ color: "#94A3B8", marginRight: 6 }}>{t.sym}</span>
             <span style={{ color: t.bull ? "#22C78E" : "#F87171" }}>
-              {t.bull?"▲":"▼"} {t.val}
+              {t.bull ? "▲" : "▼"} {t.val}
             </span>
           </span>
         ))}
@@ -119,38 +120,38 @@ function TickerTape() {
 ───────────────────────────────────────── */
 function DeleteModal({ trade, onConfirm, onCancel }) {
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(15,25,35,0.6)", backdropFilter:"blur(6px)" }} onClick={onCancel}/>
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(15,25,35,0.6)", backdropFilter: "blur(6px)" }} onClick={onCancel} />
       <div style={{
-        position:"relative", background:"#FFFFFF", border:"1px solid #E2E8F0",
-        borderRadius:12, padding:"28px", maxWidth:340, width:"100%",
-        boxShadow:"0 8px 32px rgba(15,25,35,0.15)",
+        position: "relative", background: "#FFFFFF", border: "1px solid #E2E8F0",
+        borderRadius: 12, padding: "28px", maxWidth: 340, width: "100%",
+        boxShadow: "0 8px 32px rgba(15,25,35,0.15)",
       }}>
-        <div style={{ height:3, background:"linear-gradient(90deg,#D63B3B,transparent)", marginBottom:20, borderRadius:2 }}/>
-        <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:18, fontWeight:800, color:"#0F1923", marginBottom:8 }}>
+        <div style={{ height: 3, background: "linear-gradient(90deg,#D63B3B,transparent)", marginBottom: 20, borderRadius: 2 }} />
+        <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 18, fontWeight: 800, color: "#0F1923", marginBottom: 8 }}>
           DELETE TRADE?
         </div>
-        <div style={{ fontSize:10, color:"#94A3B8", fontFamily:"'JetBrains Mono',monospace", marginBottom:6, letterSpacing:"0.08em" }}>
+        <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6, letterSpacing: "0.08em" }}>
           TRADE TO DELETE
         </div>
-        <div style={{ fontSize:13, color:"#0F1923", fontFamily:"'JetBrains Mono',monospace", marginBottom:20, fontWeight:600 }}>
+        <div style={{ fontSize: 13, color: "#0F1923", fontFamily: "'JetBrains Mono',monospace", marginBottom: 20, fontWeight: 600 }}>
           {trade?.pair} — {trade?.type?.toUpperCase()}
         </div>
-        <div style={{ fontSize:9, color:"#94A3B8", letterSpacing:"0.06em", marginBottom:22, lineHeight:1.6 }}>
+        <div style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.06em", marginBottom: 22, lineHeight: 1.6 }}>
           THIS ACTION CANNOT BE UNDONE. THE TRADE WILL BE PERMANENTLY REMOVED FROM YOUR JOURNAL.
         </div>
-        <div style={{ display:"flex", gap:10 }}>
+        <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onCancel} style={{
-            flex:1, padding:"10px", background:"#F8F6F2", border:"1px solid #E2E8F0",
-            borderRadius:6, color:"#4A5568", fontSize:10, fontFamily:"'JetBrains Mono',monospace",
-            letterSpacing:"0.12em", cursor:"pointer",
+            flex: 1, padding: "10px", background: "#F8F6F2", border: "1px solid #E2E8F0",
+            borderRadius: 6, color: "#4A5568", fontSize: 10, fontFamily: "'JetBrains Mono',monospace",
+            letterSpacing: "0.12em", cursor: "pointer",
           }}>CANCEL</button>
           <button onClick={onConfirm} style={{
-            flex:1, padding:"10px", background:"linear-gradient(135deg,#D63B3B,#F87171)",
-            border:"none", borderRadius:6, color:"#FFFFFF", fontSize:10,
-            fontFamily:"'JetBrains Mono',monospace", fontWeight:700,
-            letterSpacing:"0.12em", cursor:"pointer",
-            boxShadow:"0 4px 12px rgba(214,59,59,0.3)",
+            flex: 1, padding: "10px", background: "linear-gradient(135deg,#D63B3B,#F87171)",
+            border: "none", borderRadius: 6, color: "#FFFFFF", fontSize: 10,
+            fontFamily: "'JetBrains Mono',monospace", fontWeight: 700,
+            letterSpacing: "0.12em", cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(214,59,59,0.3)",
           }}>DELETE TRADE</button>
         </div>
       </div>
@@ -165,71 +166,83 @@ function TradeRow({ trade, onDelete, idx }) {
   const bull = parseFloat(trade.profit) >= 0;
   return (
     <tr style={{
-      borderBottom:"1px solid #E2E8F0",
-      animation:`fadeUp 0.4s ease ${idx * 0.05}s both`,
-      transition:"background 0.2s",
+      borderBottom: "1px solid #E2E8F0",
+      animation: `fadeUp 0.4s ease ${idx * 0.05}s both`,
+      transition: "background 0.2s",
     }}
-      onMouseEnter={e => e.currentTarget.style.background="#F8F6F2"}
-      onMouseLeave={e => e.currentTarget.style.background="transparent"}
+      onMouseEnter={e => e.currentTarget.style.background = "#F8F6F2"}
+      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
     >
       {/* Pair */}
-      <td style={{ padding:"14px 16px" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+      <td style={{ padding: "14px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{
-            width:6, height:6, borderRadius:"50%",
+            width: 6, height: 6, borderRadius: "50%",
             background: bull ? "#0D9E6E" : "#D63B3B",
             boxShadow: bull ? "0 0 6px #0D9E6E" : "0 0 6px #D63B3B",
-            flexShrink:0,
-          }}/>
-          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:"#0F1923", fontWeight:600 }}>
+            flexShrink: 0,
+          }} />
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#0F1923", fontWeight: 600 }}>
             {trade.pair}
           </span>
         </div>
       </td>
       {/* Type */}
-      <td style={{ padding:"14px 16px" }}>
+      <td style={{ padding: "14px 16px" }}>
         <span style={{
-          fontSize:9, letterSpacing:"0.12em",
-          color: trade.type?.toUpperCase()==="LONG" ? "#0D9E6E" : "#D63B3B",
-          background: trade.type?.toUpperCase()==="LONG" ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)",
-          border: `1px solid ${trade.type?.toUpperCase()==="LONG" ? "rgba(13,158,110,0.3)" : "rgba(214,59,59,0.3)"}`,
-          borderRadius:20, padding:"3px 10px",
-          fontFamily:"'JetBrains Mono',monospace",
+          fontSize: 9, letterSpacing: "0.12em",
+          color: trade.type?.toUpperCase() === "LONG" ? "#0D9E6E" : "#D63B3B",
+          background: trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)",
+          border: `1px solid ${trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.3)" : "rgba(214,59,59,0.3)"}`,
+          borderRadius: 20, padding: "3px 10px",
+          fontFamily: "'JetBrains Mono',monospace",
         }}>
-          {trade.type?.toUpperCase()==="LONG" ? "▲ LONG" : "▼ SHORT"}
+          {trade.type?.toUpperCase() === "LONG" ? "▲ LONG" : "▼ SHORT"}
+        </span>
+      </td>
+      {/* Basis */}
+      <td style={{ padding: "14px 16px" }}>
+        <span style={{
+          fontSize: 9, letterSpacing: "0.08em",
+          color: trade.entryBasis === "Plan" ? "#4A5568" : trade.entryBasis === "Emotion" ? "#D63B3B" : "#B8860B",
+          fontFamily: "'JetBrains Mono',monospace",
+          fontWeight: 600,
+          textTransform: "uppercase",
+        }}>
+          {trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}
         </span>
       </td>
       {/* Profit */}
-      <td style={{ padding:"14px 16px" }}>
+      <td style={{ padding: "14px 16px" }}>
         <span style={{
-          fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:700,
+          fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700,
           color: bull ? "#0D9E6E" : "#D63B3B",
         }}>
           {bull ? "+" : ""}{trade.profit}
         </span>
       </td>
       {/* Actions */}
-      <td style={{ padding:"14px 16px" }}>
-        <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+      <td style={{ padding: "14px 16px" }}>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Link href={`/trades/${trade._id}`} style={{
-            fontSize:9, letterSpacing:"0.1em", fontFamily:"'JetBrains Mono',monospace",
-            color:"#0D9E6E", border:"1px solid rgba(13,158,110,0.3)",
-            background:"rgba(13,158,110,0.05)", borderRadius:4,
-            padding:"5px 12px", textDecoration:"none", transition:"all 0.2s",
+            fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
+            color: "#0D9E6E", border: "1px solid rgba(13,158,110,0.3)",
+            background: "rgba(13,158,110,0.05)", borderRadius: 4,
+            padding: "5px 12px", textDecoration: "none", transition: "all 0.2s",
           }}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(13,158,110,0.12)"}}
-            onMouseLeave={e=>{e.currentTarget.style.background="rgba(13,158,110,0.05)"}}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(13,158,110,0.12)" }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(13,158,110,0.05)" }}
           >
             VIEW →
           </Link>
           <button onClick={() => onDelete(trade)} style={{
-            fontSize:9, letterSpacing:"0.1em", fontFamily:"'JetBrains Mono',monospace",
-            color:"#D63B3B", border:"1px solid rgba(214,59,59,0.3)",
-            background:"rgba(214,59,59,0.05)", borderRadius:4,
-            padding:"5px 12px", cursor:"pointer", transition:"all 0.2s",
+            fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
+            color: "#D63B3B", border: "1px solid rgba(214,59,59,0.3)",
+            background: "rgba(214,59,59,0.05)", borderRadius: 4,
+            padding: "5px 12px", cursor: "pointer", transition: "all 0.2s",
           }}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(214,59,59,0.12)"}}
-            onMouseLeave={e=>{e.currentTarget.style.background="rgba(214,59,59,0.05)"}}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(214,59,59,0.12)" }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(214,59,59,0.05)" }}
           >
             DELETE
           </button>
@@ -246,47 +259,50 @@ function TradeCard({ trade, onDelete, idx }) {
   const bull = parseFloat(trade.profit) >= 0;
   return (
     <div style={{
-      background:"#FFFFFF", border:"1px solid #E2E8F0",
-      borderRadius:8, padding:"16px", marginBottom:10, position:"relative",
-      borderLeft:`3px solid ${bull ? "#0D9E6E" : "#D63B3B"}`,
-      animation:`fadeUp 0.4s ease ${idx * 0.06}s both`,
-      boxShadow:"0 2px 8px rgba(15,25,35,0.05)",
+      background: "#FFFFFF", border: "1px solid #E2E8F0",
+      borderRadius: 8, padding: "16px", marginBottom: 10, position: "relative",
+      borderLeft: `3px solid ${bull ? "#0D9E6E" : "#D63B3B"}`,
+      animation: `fadeUp 0.4s ease ${idx * 0.06}s both`,
+      boxShadow: "0 2px 8px rgba(15,25,35,0.05)",
     }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
-          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:14, color:"#0F1923", fontWeight:700, marginBottom:4 }}>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 14, color: "#0F1923", fontWeight: 700, marginBottom: 4 }}>
             {trade.pair}
           </div>
           <span style={{
-            fontSize:8, letterSpacing:"0.12em",
-            color: trade.type?.toUpperCase()==="LONG" ? "#0D9E6E" : "#D63B3B",
-            background: trade.type?.toUpperCase()==="LONG" ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)",
-            border:`1px solid ${trade.type?.toUpperCase()==="LONG" ? "rgba(13,158,110,0.3)" : "rgba(214,59,59,0.3)"}`,
-            borderRadius:20, padding:"2px 8px",
-            fontFamily:"'JetBrains Mono',monospace",
+            fontSize: 8, letterSpacing: "0.12em",
+            color: trade.type?.toUpperCase() === "LONG" ? "#0D9E6E" : "#D63B3B",
+            background: trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)",
+            border: `1px solid ${trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.3)" : "rgba(214,59,59,0.3)"}`,
+            borderRadius: 20, padding: "2px 8px",
+            fontFamily: "'JetBrains Mono',monospace",
           }}>
-            {trade.type?.toUpperCase()==="LONG" ? "▲ LONG" : "▼ SHORT"}
+            {trade.type?.toUpperCase() === "LONG" ? "▲ LONG" : "▼ SHORT"}
           </span>
         </div>
         <div style={{
-          fontFamily:"'JetBrains Mono',monospace", fontSize:16, fontWeight:700,
+          fontFamily: "'JetBrains Mono',monospace", fontSize: 16, fontWeight: 700,
           color: bull ? "#0D9E6E" : "#D63B3B",
         }}>
           {bull ? "+" : ""}{trade.profit}
         </div>
       </div>
-      <div style={{ display:"flex", gap:8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94A3B8", marginBottom: 12, fontFamily: "'JetBrains Mono',monospace" }}>
+        <span>BASIS: <span style={{ color: trade.entryBasis === "Plan" ? "#4A5568" : trade.entryBasis === "Emotion" ? "#D63B3B" : "#B8860B", fontWeight: 700 }}>{trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}</span></span>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
         <Link href={`/trades/${trade._id}`} style={{
-          flex:1, textAlign:"center", fontSize:9, letterSpacing:"0.1em",
-          fontFamily:"'JetBrains Mono',monospace", color:"#0D9E6E",
-          border:"1px solid rgba(13,158,110,0.3)", background:"rgba(13,158,110,0.05)",
-          borderRadius:4, padding:"8px", textDecoration:"none",
+          flex: 1, textAlign: "center", fontSize: 9, letterSpacing: "0.1em",
+          fontFamily: "'JetBrains Mono',monospace", color: "#0D9E6E",
+          border: "1px solid rgba(13,158,110,0.3)", background: "rgba(13,158,110,0.05)",
+          borderRadius: 4, padding: "8px", textDecoration: "none",
         }}>VIEW →</Link>
         <button onClick={() => onDelete(trade)} style={{
-          flex:1, fontSize:9, letterSpacing:"0.1em",
-          fontFamily:"'JetBrains Mono',monospace", color:"#D63B3B",
-          border:"1px solid rgba(214,59,59,0.3)", background:"rgba(214,59,59,0.05)",
-          borderRadius:4, padding:"8px", cursor:"pointer",
+          flex: 1, fontSize: 9, letterSpacing: "0.1em",
+          fontFamily: "'JetBrains Mono',monospace", color: "#D63B3B",
+          border: "1px solid rgba(214,59,59,0.3)", background: "rgba(214,59,59,0.05)",
+          borderRadius: 4, padding: "8px", cursor: "pointer",
         }}>DELETE</button>
       </div>
     </div>
@@ -298,22 +314,22 @@ function TradeCard({ trade, onDelete, idx }) {
 ───────────────────────────────────────── */
 function EmptyState() {
   return (
-    <div style={{ textAlign:"center", padding:"60px 20px" }}>
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ margin:"0 auto 16px" }}>
-        <rect x="8" y="16" width="10" height="18" fill="rgba(13,158,110,0.2)" rx="1"/>
-        <line x1="13" y1="8" x2="13" y2="16" stroke="rgba(13,158,110,0.3)" strokeWidth="2"/>
-        <line x1="13" y1="34" x2="13" y2="42" stroke="rgba(13,158,110,0.3)" strokeWidth="2"/>
-        <rect x="22" y="12" width="10" height="12" fill="rgba(214,59,59,0.2)" rx="1"/>
-        <line x1="27" y1="4" x2="27" y2="12" stroke="rgba(214,59,59,0.3)" strokeWidth="2"/>
-        <line x1="27" y1="24" x2="27" y2="34" stroke="rgba(214,59,59,0.3)" strokeWidth="2"/>
-        <rect x="36" y="14" width="10" height="16" fill="rgba(13,158,110,0.2)" rx="1"/>
-        <line x1="41" y1="6" x2="41" y2="14" stroke="rgba(13,158,110,0.3)" strokeWidth="2"/>
-        <line x1="41" y1="30" x2="41" y2="42" stroke="rgba(13,158,110,0.3)" strokeWidth="2"/>
+    <div style={{ textAlign: "center", padding: "60px 20px" }}>
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ margin: "0 auto 16px" }}>
+        <rect x="8" y="16" width="10" height="18" fill="rgba(13,158,110,0.2)" rx="1" />
+        <line x1="13" y1="8" x2="13" y2="16" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
+        <line x1="13" y1="34" x2="13" y2="42" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
+        <rect x="22" y="12" width="10" height="12" fill="rgba(214,59,59,0.2)" rx="1" />
+        <line x1="27" y1="4" x2="27" y2="12" stroke="rgba(214,59,59,0.3)" strokeWidth="2" />
+        <line x1="27" y1="24" x2="27" y2="34" stroke="rgba(214,59,59,0.3)" strokeWidth="2" />
+        <rect x="36" y="14" width="10" height="16" fill="rgba(13,158,110,0.2)" rx="1" />
+        <line x1="41" y1="6" x2="41" y2="14" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
+        <line x1="41" y1="30" x2="41" y2="42" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
       </svg>
-      <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:16, fontWeight:800, color:"#0F1923", marginBottom:6 }}>
+      <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 16, fontWeight: 800, color: "#0F1923", marginBottom: 6 }}>
         NO TRADES LOGGED YET
       </div>
-      <div style={{ fontSize:9, color:"#94A3B8", letterSpacing:"0.1em", fontFamily:"'JetBrains Mono',monospace" }}>
+      <div style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace" }}>
         START BUILDING YOUR JOURNAL — LOG YOUR FIRST TRADE
       </div>
     </div>
@@ -388,13 +404,14 @@ export default function TradesPage() {
       overflow: "hidden",
     }}>
       {/* Fonts */}
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Background */}
-      <CandlestickBackground/>
-      <div style={{ position:"fixed", inset:0, zIndex:1, pointerEvents:"none",
-        background:"linear-gradient(135deg, rgba(240,238,233,0.82) 0%, rgba(240,238,233,0.75) 100%)"
-      }}/>
+      <CandlestickBackground />
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none",
+        background: "linear-gradient(135deg, rgba(240,238,233,0.82) 0%, rgba(240,238,233,0.75) 100%)"
+      }} />
 
       {/* Header */}
       <header style={{
@@ -412,15 +429,11 @@ export default function TradesPage() {
         borderBottom: "1px solid #E2E8F0",
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            width: 38,
-            height: 38,
-            borderRadius: 8,
+            width: 38, height: 38, borderRadius: 8,
             background: "#0F1923",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 2px 8px rgba(15,25,35,0.2)",
           }}>
             <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: "#22C78E", letterSpacing: "-1px" }}>S</span>
@@ -431,43 +444,24 @@ export default function TradesPage() {
               SR TRADING
             </div>
             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-              AI JOURNAL
+              FOREX AI JOURNAL
             </div>
           </div>
-        </div>
+        </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {/* Market open pill */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            background: "#ECFDF5",
-            border: "1px solid #A7F3D0",
-            borderRadius: 20,
-            padding: "5px 12px",
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#0D9E6E", animation: "blink 1.2s ease-in-out infinite" }}/>
-            <span style={{ fontSize: 10, letterSpacing: "0.1em", color: "#0D9E6E", fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>
-              MARKET OPEN
-            </span>
-          </div>
+          <MarketSwitcher />
 
-          {/* Nav links */}
           <nav style={{ display: "flex", gap: 4 }}>
             {[
-              { href: "/dashboard", label: "Dashboard" },
+              { href: "/trades", label: "Journal" },
               { href: "/add-trade", label: "Log Trade" },
               { href: "/analytics", label: "Analytics" },
             ].map(n => (
               <Link key={n.href} href={n.href} style={{
-                fontSize: 12,
-                color: "#4A5568",
-                fontWeight: 600,
-                textDecoration: "none",
-                padding: "5px 10px",
-                borderRadius: 6,
-                transition: "all 0.15s",
+                fontSize: 12, color: "#4A5568", fontWeight: 600,
+                textDecoration: "none", padding: "5px 10px",
+                borderRadius: 6, transition: "all 0.15s",
                 fontFamily: "'Plus Jakarta Sans',sans-serif",
               }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#F0EEE9"; e.currentTarget.style.color = "#0F1923"; }}
@@ -478,42 +472,33 @@ export default function TradesPage() {
             ))}
           </nav>
 
-          {/* Logout button */}
           <button
             onClick={() => {
               localStorage.removeItem("token");
               window.location.href = "/login";
             }}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(214,59,59,0.1)",
-              border: "1px solid rgba(214,59,59,0.3)",
-              borderRadius: 6,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 10,
-              letterSpacing: "0.1em",
-              color: "#D63B3B",
-              fontFamily: "'JetBrains Mono',monospace",
-              fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
+              borderRadius: 6, padding: "6px 12px",
+              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
+              color: "#D63B3B", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
               transition: "all 0.2s",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(214,59,59,0.2)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(214,59,59,0.1)"; }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             LOGOUT
           </button>
         </div>
       </header>
 
-      <TickerTape/>
+      <TickerTape />
 
       {/* Main */}
       <main style={{
@@ -556,7 +541,7 @@ export default function TradesPage() {
             overflow: "hidden",
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             LOG TRADE
           </Link>
@@ -598,7 +583,7 @@ export default function TradesPage() {
           <div style={{ position: "relative", flex: "1 1 160px", minWidth: 140 }}>
             <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8", pointerEvents: "none" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </div>
             <input
@@ -655,17 +640,17 @@ export default function TradesPage() {
           boxShadow: "0 2px 12px rgba(15,25,35,0.05)",
         }}>
           {/* Top accent */}
-          <div style={{ height: 3, background: "linear-gradient(90deg, #0D9E6E 0%, transparent 45%, transparent 55%, #D63B3B 100%)" }}/>
+          <div style={{ height: 3, background: "linear-gradient(90deg, #0D9E6E 0%, transparent 45%, transparent 55%, #D63B3B 100%)" }} />
 
           {loading ? (
             <div style={{ padding: "60px", textAlign: "center" }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D9E6E" strokeWidth="2" style={{ animation: "spin 0.8s linear infinite", margin: "0 auto 12px", display: "block" }}>
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
               <div style={{ fontSize: 11, color: "#94A3B8", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono',monospace" }}>LOADING JOURNAL...</div>
             </div>
           ) : filtered.length === 0 ? (
-            <EmptyState/>
+            <EmptyState />
           ) : (
             <>
               {/* Desktop table — hidden on mobile via inline media logic using JS */}
@@ -673,14 +658,14 @@ export default function TradesPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #E2E8F0" }}>
-                      {["PAIR", "TYPE", "P&L", "ACTIONS"].map((h, i) => (
+                      {["PAIR", "TYPE", "BASIS", "P&L", "ACTIONS"].map((h, i) => (
                         <th key={h} style={{
                           padding: "14px 16px",
                           fontSize: 10,
                           letterSpacing: "0.14em",
                           color: "#94A3B8",
                           fontFamily: "'JetBrains Mono',monospace",
-                          textAlign: i === 3 ? "right" : "left",
+                          textAlign: i === 4 ? "right" : "left",
                           fontWeight: 600,
                         }}>{h}</th>
                       ))}
@@ -688,7 +673,7 @@ export default function TradesPage() {
                   </thead>
                   <tbody>
                     {filtered.map((trade, idx) => (
-                      <TradeRow key={trade._id} trade={trade} onDelete={setDeleteTarget} idx={idx}/>
+                      <TradeRow key={trade._id} trade={trade} onDelete={setDeleteTarget} idx={idx} />
                     ))}
                   </tbody>
                 </table>
@@ -697,7 +682,7 @@ export default function TradesPage() {
               {/* Mobile cards */}
               <div className="show-mobile" style={{ padding: "14px" }}>
                 {filtered.map((trade, idx) => (
-                  <TradeCard key={trade._id} trade={trade} onDelete={setDeleteTarget} idx={idx}/>
+                  <TradeCard key={trade._id} trade={trade} onDelete={setDeleteTarget} idx={idx} />
                 ))}
               </div>
             </>

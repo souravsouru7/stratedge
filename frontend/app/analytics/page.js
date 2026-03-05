@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import MarketSwitcher from "@/components/MarketSwitcher";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   getSummary,
   getRiskRewardAnalysis,
@@ -261,7 +263,11 @@ export default function AnalyticsPage() {
     }
   };
 
-  if (loading) return <LoadingSkeleton />;
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <LoadingSpinner message="CRUNCHING STATISTICS..." fullPage />
+    </div>
+  );
 
   const { summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights } = data;
 
@@ -279,27 +285,56 @@ export default function AnalyticsPage() {
       {/* Header */}
       <header style={{
         background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", borderBottom: `1px solid ${colors.border}`,
-        padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, position: "sticky", top: 0, zIndex: 100
+        padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, position: "sticky", top: 0, zIndex: 100,
+        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/dashboard" style={{ textDecoration: "none", color: colors.primary, fontSize: 24, fontWeight: 800 }}>←</Link>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>AI Analytics</div>
-            <div style={{ fontSize: 10, color: colors.muted, letterSpacing: "0.1em" }}>ADVANCED TRADING INSIGHTS</div>
-          </div>
-        </div>
-        {aiInsights && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 10, color: colors.muted }}>AI SCORE</span>
+          <Link href="/dashboard" style={{ textDecoration: "none", color: colors.primary, display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
-              width: 48, height: 48, borderRadius: "50%", background: `linear-gradient(135deg, ${colors.gold}, #D4A017)`,
+              width: 38, height: 38, borderRadius: 8,
+              background: colors.primary,
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(184,134,11,0.3)"
+              boxShadow: "0 2px 8px rgba(15,25,35,0.2)",
             }}>
-              <span style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{aiInsights.score}</span>
+              <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: colors.bull, letterSpacing: "-1px" }}>S</span>
+              <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: colors.bear, letterSpacing: "-1px" }}>R</span>
             </div>
-          </div>
-        )}
+            <div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: colors.primary, lineHeight: 1 }}>
+                SR TRADING
+              </div>
+              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: colors.bull, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+                FOREX AI JOURNAL
+              </div>
+            </div>
+          </Link>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <MarketSwitcher />
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
+              borderRadius: 6, padding: "6px 12px",
+              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
+              color: colors.bear, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(214,59,59,0.2)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(214,59,59,0.1)"; }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            LOGOUT
+          </button>
+        </div>
       </header>
 
       <div style={{ padding: "24px 20px", maxWidth: 1200, margin: "0 auto" }}>

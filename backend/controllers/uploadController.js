@@ -28,11 +28,16 @@ exports.uploadImage = async (req, res) => {
     const extractedText = await extractText(imageUrl);
     console.log("Extracted text:", extractedText);
 
+    // Get marketType from body or query
+    const marketType = req.body.marketType || req.query.marketType || "Forex";
+    console.log("Parsing for marketType:", marketType);
+
     // Parse the extracted text to get trade data
-    const parsedTrade = parseTrade(extractedText);
+    const { parseTrade, parseIndianTrade } = require("../services/parsingService");
+    const parsedTrade = marketType === "Indian_Market" ? parseIndianTrade(extractedText) : parseTrade(extractedText);
     console.log("Parsed trade:", parsedTrade);
 
-    res.json({ 
+    res.json({
       url: imageUrl,
       extractedText,
       parsedTrade

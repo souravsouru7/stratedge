@@ -96,3 +96,85 @@ exports.parseTrade = (text) => {
     session: getSession(openTime)
   };
 };
+
+exports.parseIndianTrade = (text) => {
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+  let pair = null; // Symbol
+  let quantity = null;
+  let entryPrice = null;
+  let exitPrice = null;
+  let profit = null;
+  let action = "BUY"; // Default
+  let segment = "Equity";
+  let instrumentType = "EQUITY";
+  let strikePrice = null;
+  let expiryDate = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Symbol / Instrument Name
+    // Pattern: Look for uppercase words, sometimes with dates and numbers for F&O
+    // e.g., NIFTY 24 MAR 22000 CE, RELIANCE, HDFCBANK
+    const instrumentMatch = line.match(/^([A-Z\&0-9]{2,}\s*(?:\d+\s*[A-Z]{3})?.*(?:CE|PE|FUT)?)$/i);
+    if (instrumentMatch && !pair && !line.match(/Avg|Price|Qty|Quantity|Profit|P&L/i)) {
+      pair = instrumentMatch[1].trim();
+      if (pair.match(/CE|PE/i)) {
+        segment = "F&O";
+        instrumentType = "OPTION";
+        const strikeMatch = pair.match(/(\d+)\s*(?:CE|PE)/i);
+        if (strikeMatch) strikePrice = strikeMatch[1];
+      } else if (pair.match(/FUT/i)) {
+        segment = "F&O";
+        instrumentType = "FUTURE";
+      }
+    }
+
+    // Quantity
+    const qtyMatch = line.match(/(?:Qty|Quantity|Lots?)[:\s]*(\d+)/i);
+    if (qtyMatch) {
+      quantity = qtyMatch[1];
+    }
+
+    // Entry Price (Avg. Price)
+    const entryMatch = line.match(/(?:Avg\.?\s*Price|Average\s*Price|Entry)[:\s]*(\d+\.?\d*)/i);
+    if (entryMatch) {
+      entryPrice = entryMatch[1];
+    }
+
+    // Exit Price (LTP/CMP)
+    const exitMatch = line.match(/(?:LTP|CMP|Exit\s*Price)[:\s]*(\d+\.?\d*)/i);
+    if (exitMatch) {
+      exitPrice = exitMatch[1];
+    }
+
+    // Profit (P&L)
+    const profitMatch = line.match(/(?:Realized\s*)?P\s*&\s*L|Profit[:\s]*([-+]?\d+\.?\d*)/i);
+    if (profitMatch) {
+      profit = profitMatch[1];
+    }
+
+    // Fallback Profit: Large numbers with + or -
+    if (!profit) {
+      const fallbackProfit = line.match(/^([-+]?\s*\d+\.?\d*)$/);
+      if (fallbackProfit && i > 0 && lines[i - 1].match(/P\s*&\s*L|Profit/i)) {
+        profit = fallbackProfit[1].replace(/\s+/g, '');
+      }
+    }
+  }
+
+  return {
+    pair: pair || null,
+    type: action,
+    quantity: quantity ? parseFloat(quantity) : null,
+    entryPrice: entryPrice ? parseFloat(entryPrice) : null,
+    exitPrice: exitPrice ? parseFloat(exitPrice) : null,
+    profit: profit ? parseFloat(profit) : null,
+    segment,
+    instrumentType,
+    strikePrice: strikePrice ? parseFloat(strikePrice) : null,
+    expiryDate: expiryDate || null,
+    marketType: 'Indian_Market'
+  };
+};
