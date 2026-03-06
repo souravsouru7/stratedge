@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 // Market types
@@ -17,27 +17,12 @@ const STORAGE_KEY = 'currentMarket';
 
 const MarketContext = createContext(null);
 
-export function MarketProvider({ children }) {
-  const [currentMarket, setCurrentMarket] = useState(DEFAULT_MARKET);
-  const [isLoading, setIsLoading] = useState(true);
+// Helper component to handle market syncing with search params
+// This is separated to be wrapped in Suspense for static generation
+function MarketSync({ currentMarket, setCurrentMarket }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Load saved market preference on mount
-  useEffect(() => {
-    try {
-      const savedMarket = localStorage.getItem(STORAGE_KEY);
-      if (savedMarket && Object.values(MARKETS).includes(savedMarket)) {
-        setCurrentMarket(savedMarket);
-      }
-    } catch (error) {
-      console.error('Error loading market preference:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Sync market with URL pathname and query params
   useEffect(() => {
     if (!pathname) return;
 
@@ -72,9 +57,36 @@ export function MarketProvider({ children }) {
     // Only update if we have a target market and it's different from the current one
     if (targetMarket && currentMarket !== targetMarket) {
       setCurrentMarket(targetMarket);
-      localStorage.setItem(STORAGE_KEY, targetMarket);
+      try {
+        localStorage.setItem(STORAGE_KEY, targetMarket);
+      } catch (e) {
+        // Ignore localStorage errors during SSR
+      }
     }
-  }, [pathname, searchParams, currentMarket]);
+  }, [pathname, searchParams, currentMarket, setCurrentMarket]);
+
+  return null;
+}
+
+export function MarketProvider({ children }) {
+  const [currentMarket, setCurrentMarket] = useState(DEFAULT_MARKET);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load saved market preference on mount
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const savedMarket = localStorage.getItem(STORAGE_KEY);
+        if (savedMarket && Object.values(MARKETS).includes(savedMarket)) {
+          setCurrentMarket(savedMarket);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading market preference:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Save market preference whenever it changes
   const toggleMarket = (market) => {
@@ -154,6 +166,9 @@ export function MarketProvider({ children }) {
 
   return (
     <MarketContext.Provider value={value}>
+      <Suspense fallback={null}>
+        <MarketSync currentMarket={currentMarket} setCurrentMarket={setCurrentMarket} />
+      </Suspense>
       {children}
     </MarketContext.Provider>
   );
