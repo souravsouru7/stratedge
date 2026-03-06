@@ -71,19 +71,30 @@ export default function LoadingSpinner({ message = "LOADING DATA...", fullPage =
                     />
                 </svg>
 
-                {/* Center Dot */}
+                {/* Center Logo */}
                 <div style={{
                     position: 'absolute',
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: colors.bull,
-                    boxShadow: `0 0 10px ${colors.bull}`,
+                    width: 24,
+                    height: 24,
                     animation: 'pulseOpacity 1s ease-in-out infinite',
-                }} />
+                }}>
+                    <img
+                        src="/load.png"
+                        alt="Loading"
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                        onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentNode.style.background = colors.bull;
+                            e.target.parentNode.style.borderRadius = '50%';
+                            e.target.parentNode.style.width = '8px';
+                            e.target.parentNode.style.height = '8px';
+                            e.target.parentNode.style.boxShadow = `0 0 10px ${colors.bull}`;
+                        }}
+                    />
+                </div>
             </div>
 
             <div style={{

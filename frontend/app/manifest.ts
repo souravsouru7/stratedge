@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: 'SR Trading - AI Journal',
-        short_name: 'SR Trading',
+        name: 'Stratedge - AI Journal',
+        short_name: 'Stratedge',
         description: 'Professional Trading Journal with AI Analytics',
         start_url: '/',
         display: 'standalone',

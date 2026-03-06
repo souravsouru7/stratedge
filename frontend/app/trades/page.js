@@ -431,18 +431,10 @@ export default function TradesPage() {
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 8,
-            background: "#0F1923",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 2px 8px rgba(15,25,35,0.2)",
-          }}>
-            <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: "#22C78E", letterSpacing: "-1px" }}>S</span>
-            <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: "#F87171", letterSpacing: "-1px" }}>R</span>
-          </div>
+          <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
-              SR TRADING
+              STRATEDGE
             </div>
             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
               FOREX AI JOURNAL
@@ -704,7 +696,7 @@ export default function TradesPage() {
                 SHOWING {filtered.length} OF {trades.length} TRADES
               </span>
               <span style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace" }}>
-                SR TRADING AI JOURNAL
+                STRATEDGE AI JOURNAL
               </span>
             </div>
           )}

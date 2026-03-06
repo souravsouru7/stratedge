@@ -218,16 +218,9 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{
-            width:38, height:38, borderRadius:8, background:"#0F1923",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            boxShadow:"0 2px 8px rgba(15,25,35,0.2)",
-          }}>
-            <span style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:16, color:"#22C78E", letterSpacing:"-1px" }}>S</span>
-            <span style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:800, fontSize:16, color:"#F87171", letterSpacing:"-1px" }}>R</span>
-          </div>
+          <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
-            <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:15, fontWeight:800, letterSpacing:"0.04em", color:"#0F1923", lineHeight:1 }}>SR TRADING</div>
+            <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:15, fontWeight:800, letterSpacing:"0.04em", color:"#0F1923", lineHeight:1 }}>STRATEDGE</div>
             <div style={{ fontSize:9, letterSpacing:"0.18em", color:"#0D9E6E", marginTop:1, fontFamily:"'JetBrains Mono',monospace", fontWeight:600 }}>AI JOURNAL</div>
           </div>
         </div>
@@ -484,7 +477,7 @@ export default function LoginPage() {
 
               {/* Register link */}
               <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:"#94A3B8", fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
-                New to SR Trading?{" "}
+                New to Stratedge?{" "}
                 <span
                   style={{ color:"#0D9E6E", cursor:"pointer", fontWeight:700, borderBottom:"1px solid rgba(13,158,110,0.3)", paddingBottom:1 }}
                   onClick={() => router.push("/register")}

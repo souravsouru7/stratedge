@@ -14,13 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SR Trading - AI Journal",
+  title: "Stratedge - AI Journal",
   description: "Professional Trading Journal with AI Analytics",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/load.png", type: "image/png" },
+    ],
+    shortcut: "/load.png",
+    apple: "/load.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "SR Trading",
+    title: "Stratedge",
   },
   formatDetection: {
     telephone: false,

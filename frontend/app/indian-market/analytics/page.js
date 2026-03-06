@@ -70,18 +70,10 @@ export default function IndianAnalyticsPage() {
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{
-                            width: 38, height: 38, borderRadius: 8,
-                            background: theme.primary,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            boxShadow: "0 2px 8px rgba(27,94,32,0.2)",
-                        }}>
-                            <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: theme.gold, letterSpacing: "-1px" }}>S</span>
-                            <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 800, fontSize: 16, color: "#FFF", letterSpacing: "-1px" }}>R</span>
-                        </div>
+                        <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
                         <div>
                             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
-                                SR TRADING
+                                STRATEDGE
                             </div>
                             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                                 INDIAN MARKET JOURNAL
