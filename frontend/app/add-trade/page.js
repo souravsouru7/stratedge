@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { createTrade } from "@/services/tradeApi";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMarket, MARKETS } from "@/context/MarketContext";
+import InstallPWA from "@/components/InstallPWA";
 
 function AddTradePageContent() {
   const router = useRouter();
@@ -175,7 +176,7 @@ function AddTradePageContent() {
 
   return (
     <div className="p-10 max-w-4xl mx-auto" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <header className="mb-10 flex justify-between items-center">
+      <header className="mb-10 flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
             Log New <span style={{ color: isIndianMarket ? '#1B5E20' : '#0D9E6E' }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
@@ -183,6 +184,9 @@ function AddTradePageContent() {
           <p className="text-gray-500 mt-1 uppercase text-xs tracking-widest font-bold">
             {isIndianMarket ? "NSE / BSE / F&O MARKET ENTRY" : "GLOBAL CURRENCY MARKET ENTRY"}
           </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <InstallPWA />
         </div>
       </header>
 

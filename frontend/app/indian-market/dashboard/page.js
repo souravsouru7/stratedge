@@ -7,6 +7,7 @@ import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import InstallPWA from "@/components/InstallPWA";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Indian Market Theme (Green/Gold)
@@ -289,7 +290,7 @@ export default function IndianMarketDashboard() {
             <header style={{
                 position: "relative", zIndex: 20,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "0 24px", height: 60, flexWrap: "wrap", gap: 10,
+                padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
                 background: "rgba(255,255,255,0.92)",
                 backdropFilter: "blur(20px)",
                 borderBottom: `1px solid ${theme.border}`,
@@ -350,6 +351,7 @@ export default function IndianMarketDashboard() {
                     </nav>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <InstallPWA />
                         <button
                             onClick={() => {
                                 localStorage.removeItem("token");

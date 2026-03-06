@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import InstallPWA from "@/components/InstallPWA";
 import {
   getSummary,
   getRiskRewardAnalysis,
@@ -285,7 +286,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <header style={{
         background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", borderBottom: `1px solid ${colors.border}`,
-        padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, position: "sticky", top: 0, zIndex: 100,
+        padding: "10px 24px", minHeight: 60, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, position: "sticky", top: 0, zIndex: 100,
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -310,6 +311,7 @@ export default function AnalyticsPage() {
           </Link>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <InstallPWA />
           <MarketSwitcher />
           <button
             onClick={() => {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getTrades, deleteTrade } from "@/services/tradeApi";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import InstallPWA from "@/components/InstallPWA";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -420,8 +421,8 @@ export default function TradesPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 24px",
-        height: 60,
+        padding: "10px 24px",
+        minHeight: 60,
         flexWrap: "wrap",
         gap: 10,
         background: "rgba(255,255,255,0.92)",
@@ -472,6 +473,7 @@ export default function TradesPage() {
             ))}
           </nav>
 
+          <InstallPWA />
           <button
             onClick={() => {
               localStorage.removeItem("token");

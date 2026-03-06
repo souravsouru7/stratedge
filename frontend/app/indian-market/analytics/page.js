@@ -9,6 +9,7 @@ import {
 } from "@/services/analyticsApi";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import InstallPWA from "@/components/InstallPWA";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 
 const theme = {
@@ -64,8 +65,8 @@ export default function IndianAnalyticsPage() {
     return (
         <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.primary }}>
             <header style={{
-                background: "#FFF", borderBottom: `1px solid ${theme.border}`, height: 60, padding: "0 24px",
-                display: "flex", alignItems: "center", justifyContent: "space-between"
+                background: "#FFF", borderBottom: `1px solid ${theme.border}`, minHeight: 60, padding: "10px 24px",
+                display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between"
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
@@ -88,7 +89,10 @@ export default function IndianAnalyticsPage() {
                         </div>
                     </Link>
                 </div>
-                <MarketSwitcher />
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <InstallPWA />
+                    <MarketSwitcher />
+                </div>
             </header>
 
             <main style={{ padding: "28px 20px", maxWidth: 1000, margin: "0 auto" }}>

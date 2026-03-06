@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import InstallPWA from "@/components/InstallPWA";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -380,7 +381,7 @@ function UploadTradeContent() {
       <div style={{ position: "fixed", bottom: -100, right: -60, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(13,158,110,0.06) 0%,transparent 70%)", zIndex: 1, pointerEvents: "none" }} />
 
       {/* ── HEADER ── */}
-      <header style={{ position: "relative", zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", height: 60, flexWrap: "wrap", gap: 10, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E2E8F0", boxShadow: "0 1px 12px rgba(15,25,35,0.06)" }}>
+      <header style={{ position: "relative", zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E2E8F0", boxShadow: "0 1px 12px rgba(15,25,35,0.06)" }}>
 
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -407,6 +408,7 @@ function UploadTradeContent() {
             <span style={{ fontSize: 10, letterSpacing: "0.1em", color: "#0D9E6E", fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>MARKET OPEN</span>
           </div>
 
+          <InstallPWA />
           <MarketSwitcher />
         </div>
       </header>

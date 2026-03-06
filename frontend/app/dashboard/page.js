@@ -6,6 +6,7 @@ import { getSummary } from "@/services/analyticsApi";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import InstallPWA from "@/components/InstallPWA";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -513,7 +514,7 @@ export default function Dashboard() {
       <header style={{
         position: "relative", zIndex: 20,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 24px", height: 60, flexWrap: "wrap", gap: 10,
+        padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
         background: "rgba(255,255,255,0.92)",
         backdropFilter: "blur(20px)",
         borderBottom: "1px solid #E2E8F0",
@@ -574,6 +575,7 @@ export default function Dashboard() {
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <InstallPWA />
             <button
               onClick={() => {
                 localStorage.removeItem("token");
