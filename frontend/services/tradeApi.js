@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://api.stratedge.live/api";
 
 // Helper to get base URL based on market
 const getBaseUrl = (marketType) => {

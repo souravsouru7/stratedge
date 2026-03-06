@@ -260,7 +260,7 @@ export default function UploadTrade() {
       formData.append("image", file);
       formData.append("marketType", marketType); // Send marketType
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/upload?marketType=${marketType}`, {
+      const res = await fetch(`https://api.stratedge.live/api/upload?marketType=${marketType}`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
