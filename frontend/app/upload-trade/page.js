@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { createTrade } from "@/services/tradeApi";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -17,7 +17,7 @@ import MarketSwitcher from "@/components/MarketSwitcher";
    Text:         #0F1923 / #4A5568 / #94A3B8
    Border:       #E2E8F0
    Fonts:        Plus Jakarta Sans + JetBrains Mono
-───────────────────────────────────────── */
+ ───────────────────────────────────────── */
 
 /* ── CANDLESTICK BACKGROUND ── */
 function CandlestickBackground() {
@@ -228,8 +228,8 @@ function SectionCard({ accentColor = "#0D9E6E", title, subtitle, children, delay
 
 /* ─────────────────────────────────────────
    MAIN COMPONENT
-───────────────────────────────────────── */
-export default function UploadTrade() {
+ ───────────────────────────────────────── */
+function UploadTradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentMarket } = useMarket();
@@ -670,5 +670,13 @@ export default function UploadTrade() {
         @media (max-width: 640px) { main { padding: 16px 12px !important; } }
       `}</style>
     </div>
+  );
+}
+
+export default function UploadTrade() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Loading extractor...</div>}>
+      <UploadTradeContent />
+    </Suspense>
   );
 }

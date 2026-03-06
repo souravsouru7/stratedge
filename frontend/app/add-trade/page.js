@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { createTrade } from "@/services/tradeApi";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 
-export default function AddTradePage() {
+function AddTradePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentMarket, getCurrencySymbol, isIndianMarket } = useMarket();
@@ -371,5 +371,13 @@ export default function AddTradePage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function AddTradePage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Loading form...</div>}>
+      <AddTradePageContent />
+    </Suspense>
   );
 }
