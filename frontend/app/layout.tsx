@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Stratedge",
+    startupImage: "/load.png",
   },
   formatDetection: {
     telephone: false,
