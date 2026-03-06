@@ -34,3 +34,37 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+High‑impact analytics ideas for your journal
+Here are concise, “impressive but useful” analytics you can add on top of what you already have:
+
+Behavior & discipline
+
+Rule vs Emotion score: % of trades tagged Plan vs Emotion/Impulsive, plus P&L per category.
+Plan adherence timeline: small chart showing how often they follow plan over weeks.
+Revenge trading detector: highlight sequences where user increases size right after a loss.
+Risk & sizing
+
+Risk per trade heatmap: actual (R) risked per trade vs target (e.g. 0.5R–2R); flag oversizing.
+Position size consistency: variance of lot size or ₹ risk; show “Stable / Swingy” risk behavior.
+Max risk exposure per day: sum of risk in open trades vs account size.
+Session & time behavior (now using user session)
+
+Session edge card: for each session (Asia/London/NY), show WR, avg R, and “Green/Red” tag.
+Energy curve: profit by hour of day (local time); mark “focus hours” vs “danger hours”.
+Psychological patterns
+
+After-win / after-loss behavior: WR and avg R:R for trades taken immediately after a big win or big loss.
+Tilt alert: detect days where 3+ losing trades in a row with increasing size.
+Strategy performance
+
+League table of strategies: WR, avg R, profit, and trade count per strategy, ranked.
+Strategy stability: rolling 10‑trade WR per strategy to show which edges are degrading.
+Consistency & quality scores
+
+Weekly consistency index: combines number of trades, adherence, and variance of P&L to rate each week.
+Execution quality score per trade: simple 0–100 combining: had SL, had TP, RR ≥ target, followed session/strategy rules.
+Narrative insights
+
+Plain‑language weekly review: “This week you followed your plan on 70% of trades, made most of your profit in New York, and lost mainly when trading outside your focus hours.”
+Next‑week checklist: 3 auto‑generated, specific action items (e.g. “Avoid new trades after 3 consecutive losses”, “Trade only New York session for EURUSD”).
+.

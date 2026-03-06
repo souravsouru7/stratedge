@@ -98,7 +98,10 @@ exports.parseTrade = (text) => {
 };
 
 exports.parseIndianTrade = (text) => {
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
   let pair = null; // Symbol
   let quantity = null;
@@ -111,55 +114,110 @@ exports.parseIndianTrade = (text) => {
   let strikePrice = null;
   let expiryDate = null;
 
+  // First, try to capture “Total P&L / Overall P&L” style lines
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Examples (from Indian broker apps):
+    // "Total P&L  +4,132.50"
+    // "Overall P&L  -5,367.00 on 1 positions"
+    const overallMatch = line.match(
+      /(Total|Overall)\s*P&L[^\d\-+]*([+\-]?\s*[\d,]+(?:\.\d+)?)/
+    );
+    if (overallMatch && !profit) {
+      const numeric = overallMatch[2].replace(/\s+/g, "").replace(/,/g, "");
+      const parsed = parseFloat(numeric);
+      if (!Number.isNaN(parsed)) {
+        profit = parsed;
+      }
+    }
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     // Symbol / Instrument Name
-    // Pattern: Look for uppercase words, sometimes with dates and numbers for F&O
-    // e.g., NIFTY 24 MAR 22000 CE, RELIANCE, HDFCBANK
-    const instrumentMatch = line.match(/^([A-Z\&0-9]{2,}\s*(?:\d+\s*[A-Z]{3})?.*(?:CE|PE|FUT)?)$/i);
-    if (instrumentMatch && !pair && !line.match(/Avg|Price|Qty|Quantity|Profit|P&L/i)) {
+    // Handles: "NIFTY 09TH DEC 26000 PE", "SENSEX 27 NOV 85600 CALL" etc.
+    const instrumentMatch = line.match(
+      /^([A-Z&0-9]{2,}(?:\s+\d{1,2}(?:ST|ND|RD|TH)?)?(?:\s+[A-Z]{3})?(?:\s+\d+)?(?:\s+(?:CE|PE|CALL|PUT|FUT))?)$/i
+    );
+    if (
+      instrumentMatch &&
+      !pair &&
+      !line.match(/Avg|Price|Qty|Quantity|Profit|P&L|Orders?/i)
+    ) {
       pair = instrumentMatch[1].trim();
-      if (pair.match(/CE|PE/i)) {
+
+      // Infer segment / instrument type from keywords
+      if (pair.match(/CE|PE|CALL|PUT/i)) {
         segment = "F&O";
         instrumentType = "OPTION";
-        const strikeMatch = pair.match(/(\d+)\s*(?:CE|PE)/i);
-        if (strikeMatch) strikePrice = strikeMatch[1];
+        const strikeMatch = pair.match(/(\d+)\s*(?:CE|PE|CALL|PUT)/i);
+        if (strikeMatch) {
+          strikePrice = strikeMatch[1];
+        }
       } else if (pair.match(/FUT/i)) {
         segment = "F&O";
         instrumentType = "FUTURE";
       }
     }
 
-    // Quantity
-    const qtyMatch = line.match(/(?:Qty|Quantity|Lots?)[:\s]*(\d+)/i);
+    // Quantity (from contract-note style or some apps)
+    const qtyMatch = line.match(/(?:Qty|Quantity|Lots?)[:\s]*([\d,]+)/i);
     if (qtyMatch) {
-      quantity = qtyMatch[1];
+      quantity = qtyMatch[1].replace(/,/g, "");
     }
 
     // Entry Price (Avg. Price)
-    const entryMatch = line.match(/(?:Avg\.?\s*Price|Average\s*Price|Entry)[:\s]*(\d+\.?\d*)/i);
+    const entryMatch = line.match(
+      /(?:Avg\.?\s*Price|Average\s*Price|Entry)[:\s]*([\d,]+\.?\d*)/i
+    );
     if (entryMatch) {
-      entryPrice = entryMatch[1];
+      entryPrice = entryMatch[1].replace(/,/g, "");
     }
 
     // Exit Price (LTP/CMP)
-    const exitMatch = line.match(/(?:LTP|CMP|Exit\s*Price)[:\s]*(\d+\.?\d*)/i);
+    const exitMatch = line.match(
+      /(?:LTP|CMP|Exit\s*Price)[:\s]*([\d,]+\.?\d*)/i
+    );
     if (exitMatch) {
-      exitPrice = exitMatch[1];
+      exitPrice = exitMatch[1].replace(/,/g, "");
     }
 
-    // Profit (P&L)
-    const profitMatch = line.match(/(?:Realized\s*)?P\s*&\s*L|Profit[:\s]*([-+]?\d+\.?\d*)/i);
-    if (profitMatch) {
-      profit = profitMatch[1];
+    // Profit (P&L) – row‑level P&L if present.
+    // NOTE: The regex has an alternation; only use the capturing group when it exists.
+    const profitMatch = line.match(
+      /(?:Realized\s*)?P\s*&\s*L[:\s]*([+\-]?\s*[\d,]+\.?\d*)|Profit[:\s]*([+\-]?\s*[\d,]+\.?\d*)/i
+    );
+    if (profitMatch && !profit) {
+      const captured =
+        (profitMatch[1] && profitMatch[1].trim().length > 0
+          ? profitMatch[1]
+          : profitMatch[2]) || null;
+      if (captured) {
+        const numeric = captured.replace(/\s+/g, "").replace(/,/g, "");
+        const parsed = parseFloat(numeric);
+        if (!Number.isNaN(parsed)) {
+          profit = parsed;
+        }
+      }
     }
 
-    // Fallback Profit: Large numbers with + or -
+    // Fallback Profit: standalone number right after a P&L label
     if (!profit) {
-      const fallbackProfit = line.match(/^([-+]?\s*\d+\.?\d*)$/);
-      if (fallbackProfit && i > 0 && lines[i - 1].match(/P\s*&\s*L|Profit/i)) {
-        profit = fallbackProfit[1].replace(/\s+/g, '');
+      const fallbackProfit = line.match(/^([+\-]?\s*[\d,]+\.?\d*)$/);
+      if (
+        fallbackProfit &&
+        i > 0 &&
+        lines[i - 1].match(/P\s*&\s*L|Profit/i)
+      ) {
+        const numeric = fallbackProfit[1]
+          .replace(/\s+/g, "")
+          .replace(/,/g, "");
+        const parsed = parseFloat(numeric);
+        if (!Number.isNaN(parsed)) {
+          profit = parsed;
+        }
       }
     }
   }
@@ -170,11 +228,11 @@ exports.parseIndianTrade = (text) => {
     quantity: quantity ? parseFloat(quantity) : null,
     entryPrice: entryPrice ? parseFloat(entryPrice) : null,
     exitPrice: exitPrice ? parseFloat(exitPrice) : null,
-    profit: profit ? parseFloat(profit) : null,
+    profit: profit != null ? profit : null,
     segment,
     instrumentType,
     strikePrice: strikePrice ? parseFloat(strikePrice) : null,
     expiryDate: expiryDate || null,
-    marketType: 'Indian_Market'
+    marketType: "Indian_Market",
   };
 };

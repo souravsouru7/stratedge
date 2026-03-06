@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { API_URL } from "@/config/api";
 
 export default function UploadPage() {
 
@@ -25,7 +26,7 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append("image", file);
 
-      const res = await fetch("https://api.stratedge.live/api/upload", {
+      const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData
       });

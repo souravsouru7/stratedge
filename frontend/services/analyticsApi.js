@@ -1,4 +1,4 @@
-const BASE_URL = "https://api.stratedge.live/api";
+import { API_URL as BASE_URL } from "@/config/api";
 
 // Helper to get base URL based on market
 const getBaseUrl = (marketType) => {

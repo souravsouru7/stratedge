@@ -122,42 +122,77 @@ exports.getRiskRewardAnalysis = async (req, res) => {
 
     // Calculate planned R:R from SL/TP (only for trades with stopLoss and takeProfit)
     let plannedRR = 0;
-    let totalRR = 0;
+    let totalRRFromPrices = 0;
     let totalRisk = 0;
     let tradesCountedForRR = 0;
 
+    // Additionally, calculate average R:R purely from the manual field
+    // (riskRewardRatio / riskRewardCustom) so the UI reflects what the
+    // trader actually planned (e.g. 1:2), without being distorted by
+    // tiny price differences or P&L.
+    let fieldRRTotal = 0;
+    let fieldRRCount = 0;
+
     trades.forEach(trade => {
-      let tradeRR = 0;
-      let hasValidPrices = trade.entryPrice && trade.stopLoss && trade.takeProfit && Math.abs(trade.entryPrice - trade.stopLoss) > 0;
+      let tradeRRFromPrices = 0;
+      const hasValidPrices =
+        trade.entryPrice &&
+        trade.stopLoss &&
+        trade.takeProfit &&
+        Math.abs(trade.entryPrice - trade.stopLoss) > 0;
 
       if (hasValidPrices) {
         const risk = Math.abs(trade.entryPrice - trade.stopLoss);
         const reward = Math.abs(trade.takeProfit - trade.entryPrice);
-        tradeRR = reward / risk;
+        tradeRRFromPrices = reward / risk;
         totalRisk += risk;
       }
 
-      // Fallback to stored riskRewardRatio if price-based RR is 0 or invalid
-      if (tradeRR <= 0 && trade.riskRewardRatio) {
+      // Always try to read the explicit riskRewardRatio field
+      let tradeRRFromField = 0;
+      if (trade.riskRewardRatio) {
         if (trade.riskRewardRatio === "custom" && trade.riskRewardCustom) {
-          const customVal = parseFloat(trade.riskRewardCustom.split(":")[1]);
-          if (!isNaN(customVal)) tradeRR = customVal;
+          const parts = trade.riskRewardCustom.split(":");
+          if (parts.length === 2) {
+            const customVal = parseFloat(parts[1]);
+            if (!isNaN(customVal)) tradeRRFromField = customVal;
+          }
         } else if (trade.riskRewardRatio.includes(":")) {
-          const val = parseFloat(trade.riskRewardRatio.split(":")[1]);
-          if (!isNaN(val)) tradeRR = val;
+          const parts = trade.riskRewardRatio.split(":");
+          if (parts.length === 2) {
+            const val = parseFloat(parts[1]);
+            if (!isNaN(val)) tradeRRFromField = val;
+          }
         }
       }
 
-      if (tradeRR > 0) {
-        totalRR += tradeRR;
+      // Aggregate price‑based RR (for risk per trade etc.)
+      if (tradeRRFromPrices > 0) {
+        totalRRFromPrices += tradeRRFromPrices;
         tradesCountedForRR++;
+      }
+
+      // Aggregate field‑based RR for the "planned" average shown in UI
+      if (tradeRRFromField > 0) {
+        fieldRRTotal += tradeRRFromField;
+        fieldRRCount++;
       }
     });
 
-    plannedRR = tradesCountedForRR > 0 ? totalRR / tradesCountedForRR : 0;
+    plannedRR = tradesCountedForRR > 0 ? totalRRFromPrices / tradesCountedForRR : 0;
 
-    // Use planned RR if available, otherwise use realized RR
-    const avgRR = plannedRR > 0 ? plannedRR : actualRR;
+    // For the avgRR we return to the client:
+    // 1) Prefer the explicit RR field entered by the user (1:2, 1:3, custom)
+    // 2) Fallback to price‑based planned RR
+    // 3) Finally, fallback to realized RR from P&L
+    let avgRR = 0;
+    if (fieldRRCount > 0) {
+      avgRR = fieldRRTotal / fieldRRCount;
+    } else if (plannedRR > 0) {
+      avgRR = plannedRR;
+    } else {
+      avgRR = actualRR;
+    }
     const riskPerTrade = tradesCountedForRR > 0 ? totalRisk / tradesCountedForRR : 0;
 
     // Calculate expectancy
@@ -434,53 +469,76 @@ exports.getTimeAnalysis = async (req, res) => {
     let worstDay = ["0", { profit: 0, winRate: 0 }];
 
     if (dayEntries.length > 0) {
-      if (dayEntries.length === 1) {
-        // Only one day has trades - best and worst are the same
-        bestDay = dayEntries[0];
-        worstDay = ["0", { profit: 0, winRate: 0 }]; // No comparison possible
-      } else {
-        bestDay = dayEntries.reduce((a, b) => parseFloat(a[1].profit) > parseFloat(b[1].profit) ? a : b);
-        worstDay = dayEntries.reduce((a, b) => parseFloat(a[1].profit) < parseFloat(b[1].profit) ? a : b);
+      // Worst day is always the lowest profit (most negative).
+      worstDay = dayEntries.reduce((a, b) =>
+        parseFloat(a[1].profit) < parseFloat(b[1].profit) ? a : b
+      );
+
+      // Best day should only be counted if there is at least one POSITIVE day.
+      const positiveDays = dayEntries.filter(
+        ([_, d]) => parseFloat(d.profit) > 0
+      );
+      if (positiveDays.length > 0) {
+        bestDay = positiveDays.reduce((a, b) =>
+          parseFloat(a[1].profit) > parseFloat(b[1].profit) ? a : b
+        );
       }
     }
 
-    const bestDayWinRate = dayEntries.length > 1 ? dayEntries.reduce((a, b) => parseFloat(a[1].winRate) > parseFloat(b[1].winRate) ? a : b) : ["0", { winRate: 0 }];
-    const worstDayWinRate = dayEntries.length > 1 ? dayEntries.reduce((a, b) => parseFloat(a[1].winRate) < parseFloat(b[1].winRate) ? a : b) : ["0", { winRate: 0 }];
+    const bestDayWinRate =
+      dayEntries.length > 1
+        ? dayEntries.reduce((a, b) =>
+            parseFloat(a[1].winRate) > parseFloat(b[1].winRate) ? a : b
+          )
+        : ["0", { winRate: 0 }];
+    const worstDayWinRate =
+      dayEntries.length > 1
+        ? dayEntries.reduce((a, b) =>
+            parseFloat(a[1].winRate) < parseFloat(b[1].winRate) ? a : b
+          )
+        : ["0", { winRate: 0 }];
 
     const hourEntries = Object.entries(byHour).filter(([_, h]) => h.total > 0);
     let bestHour = [0, { profit: 0, winRate: 0 }];
     let worstHour = [0, { profit: 0, winRate: 0 }];
 
     if (hourEntries.length > 0) {
-      if (hourEntries.length === 1) {
-        // Only one hour has trades - best and worst are the same
-        bestHour = hourEntries[0];
-        worstHour = [0, { profit: 0, winRate: 0 }]; // No comparison possible
-      } else {
-        bestHour = hourEntries.reduce((a, b) => parseFloat(a[1].profit) > parseFloat(b[1].profit) ? a : b);
-        worstHour = hourEntries.reduce((a, b) => parseFloat(a[1].profit) < parseFloat(b[1].profit) ? a : b);
+      // Worst hour is always the lowest profit.
+      worstHour = hourEntries.reduce((a, b) =>
+        parseFloat(a[1].profit) < parseFloat(b[1].profit) ? a : b
+      );
+
+      // Best hour only if there is at least one positive hour.
+      const positiveHours = hourEntries.filter(
+        ([_, h]) => parseFloat(h.profit) > 0
+      );
+      if (positiveHours.length > 0) {
+        bestHour = positiveHours.reduce((a, b) =>
+          parseFloat(a[1].profit) > parseFloat(b[1].profit) ? a : b
+        );
       }
     }
 
     const bestHourWinRate = hourEntries.length > 1 ? hourEntries.reduce((a, b) => parseFloat(a[1].winRate) > parseFloat(b[1].winRate) ? a : b) : [0, { winRate: 0 }];
 
     // Session Analysis
-    const bySession = {
-      "Asia (00-08 UTC)": { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 },
-      "London (08-16 UTC)": { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 },
-      "NY (13-21 UTC)": { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 },
-      "Overlap (13-16 UTC)": { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 },
-      "Off Session": { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 }
-    };
+    // IMPORTANT: Only respect the session explicitly chosen by the user
+    // (trade.session). If none is set, bucket into "Unspecified", but we
+    // don't treat that as a "best" session in the summary.
+    const bySession = {};
 
     trades.forEach(t => {
-      const hour = new Date(t.createdAt).getUTCHours();
-      let session = "Off Session";
-
-      if (hour >= 0 && hour < 8) session = "Asia (00-08 UTC)";
-      else if (hour >= 8 && hour < 13) session = "London (08-16 UTC)";
-      else if (hour >= 13 && hour < 16) session = "Overlap (13-16 UTC)";
-      else if (hour >= 16 && hour < 21) session = "NY (13-21 UTC)";
+      const session = t.session || "Unspecified";
+      if (!bySession[session]) {
+        bySession[session] = {
+          total: 0,
+          wins: 0,
+          losses: 0,
+          profit: 0,
+          winRate: 0,
+          avgProfit: 0
+        };
+      }
 
       bySession[session].total++;
       if (t.profit > 0) bySession[session].wins++;
@@ -489,26 +547,41 @@ exports.getTimeAnalysis = async (req, res) => {
     });
 
     Object.keys(bySession).forEach(session => {
-      bySession[session].winRate = bySession[session].total ? ((bySession[session].wins / bySession[session].total) * 100).toFixed(1) : 0;
-      bySession[session].avgProfit = bySession[session].total ? (bySession[session].profit / bySession[session].total).toFixed(2) : 0;
+      const s = bySession[session];
+      s.winRate = s.total ? ((s.wins / s.total) * 100).toFixed(1) : 0;
+      s.avgProfit = s.total ? (s.profit / s.total).toFixed(2) : 0;
     });
 
-    const sessionEntries = Object.entries(bySession).filter(([_, s]) => s.total > 0);
+    const sessionEntries = Object.entries(bySession).filter(
+      ([name, s]) => name !== "Unspecified" && s.total > 0
+    );
 
     let bestSession = ["0", { profit: 0, winRate: 0, total: 0 }];
     let worstSession = ["0", { profit: 0, winRate: 0, total: 0 }];
 
     if (sessionEntries.length > 0) {
-      // Best session is the one with highest profit
-      bestSession = sessionEntries.reduce((a, b) => parseFloat(a[1].profit) > parseFloat(b[1].profit) ? a : b);
+      // Worst session is always the lowest profit.
+      worstSession = sessionEntries.reduce((a, b) =>
+        parseFloat(a[1].profit) < parseFloat(b[1].profit) ? a : b
+      );
 
-      // Worst session only makes sense if there are 2+ sessions to compare
-      if (sessionEntries.length > 1) {
-        worstSession = sessionEntries.reduce((a, b) => parseFloat(a[1].profit) < parseFloat(b[1].profit) ? a : b);
+      // Best session only if there is at least one positive session.
+      const positiveSessions = sessionEntries.filter(
+        ([_, s]) => parseFloat(s.profit) > 0
+      );
+      if (positiveSessions.length > 0) {
+        bestSession = positiveSessions.reduce((a, b) =>
+          parseFloat(a[1].profit) > parseFloat(b[1].profit) ? a : b
+        );
       }
     }
 
-    const bestSessionWR = sessionEntries.length > 1 ? sessionEntries.reduce((a, b) => parseFloat(a[1].winRate) > parseFloat(b[1].winRate) ? a : b) : ["0", { winRate: 0, total: 0 }];
+    const bestSessionWR =
+      sessionEntries.length > 1
+        ? sessionEntries.reduce((a, b) =>
+            parseFloat(a[1].winRate) > parseFloat(b[1].winRate) ? a : b
+          )
+        : ["0", { winRate: 0, total: 0 }];
 
     res.json({
       byMonth,
@@ -725,30 +798,22 @@ exports.getAIInsights = async (req, res) => {
     else insights.push(`📉 Currently in drawdown - Stay disciplined and follow your rules`);
 
     // Session Analysis
-    const bySession = {
-      "Asia (00-08 UTC)": { profit: 0, wins: 0, total: 0 },
-      "London (08-16 UTC)": { profit: 0, wins: 0, total: 0 },
-      "NY (13-21 UTC)": { profit: 0, wins: 0, total: 0 },
-      "Overlap (13-16 UTC)": { profit: 0, wins: 0, total: 0 }
-    };
+    // Session stats driven only by the explicit trade.session value.
+    const bySession = {};
 
     trades.forEach(t => {
-      const hour = new Date(t.createdAt).getUTCHours();
-      let session = null;
-
-      if (hour >= 0 && hour < 8) session = "Asia (00-08 UTC)";
-      else if (hour >= 8 && hour < 13) session = "London (08-16 UTC)";
-      else if (hour >= 13 && hour < 16) session = "Overlap (13-16 UTC)";
-      else if (hour >= 16 && hour < 21) session = "NY (13-21 UTC)";
-
-      if (session) {
-        bySession[session].total++;
-        bySession[session].profit += t.profit || 0;
-        if (t.profit > 0) bySession[session].wins++;
+      const session = t.session || "Unspecified";
+      if (!bySession[session]) {
+        bySession[session] = { profit: 0, wins: 0, total: 0 };
       }
+      bySession[session].total++;
+      bySession[session].profit += t.profit || 0;
+      if (t.profit > 0) bySession[session].wins++;
     });
 
-    const sessionEntries = Object.entries(bySession).filter(([_, s]) => s.total > 0);
+    const sessionEntries = Object.entries(bySession).filter(
+      ([name, s]) => name !== "Unspecified" && s.total > 0
+    );
     if (sessionEntries.length > 0) {
       const bestSession = sessionEntries.reduce((a, b) => a[1].profit > b[1].profit ? a : b);
       const bestWR = sessionEntries.reduce((a, b) => (a[1].wins / a[1].total) > (b[1].wins / b[1].total) ? a : b);
