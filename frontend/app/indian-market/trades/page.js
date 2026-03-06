@@ -79,42 +79,43 @@ function TradeRow({ trade, onDelete, idx }) {
                 }}>
                     {trade.type?.toUpperCase() === "LONG" ? "▲ LONG" : "▼ SHORT"}
                 </span>
-                <td style={{ padding: "14px 16px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: theme.primary }}>{trade.segment || 'N/A'}</div>
-                    <div style={{ fontSize: 9, color: theme.muted, letterSpacing: '0.05em' }}>{trade.instrumentType || 'SPOT'}</div>
-                </td>
-                <td style={{ padding: "14px 16px" }}>
-                    <span style={{
-                        fontSize: 9, letterSpacing: "0.08em",
-                        color: trade.entryBasis === "Plan" ? theme.primary : trade.entryBasis === "Emotion" ? theme.bear : "#B8860B",
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                    }}>
-                        {trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}
-                    </span>
-                </td>
-                <td style={{ padding: "14px 16px" }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700, color: bull ? theme.bull : theme.bear }}>
-                        {bull ? "+" : ""}₹{Math.abs(profitNum).toLocaleString('en-IN')}
-                    </span>
-                </td>
-                <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                        <Link href={`/trades/${trade._id}`} style={{
-                            fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
-                            color: theme.bull, border: `1px solid ${theme.bull}55`,
-                            background: `${theme.bull}11`, borderRadius: 4,
-                            padding: "5px 12px", textDecoration: "none"
-                        }}>VIEW</Link>
-                        <button onClick={() => onDelete(trade)} style={{
-                            fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
-                            color: theme.bear, border: `1px solid ${theme.bear}55`,
-                            background: `${theme.bear}11`, borderRadius: 4,
-                            padding: "5px 12px", cursor: "pointer"
-                        }}>DELETE</button>
-                    </div>
-                </td>
+            </td>
+            <td style={{ padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: theme.primary }}>{trade.segment || 'N/A'}</div>
+                <div style={{ fontSize: 9, color: theme.muted, letterSpacing: '0.05em' }}>{trade.instrumentType || 'SPOT'}</div>
+            </td>
+            <td style={{ padding: "14px 16px" }}>
+                <span style={{
+                    fontSize: 9, letterSpacing: "0.08em",
+                    color: trade.entryBasis === "Plan" ? theme.primary : trade.entryBasis === "Emotion" ? theme.bear : "#B8860B",
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                }}>
+                    {trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}
+                </span>
+            </td>
+            <td style={{ padding: "14px 16px" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700, color: bull ? theme.bull : theme.bear }}>
+                    {bull ? "+" : ""}₹{Math.abs(profitNum).toLocaleString('en-IN')}
+                </span>
+            </td>
+            <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <Link href={`/trades/${trade._id}`} style={{
+                        fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
+                        color: theme.bull, border: `1px solid ${theme.bull}55`,
+                        background: `${theme.bull}11`, borderRadius: 4,
+                        padding: "5px 12px", textDecoration: "none"
+                    }}>VIEW</Link>
+                    <button onClick={() => onDelete(trade)} style={{
+                        fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
+                        color: theme.bear, border: `1px solid ${theme.bear}55`,
+                        background: `${theme.bear}11`, borderRadius: 4,
+                        padding: "5px 12px", cursor: "pointer"
+                    }}>DELETE</button>
+                </div>
+            </td>
         </tr >
     );
 }
