@@ -334,19 +334,56 @@ export default function AnalyticsPage() {
       <div style={{ padding: "24px 20px", maxWidth: 1200, margin: "0 auto" }}>
 
         {/* AI Insights Section */}
-        {aiInsights && aiInsights.insights && aiInsights.insights.length > 0 && (
+        {aiInsights && (
           <div style={{ marginBottom: 24, animation: "fadeUp 0.5s ease both" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: colors.gold, letterSpacing: "0.1em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: colors.gold, animation: "pulse 2s infinite" }} />
               AI POWERED INSIGHTS
             </div>
-            {aiInsights.insights.slice(0, 4).map((insight, i) => (
+
+            {/* Textual bullets from backend */}
+            {aiInsights.insights && aiInsights.insights.length > 0 && aiInsights.insights.slice(0, 4).map((insight, i) => (
               <InsightTag
                 key={i}
                 text={insight}
                 type={insight.includes("🔥") || insight.includes("💰") || insight.includes("🌏") ? "success" : insight.includes("⚠️") ? "warning" : "info"}
               />
             ))}
+
+            {/* Behavior & discipline quick view */}
+            {aiInsights.behaviorDiscipline && (
+              <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <StatCard
+                  label="PLAN VS EMOTION"
+                  value={`${aiInsights.behaviorDiscipline.ruleEmotion?.planPct || 0}%`}
+                  sub={`Plan trades • Emotion: ${aiInsights.behaviorDiscipline.ruleEmotion?.emotionPct || 0}%`}
+                  color={parseFloat(aiInsights.behaviorDiscipline.ruleEmotion?.planPct || 0) >= 70 ? colors.bull : colors.bear}
+                  delay={0.05}
+                />
+                <StatCard
+                  label="REVENGE TRADES"
+                  value={aiInsights.behaviorDiscipline.revengeTradesCount || 0}
+                  sub="Size increased right after a loss"
+                  color={(aiInsights.behaviorDiscipline.revengeTradesCount || 0) > 0 ? colors.bear : colors.bull}
+                  delay={0.1}
+                />
+              </div>
+            )}
+
+            {/* If advanced analytics are not available yet (too few trades) */}
+            {!aiInsights.behaviorDiscipline && (
+              <div style={{
+                marginTop: 12,
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: `1px dashed ${colors.border}`,
+                background: "#F8FAFC",
+                fontSize: 11,
+                color: colors.secondary
+              }}>
+                Advanced behavior, session and weekly coaching analytics unlock after you log at least 5 Forex trades with proper details (plan tag, session, strategy). Keep journaling a few more trades to see those sections.
+              </div>
+            )}
           </div>
         )}
 
@@ -719,16 +756,42 @@ export default function AnalyticsPage() {
             )}
           </SectionCard>
 
-          {/* AI Recommendations */}
+          {/* AI Recommendations + Weekly Coaching */}
           <SectionCard title="AI Recommendations" subtitle="ACTIONABLE INSIGHTS" delay={0.85} accentColor={colors.gold}>
             {aiInsights?.recommendations && aiInsights.recommendations.length > 0 ? (
-              <div>
+              <div style={{ marginBottom: 12 }}>
                 {aiInsights.recommendations.slice(0, 5).map((rec, i) => (
                   <InsightTag key={i} text={rec} type={rec.includes("⚠️") ? "warning" : "success"} />
                 ))}
               </div>
             ) : (
-              <div style={{ color: colors.muted, textAlign: "center", padding: 20 }}>Keep trading to get recommendations</div>
+              <div style={{ color: colors.muted, textAlign: "center", padding: 12 }}>Keep trading to get recommendations</div>
+            )}
+
+            {/* Weekly narrative + next week checklist from backend */}
+            {aiInsights?.weeklyNarrative && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: colors.secondary, marginBottom: 4 }}>
+                  Weekly Review
+                </div>
+                <div style={{ fontSize: 12, color: colors.primary, marginBottom: 8 }}>
+                  {aiInsights.weeklyNarrative}
+                </div>
+                {Array.isArray(aiInsights.nextWeekChecklist) && aiInsights.nextWeekChecklist.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: colors.secondary, marginBottom: 4 }}>
+                      Next Week Checklist
+                    </div>
+                    <ul style={{ paddingLeft: 18, margin: 0 }}>
+                      {aiInsights.nextWeekChecklist.slice(0, 3).map((item, idx) => (
+                        <li key={idx} style={{ fontSize: 11, color: colors.muted, marginBottom: 2 }}>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
           </SectionCard>
 

@@ -2,14 +2,12 @@ const User = require("../models/Users");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-
 // Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d"
   });
 };
-
 
 // Register User
 exports.registerUser = async (req, res) => {
@@ -47,7 +45,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
 // Login User
 exports.loginUser = async (req, res) => {
   try {
@@ -69,6 +66,25 @@ exports.loginUser = async (req, res) => {
       res.status(401).json({ message: "Invalid credentials" });
     }
 
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get current user's basic profile
+exports.getMe = async (req, res) => {
+  try {
+    // `protect` middleware attaches the full user document (without password)
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    res.json({
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      createdAt: req.user.createdAt
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

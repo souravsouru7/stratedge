@@ -797,8 +797,7 @@ exports.getAIInsights = async (req, res) => {
     if (totalProfit > 0) insights.push(`💰 Total profit: $${totalProfit.toFixed(2)} - Keep up the good work!`);
     else insights.push(`📉 Currently in drawdown - Stay disciplined and follow your rules`);
 
-    // Session Analysis
-    // Session stats driven only by the explicit trade.session value.
+    // Session Analysis (used for both insights and structured analytics)
     const bySession = {};
 
     trades.forEach(t => {
@@ -814,18 +813,34 @@ exports.getAIInsights = async (req, res) => {
     const sessionEntries = Object.entries(bySession).filter(
       ([name, s]) => name !== "Unspecified" && s.total > 0
     );
-    if (sessionEntries.length > 0) {
-      const bestSession = sessionEntries.reduce((a, b) => a[1].profit > b[1].profit ? a : b);
-      const bestWR = sessionEntries.reduce((a, b) => (a[1].wins / a[1].total) > (b[1].wins / b[1].total) ? a : b);
 
-      if (bestSession[1].profit > 0) {
-        insights.push(`🌏 Best trading session: ${bestSession[0]} ($${bestSession[1].profit.toFixed(2)})`);
+    let bestSessionEntry = null;
+    let bestSessionWinRateEntry = null;
+
+    if (sessionEntries.length > 0) {
+      bestSessionEntry = sessionEntries.reduce((a, b) => a[1].profit > b[1].profit ? a : b);
+      bestSessionWinRateEntry = sessionEntries.reduce(
+        (a, b) => (a[1].wins / a[1].total) > (b[1].wins / b[1].total) ? a : b
+      );
+
+      if (bestSessionEntry[1].profit > 0) {
+        insights.push(`🌏 Best trading session: ${bestSessionEntry[0]} ($${bestSessionEntry[1].profit.toFixed(2)})`);
       }
-      insights.push(`📈 Highest win rate: ${bestWR[0]} (${((bestWR[1].wins / bestWR[1].total) * 100).toFixed(1)}%)`);
+      insights.push(
+        `📈 Highest win rate: ${bestSessionWinRateEntry[0]} (${(
+          (bestSessionWinRateEntry[1].wins / bestSessionWinRateEntry[1].total) *
+          100
+        ).toFixed(1)}%)`
+      );
 
       // Recommendations for sessions
-      if (bestSession[0] !== "London (08-16 UTC)" && bestSession[0] !== "Overlap (13-16 UTC)") {
-        recommendations.push(`Consider trading during ${bestSession[0]} - your most profitable session`);
+      if (
+        bestSessionEntry[0] !== "London (08-16 UTC)" &&
+        bestSessionEntry[0] !== "Overlap (13-16 UTC)"
+      ) {
+        recommendations.push(
+          `Consider trading during ${bestSessionEntry[0]} - your most profitable session`
+        );
       }
     }
 
@@ -861,7 +876,257 @@ exports.getAIInsights = async (req, res) => {
     }
 
     const worstDay = Object.entries(dayStats).reduce((a, b) => a[1] < b[1] ? a : b);
-    if (worstDay[1] < -50) recommendations.push(`Avoid or reduce size on ${worstDay[0]} - your least profitable day`);
+    if (worstDay[1] < -50) {
+      recommendations.push(`Avoid or reduce size on ${worstDay[0]} - your least profitable day`);
+    }
+
+    // =====================================================
+    // NEW: Structured analytics for AI Analytics page
+    // =====================================================
+
+    // 1) Behavior & discipline (Rule vs Emotion + plan adherence + revenge)
+    const behaviorBuckets = {
+      Plan: { count: 0, pnl: 0 },
+      Emotion: { count: 0, pnl: 0 },
+      Impulsive: { count: 0, pnl: 0 },
+      Other: { count: 0, pnl: 0 }
+    };
+
+    trades.forEach(t => {
+      const key =
+        t.entryBasis === "Plan" ||
+        t.entryBasis === "Emotion" ||
+        t.entryBasis === "Impulsive"
+          ? t.entryBasis
+          : "Other";
+      behaviorBuckets[key].count += 1;
+      behaviorBuckets[key].pnl += t.profit || 0;
+    });
+
+    const behaviorTotal = trades.length || 1;
+    const behaviorRuleEmotion = {
+      planPct: ((behaviorBuckets.Plan.count / behaviorTotal) * 100).toFixed(1),
+      emotionPct: (
+        ((behaviorBuckets.Emotion.count + behaviorBuckets.Impulsive.count) / behaviorTotal) *
+        100
+      ).toFixed(1),
+      planPnl: behaviorBuckets.Plan.pnl.toFixed(2),
+      emotionPnl: (behaviorBuckets.Emotion.pnl + behaviorBuckets.Impulsive.pnl).toFixed(2)
+    };
+
+    // Weekly plan adherence timeline
+    const weeklyPlan = {};
+    trades.forEach(t => {
+      const d = new Date(t.createdAt);
+      const year = d.getFullYear();
+      const week = Math.ceil(((d - new Date(year, 0, 1)) / 86400000 + d.getDay() + 1) / 7);
+      const key = `${year}-W${week}`;
+      if (!weeklyPlan[key]) {
+        weeklyPlan[key] = { total: 0, plan: 0 };
+      }
+      weeklyPlan[key].total += 1;
+      if (t.entryBasis === "Plan") weeklyPlan[key].plan += 1;
+    });
+
+    const planTimeline = Object.entries(weeklyPlan)
+      .sort(([a], [b]) => (a > b ? 1 : -1))
+      .map(([week, v]) => ({
+        week,
+        planAdherencePct: v.total ? ((v.plan / v.total) * 100).toFixed(1) : "0.0"
+      }));
+
+    // Revenge trading detector (size up immediately after a loss)
+    const revengeTrades = [];
+    for (let i = 1; i < trades.length; i++) {
+      const prev = trades[i - 1];
+      const curr = trades[i];
+
+      const prevLoss = (prev.profit || 0) < 0;
+
+      const prevRisk =
+        prev.entryPrice && prev.stopLoss ? Math.abs(prev.entryPrice - prev.stopLoss) : 0;
+      const currRisk =
+        curr.entryPrice && curr.stopLoss ? Math.abs(curr.entryPrice - curr.stopLoss) : 0;
+
+      const sameDay =
+        new Date(prev.createdAt).toDateString() === new Date(curr.createdAt).toDateString();
+
+      if (prevLoss && sameDay && prevRisk > 0 && currRisk > prevRisk * 1.5) {
+        revengeTrades.push({
+          id: curr._id,
+          pair: curr.pair,
+          createdAt: curr.createdAt,
+          prevProfit: prev.profit,
+          currRisk,
+          prevRisk
+        });
+      }
+    }
+
+    const behaviorDiscipline = {
+      ruleEmotion: behaviorRuleEmotion,
+      planTimeline,
+      revengeTradesCount: revengeTrades.length,
+      revengeTrades: revengeTrades.slice(-10) // cap payload
+    };
+
+    // 2) Session edge card
+    const sessionEdge = sessionEntries.map(([name, s]) => {
+      const wr = s.total ? (s.wins / s.total) * 100 : 0;
+      return {
+        session: name,
+        winRate: wr.toFixed(1),
+        avgProfit: (s.total ? s.profit / s.total : 0).toFixed(2),
+        totalProfit: (s.profit || 0).toFixed(2),
+        trades: s.total,
+        tag: s.profit > 0 ? "Green" : "Red"
+      };
+    });
+
+    // 3) Psychological patterns: after-win / after-loss + tilt days
+    const afterBigWin = [];
+    const afterBigLoss = [];
+    const tiltDays = [];
+
+    // Define "big" as > 1.5x avg absolute loss if available
+    let avgAbsLoss = 0;
+    if (losingTrades.length > 0) {
+      avgAbsLoss =
+        Math.abs(
+          losingTrades.reduce((acc, t) => acc + (t.profit || 0), 0) / losingTrades.length
+        ) || 0;
+    }
+    const bigThreshold = avgAbsLoss > 0 ? avgAbsLoss * 1.5 : 0;
+
+    // After big win/loss
+    for (let i = 1; i < trades.length; i++) {
+      const prev = trades[i - 1];
+      const curr = trades[i];
+      const prevPnl = prev.profit || 0;
+
+      if (bigThreshold > 0) {
+        if (prevPnl >= bigThreshold) {
+          afterBigWin.push(curr);
+        } else if (prevPnl <= -bigThreshold) {
+          afterBigLoss.push(curr);
+        }
+      }
+    }
+
+    const calcBucketStats = bucket => {
+      if (!bucket.length) return { trades: 0, winRate: "0.0", avgProfit: "0.00" };
+      const winsLocal = bucket.filter(t => (t.profit || 0) > 0).length;
+      const pnlLocal = bucket.reduce((acc, t) => acc + (t.profit || 0), 0);
+      return {
+        trades: bucket.length,
+        winRate: ((winsLocal / bucket.length) * 100).toFixed(1),
+        avgProfit: (pnlLocal / bucket.length).toFixed(2)
+      };
+    };
+
+    // Tilt: 3+ losing trades in a row with increasing size (risk or lot)
+    let currentStreak = [];
+    const pushTiltStreakIfNeeded = () => {
+      if (currentStreak.length >= 3) {
+        const increasing =
+          currentStreak.every((t, idx) => {
+            if (idx === 0) return true;
+            const prev = currentStreak[idx - 1];
+            const sizePrev = prev.lotSize || 0;
+            const sizeCurr = t.lotSize || 0;
+            return sizeCurr >= sizePrev;
+          }) || false;
+
+        if (increasing) {
+          const day = new Date(currentStreak[0].createdAt).toDateString();
+          tiltDays.push({
+            day,
+            streakLength: currentStreak.length,
+            totalLoss: currentStreak.reduce((acc, t) => acc + (t.profit || 0), 0).toFixed(2)
+          });
+        }
+      }
+      currentStreak = [];
+    };
+
+    trades.forEach(t => {
+      const pnl = t.profit || 0;
+      if (pnl < 0) {
+        currentStreak.push(t);
+      } else {
+        pushTiltStreakIfNeeded();
+      }
+    });
+    pushTiltStreakIfNeeded();
+
+    const psychologicalPatterns = {
+      afterBigWin: calcBucketStats(afterBigWin),
+      afterBigLoss: calcBucketStats(afterBigLoss),
+      tiltDays
+    };
+
+    // 4) Strategy performance league table
+    const strategyStats = {};
+    trades.forEach(t => {
+      const key = t.strategy || "Unspecified";
+      if (!strategyStats[key]) {
+        strategyStats[key] = { trades: 0, wins: 0, pnl: 0 };
+      }
+      strategyStats[key].trades += 1;
+      strategyStats[key].pnl += t.profit || 0;
+      if ((t.profit || 0) > 0) strategyStats[key].wins += 1;
+    });
+
+    const strategyLeague = Object.entries(strategyStats)
+      .map(([name, s]) => ({
+        strategy: name,
+        trades: s.trades,
+        winRate: s.trades ? ((s.wins / s.trades) * 100).toFixed(1) : "0.0",
+        totalProfit: s.pnl.toFixed(2),
+        avgProfit: (s.trades ? s.pnl / s.trades : 0).toFixed(2)
+      }))
+      .sort((a, b) => parseFloat(b.totalProfit) - parseFloat(a.totalProfit));
+
+    // 5) Weekly narrative + checklist (plain language)
+    const recentWeeks = planTimeline.slice(-4);
+    const latestWeek = recentWeeks[recentWeeks.length - 1];
+
+    const bestSessionStructured =
+      bestSessionEntry && bestSessionEntry[1].profit > 0 ? bestSessionEntry[0] : null;
+
+    const worstHourEntry = Object.entries(dayStats).reduce((a, b) => (a[1] < b[1] ? a : b));
+
+    const weeklyNarrativeParts = [];
+    if (latestWeek) {
+      weeklyNarrativeParts.push(
+        `This week you followed your plan on ${latestWeek.planAdherencePct}% of trades.`
+      );
+    }
+    if (bestSessionStructured) {
+      weeklyNarrativeParts.push(
+        `Most of your profit came from the ${bestSessionStructured} session.`
+      );
+    }
+    if (worstDay[1] < 0) {
+      weeklyNarrativeParts.push(
+        `You lost the most on ${worstDay[0]}, especially when trading outside your best conditions.`
+      );
+    }
+    const weeklyNarrative = weeklyNarrativeParts.join(" ");
+
+    const nextWeekChecklist = [];
+    if (behaviorRuleEmotion.planPct < 70) {
+      nextWeekChecklist.push("Increase the share of 'Plan' trades above 70% by using your checklist.");
+    }
+    if (tiltDays.length > 0) {
+      nextWeekChecklist.push("Avoid new trades after 3 consecutive losses or reduce size significantly.");
+    }
+    if (bestSessionStructured) {
+      nextWeekChecklist.push(`Prioritize setups during the ${bestSessionStructured} session.`);
+    }
+    if (nextWeekChecklist.length === 0) {
+      nextWeekChecklist.push("Keep following your current process; maintain discipline and journaling.");
+    }
 
     // Risk management
     const tradesWithSL = trades.filter(t => t.stopLoss).length;
@@ -879,17 +1144,26 @@ exports.getAIInsights = async (req, res) => {
       insights,
       recommendations,
       score: score.toFixed(0),
+      // New structured analytics payloads for the AI Analytics page
+      behaviorDiscipline,
+      sessionEdge,
+      psychologicalPatterns,
+      strategyLeague,
+      weeklyNarrative,
+      nextWeekChecklist,
       topStrategies: [],
       topPairs: pairs.slice(0, 5),
       bestDay: bestDay[0],
       worstDay: worstDay[0],
-      bestSession: sessionEntries.length > 0 ? sessionEntries.reduce((a, b) => a[1].profit > b[1].profit ? a : b)[0] : null,
+      bestSession:
+        bestSessionEntry && bestSessionEntry[1].profit > 0 ? bestSessionEntry[0] : null,
       stats: {
         totalTrades: trades.length,
         winRate: winRate.toFixed(1),
         avgWin: avgWin.toFixed(2),
         avgLoss: avgLoss.toFixed(2),
-        profitFactor: avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : avgWin > 0 ? "∞" : "0.00"
+        profitFactor:
+          avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : avgWin > 0 ? "∞" : "0.00"
       }
     });
   } catch (error) {

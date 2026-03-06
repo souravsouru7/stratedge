@@ -591,16 +591,25 @@ export default function Dashboard() {
               </svg>
               LOGOUT
             </button>
-            <div style={{
-              width: 34, height: 34, borderRadius: "50%",
-              background: "#0F1923", border: "2px solid #E2E8F0",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer",
-            }}>
+            <Link
+              href="/profile"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: "50%",
+                background: "#0F1923",
+                border: "2px solid #E2E8F0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                textDecoration: "none"
+              }}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22C78E" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
               </svg>
-            </div>
+            </Link>
           </div>
         </div>
       </header>
