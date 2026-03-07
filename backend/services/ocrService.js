@@ -1,19 +1,11 @@
 const Tesseract = require("tesseract.js");
 
 exports.extractText = async (imageUrl) => {
-
   try {
-
-    const result = await Tesseract.recognize(
-      imageUrl,
-      "eng"
-    );
-
+    const result = await Tesseract.recognize(imageUrl, "eng");
     return result.data.text;
-
   } catch (error) {
-    console.error(error);
+    console.error("OCR error:", error);
     throw error;
   }
-
 };

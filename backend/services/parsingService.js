@@ -97,7 +97,54 @@ exports.parseTrade = (text) => {
   };
 };
 
+// Common OCR typos: strike price correction for Indian indices
+const STRIKE_CORRECTIONS = {
+  "2100": "26000", "21000": "26000", "2600": "26000", "2610": "26100", "4700": "47000",
+};
+const UNDERLYING_STRIKE_RANGES = {
+  NIFTY: [22000, 27000], BANKNIFTY: [45000, 52000], FINNIFTY: [19000, 22000],
+  MIDCPNIFTY: [9000, 12000], SENSEX: [75000, 95000],
+};
+function correctStrikeOcrTypo(underlying, rawStrike) {
+  if (!rawStrike || !underlying) return rawStrike;
+  const u = String(underlying).toUpperCase().replace(/\s+/g, "");
+  const strike = parseFloat(String(rawStrike).replace(/[^\d]/g, ""));
+  if (Number.isNaN(strike)) return rawStrike;
+  const range = UNDERLYING_STRIKE_RANGES[u] || UNDERLYING_STRIKE_RANGES.NIFTY;
+  if (strike >= range[0] && strike <= range[1]) return String(strike);
+  const corrected = STRIKE_CORRECTIONS[String(strike)];
+  if (corrected) return corrected;
+  if (strike < 10000 && u === "NIFTY" && strike >= 2000) return String(strike * 10);
+  if (strike < 1000 && u === "NIFTY") return String(strike * 100);
+  return String(strike);
+}
+function fixInstrumentOcrTypos(line) {
+  return line
+    .replace(/N1FTY|NIFT[Y1]|NlFTY/gi, "NIFTY")
+    .replace(/BANKN1FTY|BANK\s*N1FTY/gi, "BANKNIFTY")
+    .replace(/0(9|g|q|O)th|0(9|g)TH|09lh|0glh|O9th/gi, "09th")
+    .replace(/\s*[©®™●·○]\s*/g, " ")
+    .replace(/@/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseNumberWithSpaces(s) {
+  if (!s || typeof s !== "string") return NaN;
+  const cleaned = s.replace(/\s+/g, "").replace(/,/g, "");
+  return parseFloat(cleaned);
+}
+
+function looksLikeIndianInstrument(line) {
+  const s = fixInstrumentOcrTypos(String(line || ""));
+  const hasStrike = /\b\d{4,5}\b/.test(s);
+  const hasType = /\b(CE|PE|CALL|PUT|FUT)\b/i.test(s);
+  const hasUnderlying = /\b(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX)\b/i.test(s);
+  return (hasStrike && hasType) || (hasUnderlying && hasType);
+}
+
 exports.parseIndianTrade = (text) => {
+  const rawText = text;
   const lines = text
     .split("\n")
     .map((line) => line.trim())
@@ -122,55 +169,108 @@ exports.parseIndianTrade = (text) => {
     // "Total P&L  +4,132.50"
     // "Overall P&L  -5,367.00 on 1 positions"
     const overallMatch = line.match(
-      /(Total|Overall)\s*P&L[^\d\-+]*([+\-]?\s*[\d,]+(?:\.\d+)?)/
+      /(Total|Overall)\s*P\s*&\s*L[^\d\-+]*([+\-]?\s*[\d,\s]+(?:\.\d+)?)/
     );
     if (overallMatch && !profit) {
-      const numeric = overallMatch[2].replace(/\s+/g, "").replace(/,/g, "");
-      const parsed = parseFloat(numeric);
-      if (!Number.isNaN(parsed)) {
-        profit = parsed;
+      const parsed = parseNumberWithSpaces(overallMatch[2]);
+      if (!Number.isNaN(parsed)) profit = parsed;
+    }
+    // "Total P&L" on one line, "+4 132.50" on next (OCR split, space in number)
+    if (!profit && i > 0 && lines[i - 1].match(/(Total|Overall)\s*P\s*&\s*L/i)) {
+      const numMatch = line.match(/^([+\-]?\s*[\d,\s]+\.?\d*)$/);
+      if (numMatch) {
+        const parsed = parseNumberWithSpaces(numMatch[1]);
+        if (!Number.isNaN(parsed) && Math.abs(parsed) >= 1) profit = parsed;
       }
+    }
+    // Broker card: "NRML +4,132.50 LTP 161.60"
+    const nrmlMatch = line.match(/NRML\s*([+\-]?\s*[\d,\s]+\.?\d*)/);
+    if (nrmlMatch && !profit) {
+      const parsed = parseNumberWithSpaces(nrmlMatch[1]);
+      if (!Number.isNaN(parsed)) profit = parsed;
+    }
+    // Standalone large P&L when context suggests broker screen (e.g. "+4 132.50")
+    const standaloneMatch = line.match(/^([+\-]?\s*[\d,\s]+\.\d{2})$/);
+    if (standaloneMatch && !profit && (rawText.includes("Total") || rawText.includes("P&L") || rawText.includes("NRML"))) {
+      const parsed = parseNumberWithSpaces(standaloneMatch[1]);
+      if (!Number.isNaN(parsed) && Math.abs(parsed) >= 100) profit = parsed;
     }
   }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Symbol / Instrument Name
-    // Handles: "NIFTY 09TH DEC 26000 PE", "SENSEX 27 NOV 85600 CALL" etc.
-    const instrumentMatch = line.match(
-      /^([A-Z&0-9]{2,}(?:\s+\d{1,2}(?:ST|ND|RD|TH)?)?(?:\s+[A-Z]{3})?(?:\s+\d+)?(?:\s+(?:CE|PE|CALL|PUT|FUT))?)$/i
-    );
-    if (
-      instrumentMatch &&
-      !pair &&
-      !line.match(/Avg|Price|Qty|Quantity|Profit|P&L|Orders?/i)
-    ) {
-      pair = instrumentMatch[1].trim();
-
-      // Infer segment / instrument type from keywords
-      if (pair.match(/CE|PE|CALL|PUT/i)) {
+    // Symbol / Instrument Name – multiple patterns + OCR typo fixes
+    if (!pair && !line.match(/Avg|Price|Qty|Quantity|Profit|P&L|Orders?|LTP|CMP/i) && looksLikeIndianInstrument(line)) {
+      const fixedLine = fixInstrumentOcrTypos(line);
+      // OCR sometimes appends stray glyphs; normalize before regex matching
+      const fixedLineForMatch = fixedLine
+        .replace(/[^\w\s,+\-.]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      // Broker line: "NIFTY 09th DEC 26000 PE +4,182.50" – instrument + optional P&L on same line
+      const instrumentWithPnL = fixedLineForMatch.match(
+        /(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX)\s+[\dA-Za-z\s]+?\s*(\d{4,5})\s*(CE|PE|CALL|PUT)(?:\s*([+\-]?\s*[\d,\s]+\.?\d*))?$/i
+      );
+      if (instrumentWithPnL) {
+        const u = instrumentWithPnL[1].toUpperCase().replace(/\s+/g, "");
+        const strike = correctStrikeOcrTypo(u, instrumentWithPnL[2]);
+        const ot = (instrumentWithPnL[3] || "CE").toUpperCase().replace("CALL", "CE").replace("PUT", "PE");
+        // Use the matched substring (starts at underlying) to avoid prefix garbage like "pg"
+        const instrumentPart = String(instrumentWithPnL[0] || "")
+          .replace(/\s*[+\-]?\s*[\d,\s]+\.?\d*\s*$/, "")
+          .trim();
+        pair = instrumentPart || `${u} ${strike} ${ot}`;
+        if (instrumentWithPnL[4] && !profit) {
+          const pParsed = parseNumberWithSpaces(instrumentWithPnL[4]);
+          if (!Number.isNaN(pParsed)) profit = pParsed;
+        }
         segment = "F&O";
         instrumentType = "OPTION";
-        const strikeMatch = pair.match(/(\d+)\s*(?:CE|PE|CALL|PUT)/i);
-        if (strikeMatch) {
-          strikePrice = strikeMatch[1];
+        strikePrice = strike;
+      }
+      const patterns = [
+        /^([A-Z&0-9]{2,}(?:\s+\d{1,2}(?:ST|ND|RD|TH)?)?(?:\s+[A-Z]{3})?(?:\s+\d+)\s*(CE|PE|CALL|PUT|FUT))(?:\s*[+\-]?\s*[\d,\s]+\.?\d*)?$/i,
+        /^([A-Z&0-9]{2,}(?:\s+\d{1,2}(?:ST|ND|RD|TH)?)?(?:\s+[A-Z]{3})?)\s+(\d+)\s*(CE|PE|CALL|PUT|FUT)(?:\s*[+\-]?\s*[\d,\s]+\.?\d*)?$/i,
+        /^([A-Z&0-9]{2,}(?:\s+\d{1,2}(?:ST|ND|RD|TH)?)?(?:\s+[A-Z]{3})?(?:\s+\d+)\s*(CE|PE|CALL|PUT|FUT))$/i,
+        /^([A-Z&0-9]{2,}(?:\s+\d{1,2}(?:ST|ND|RD|TH)?)?(?:\s+[A-Z]{3})?)\s+(\d+)\s*(CE|PE|CALL|PUT|FUT)$/i,
+        /(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX)\s+[\dA-Z\s]+\s*(CE|PE|CALL|PUT)/i,
+        /(NIFTY|BANK\s*NIFTY|FIN\s*NIFTY)\s+(\d+)\s*(CE|PE)/i,
+      ];
+      if (!pair) for (const re of patterns) {
+        const m = fixedLineForMatch.match(re);
+        if (m) {
+          let sym = (m[1] || m[0]).trim();
+          const otRaw = (m[2] || m[3] || "").toUpperCase().replace("CALL", "CE").replace("PUT", "PE");
+          const ot = otRaw === "CE" || otRaw === "PE" ? otRaw : null;
+          if (/^\d+$/.test(m[2])) strikePrice = m[2];
+          if (ot) sym = sym.replace(/\s*(CE|PE|CALL|PUT)\s*$/i, "").trim() + " " + ot;
+          // Prevent garbage OCR tokens like "pg" from becoming a symbol
+          if (sym.length >= 6 && /\b\d{4,5}\b/.test(sym) && /\b(CE|PE|CALL|PUT|FUT)\b/i.test(sym)) {
+            pair = sym;
+          }
+          if (pair) {
+            segment = "F&O";
+            instrumentType = pair.match(/FUT/i) ? "FUTURE" : "OPTION";
+            if (!strikePrice) {
+              const strikeM = pair.match(/(\d+)\s*(?:CE|PE|CALL|PUT)/i);
+              if (strikeM) strikePrice = strikeM[1];
+            }
+            break;
+          }
         }
-      } else if (pair.match(/FUT/i)) {
-        segment = "F&O";
-        instrumentType = "FUTURE";
       }
     }
 
     // Quantity (from contract-note style or some apps)
-    const qtyMatch = line.match(/(?:Qty|Quantity|Lots?)[:\s]*([\d,]+)/i);
+    const qtyMatch = line.match(/(?:Qty|Quantity|Lots?|Net\s*Qty)[:\s]*([\d,]+)/i);
     if (qtyMatch) {
       quantity = qtyMatch[1].replace(/,/g, "");
     }
 
     // Entry Price (Avg. Price)
     const entryMatch = line.match(
-      /(?:Avg\.?\s*Price|Average\s*Price|Entry)[:\s]*([\d,]+\.?\d*)/i
+      /(?:Avg\.?\s*Price|Average\s*Price|Entry|Buy\s*Avg)[:\s]*([\d,]+\.?\d*)/i
     );
     if (entryMatch) {
       entryPrice = entryMatch[1].replace(/,/g, "");
@@ -178,7 +278,7 @@ exports.parseIndianTrade = (text) => {
 
     // Exit Price (LTP/CMP)
     const exitMatch = line.match(
-      /(?:LTP|CMP|Exit\s*Price)[:\s]*([\d,]+\.?\d*)/i
+      /(?:LTP|CMP|Exit\s*Price|Sell\s*Avg)[:\s]*([\d,]+\.?\d*)/i
     );
     if (exitMatch) {
       exitPrice = exitMatch[1].replace(/,/g, "");
@@ -220,6 +320,32 @@ exports.parseIndianTrade = (text) => {
         }
       }
     }
+  }
+
+  // Third pass: loosen instrument match – join lines (mobile card layout may split text)
+  if (!pair && rawText) {
+    const joined = fixInstrumentOcrTypos(rawText.replace(/\s+/g, " "));
+    const looseMatch = joined.match(
+      /(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX)\s+(?:\d{1,2}(?:th|st|nd|rd)?\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+)?(\d{4,5})\s*(CE|PE|CALL|PUT)/i
+    );
+    if (looseMatch) {
+      const u = looseMatch[1].toUpperCase().replace(/\s+/g, "");
+      const strike = correctStrikeOcrTypo(u, looseMatch[2]);
+      const ot = (looseMatch[3] || "CE").toUpperCase().replace("CALL", "CE").replace("PUT", "PE");
+      strikePrice = strike;
+      pair = `${u} ${strike} ${ot}`;
+      segment = "F&O";
+      instrumentType = "OPTION";
+    }
+  }
+
+  // Strike price OCR correction
+  if (pair && strikePrice) {
+    const u = pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim();
+    const corrected = correctStrikeOcrTypo(u, strikePrice);
+    const ot = pair.match(/(CE|PE)$/i)?.[1] || "CE";
+    pair = u.replace(/\s+\d+\s*$/, "").trim() + ` ${corrected} ${ot}`;
+    strikePrice = corrected;
   }
 
   return {

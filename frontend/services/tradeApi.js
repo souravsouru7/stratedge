@@ -39,59 +39,37 @@ export const createTrade = async (tradeData, marketType = 'Forex') => {
 
 export const getTrades = async (marketType = 'Forex') => {
   const token = localStorage.getItem("token");
-
-  // Use dedicated Indian Market endpoint if applicable
-  const baseUrl = marketType === 'Indian_Market'
-    ? `${BASE_URL}/indian`
-    : BASE_URL;
-
-  const res = await fetch(`${baseUrl}/trades?marketType=${marketType}`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+  const baseUrl = getBaseUrl(marketType);
+  const url = marketType === 'Indian_Market' ? `${baseUrl}/trades` : `${baseUrl}/trades`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
   });
-
   return res.json();
 };
 
-
-
-export const getTrade = async (id) => {
-
+export const getTrade = async (id, marketType = 'Forex') => {
   const token = localStorage.getItem("token");
-
-  const res = await fetch(`${BASE_URL}/trades/${id}`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+  const baseUrl = getBaseUrl(marketType);
+  const res = await fetch(`${baseUrl}/trades/${id}`, {
+    headers: { Authorization: `Bearer ${token}` }
   });
-
   return res.json();
 };
 
-
-
-export const deleteTrade = async (id) => {
-
+export const deleteTrade = async (id, marketType = 'Forex') => {
   const token = localStorage.getItem("token");
-
-  const res = await fetch(`${BASE_URL}/trades/${id}`, {
+  const baseUrl = getBaseUrl(marketType);
+  const res = await fetch(`${baseUrl}/trades/${id}`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+    headers: { Authorization: `Bearer ${token}` }
   });
-
   return res.json();
 };
 
-
-
-export const updateTrade = async (id, tradeData) => {
-
+export const updateTrade = async (id, tradeData, marketType = 'Forex') => {
   const token = localStorage.getItem("token");
-
-  const res = await fetch(`${BASE_URL}/trades/${id}`, {
+  const baseUrl = getBaseUrl(marketType);
+  const res = await fetch(`${baseUrl}/trades/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -99,6 +77,5 @@ export const updateTrade = async (id, tradeData) => {
     },
     body: JSON.stringify(tradeData)
   });
-
   return res.json();
 };

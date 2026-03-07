@@ -12,25 +12,15 @@ const {
   getDrawdownAnalysis,
   getAIInsights,
   getAdvancedAnalytics
-} = require("../controllers/analyticsController");
+} = require("../controllers/indianAnalyticsController");
 
 const { protect } = require("../middleware/authMiddleware");
 
-// Helper to force marketType to Indian_Market
-const forceIndianMarket = (req, res, next) => {
-  req.query.marketType = "Indian_Market";
-  next();
-};
-
-// All routes automatically filter by Indian_Market
+// Indian Market only — uses IndianTrade model
 router.use(protect);
-router.use(forceIndianMarket);
 
-// Basic Analytics
 router.get("/summary", getSummary);
 router.get("/weekly", getWeeklyStats);
-
-// Advanced Analytics
 router.get("/risk-reward", getRiskRewardAnalysis);
 router.get("/distribution", getTradeDistribution);
 router.get("/performance", getPerformanceMetrics);

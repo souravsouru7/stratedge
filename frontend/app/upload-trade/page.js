@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { createTrade } from "@/services/tradeApi";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
@@ -234,13 +234,17 @@ function SectionCard({ accentColor = "#0D9E6E", title, subtitle, children, delay
 function UploadTradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { currentMarket } = useMarket();
   const [file, setFile] = useState(null);
   const [trade, setTrade] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [extractedText, setExtractedText] = useState("");
 
-  const marketType = searchParams.get('market') || currentMarket;
+  const marketType = pathname?.startsWith("/indian-market")
+    ? MARKETS.INDIAN_MARKET
+    : (searchParams.get("market") || searchParams.get("marketType") || currentMarket);
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
   const [saved, setSaved] = useState(false);
@@ -271,36 +275,60 @@ function UploadTradeContent() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Upload failed"); }
       const data = await res.json();
       const p = data.parsedTrade || {};
+      setExtractedText(data.extractedText || "");
 
       const isInd = marketType === MARKETS.INDIAN_MARKET;
+      const pairStr = (p.pair || "").trim().toUpperCase();
+      const optionTypeFromPair = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (p.optionType || "CE");
 
-      setTrade({
-        pair: p.pair || "",
-        action: p.action || p.type || "BUY",
-        lotSize: p.lotSize ? String(p.lotSize) : "",
-        entryPrice: p.entryPrice ? String(p.entryPrice) : "",
-        exitPrice: p.exitPrice ? String(p.exitPrice) : "",
-        stopLoss: p.stopLoss ? String(p.stopLoss) : "",
-        takeProfit: p.takeProfit ? String(p.takeProfit) : "",
-        profit: p.profit ? String(p.profit) : "",
-        commission: p.commission ? String(p.commission) : "",
-        swap: p.swap ? String(p.swap) : "",
-        balance: p.balance ? String(p.balance) : "",
-        session: p.session || "",
-        strategy: "",
-        notes: "",
-        screenshot: data.url,
-        // Indian fields
-        segment: p.segment || "Equity",
-        instrumentType: p.instrumentType || "EQUITY",
-        quantity: p.quantity ? String(p.quantity) : "",
-        strikePrice: p.strikePrice ? String(p.strikePrice) : "",
-        expiryDate: p.expiryDate || "",
-        brokerage: "",
-        sttTaxes: "",
-        entryBasis: "Plan",
-        entryBasisCustom: "",
-      });
+      if (isInd) {
+        setTrade({
+          pair: p.pair || "",
+          action: (p.action || p.type || "BUY").toString().toUpperCase().slice(0, 4) === "SELL" ? "sell" : "buy",
+          quantity: p.quantity != null ? String(p.quantity) : "",
+          profit: p.profit != null && p.profit !== "" ? String(p.profit) : "",
+          optionType: optionTypeFromPair,
+          screenshot: data.url,
+          // keep for form (hidden in UI but used in save)
+          segment: "F&O",
+          instrumentType: "OPTION",
+          strikePrice: p.strikePrice != null ? String(p.strikePrice) : "",
+          expiryDate: p.expiryDate || "",
+          brokerage: "",
+          sttTaxes: "",
+          riskRewardRatio: "",
+          riskRewardCustom: "",
+          entryBasis: "Plan",
+          entryBasisCustom: "",
+        });
+      } else {
+        setTrade({
+          pair: p.pair || "",
+          action: p.action || p.type || "BUY",
+          lotSize: p.lotSize ? String(p.lotSize) : "",
+          entryPrice: p.entryPrice ? String(p.entryPrice) : "",
+          exitPrice: p.exitPrice ? String(p.exitPrice) : "",
+          stopLoss: p.stopLoss ? String(p.stopLoss) : "",
+          takeProfit: p.takeProfit ? String(p.takeProfit) : "",
+          profit: p.profit ? String(p.profit) : "",
+          commission: p.commission ? String(p.commission) : "",
+          swap: p.swap ? String(p.swap) : "",
+          balance: p.balance ? String(p.balance) : "",
+          session: p.session || "",
+          strategy: "",
+          notes: "",
+          screenshot: data.url,
+          segment: p.segment || "Equity",
+          instrumentType: p.instrumentType || "EQUITY",
+          quantity: p.quantity ? String(p.quantity) : "",
+          strikePrice: p.strikePrice ? String(p.strikePrice) : "",
+          expiryDate: p.expiryDate || "",
+          brokerage: "",
+          sttTaxes: "",
+          entryBasis: "Plan",
+          entryBasisCustom: "",
+        });
+      }
     } catch (err) {
       setError(err.message || "Failed to upload image. Please try again.");
     } finally { setLoading(false); }
@@ -334,13 +362,11 @@ function UploadTradeContent() {
       };
 
       if (isInd) {
-        tradeData.segment = trade.segment;
-        tradeData.instrumentType = trade.instrumentType;
+        tradeData.optionType = (trade.optionType || "CE").toUpperCase();
         tradeData.quantity = trade.quantity ? parseFloat(trade.quantity) : undefined;
+        tradeData.profit = trade.profit ? parseFloat(trade.profit) : undefined;
         tradeData.strikePrice = trade.strikePrice ? parseFloat(trade.strikePrice) : undefined;
-        tradeData.expiryDate = trade.expiryDate || undefined;
-        tradeData.brokerage = trade.brokerage ? parseFloat(trade.brokerage) : undefined;
-        tradeData.sttTaxes = trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined;
+        tradeData.underlying = trade.pair ? trade.pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim() : undefined;
       } else {
         tradeData.lotSize = trade.lotSize ? parseFloat(trade.lotSize) : undefined;
         tradeData.commission = trade.commission ? parseFloat(trade.commission) : undefined;
@@ -385,8 +411,30 @@ function UploadTradeContent() {
       {/* ── HEADER ── */}
       <header style={{ position: "relative", zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E2E8F0", boxShadow: "0 1px 12px rgba(15,25,35,0.06)" }}>
 
-        {/* Logo */}
+        {/* Left: back + logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Global back button */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "999px",
+              border: "1px solid #E2E8F0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 8,
+              cursor: "pointer",
+              background: "#FFFFFF",
+              padding: 0
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F1923" strokeWidth="2.2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
           <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>STRATEDGE</div>
@@ -448,9 +496,29 @@ function UploadTradeContent() {
         </div>
 
         {/* ── UPLOAD CARD ── */}
-        <SectionCard accentColor="#B8860B" title="Upload Screenshot" subtitle="DROP YOUR TRADE SCREENSHOT TO BEGIN AI EXTRACTION" delay={0.05}>
+        <SectionCard accentColor={isInd ? "#1B5E20" : "#B8860B"} title="Upload Screenshot" subtitle={isInd ? "DROP YOUR OPTIONS TRADE SCREENSHOT (BROKER APP)" : "DROP YOUR TRADE SCREENSHOT TO BEGIN AI EXTRACTION"} delay={0.05}>
 
           <FileUploadZone selectedFile={file} onFileSelect={f => { setFile(f); setError(null); }} onClear={() => { setFile(null); setError(null); }} />
+
+          {/* ── INDIAN OPTIONS HINT (before file selected) ── */}
+          {isInd && !file && (
+            <div style={{ marginTop: 16, borderRadius: 10, border: "1px solid #E2E8F0", overflow: "hidden", background: "#F8FAFC" }}>
+              <div style={{ padding: "10px 14px", background: "linear-gradient(90deg,rgba(27,94,32,0.08),rgba(27,94,32,0.02))", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1B5E20" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#1B5E20", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em" }}>OPTIONS — UPLOAD A SCREENSHOT LIKE THIS</span>
+              </div>
+              <div style={{ padding: "14px 16px", fontSize: 12, color: "#475569", fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1.55 }}>
+                <p style={{ margin: "0 0 8px 0" }}>Your broker app’s <strong>closed position</strong> or <strong>trade detail</strong> screen works best. Make sure it shows:</p>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  <li>Instrument (e.g. <strong>NIFTY 26100 CE</strong>) and <strong>NSE</strong> tag</li>
+                  <li><strong>Expiry</strong> (e.g. 02 Dec 2025)</li>
+                  <li><strong>Position details</strong> — Side (Closed), Avg price, Net Qty</li>
+                  <li><strong>Trade summary</strong> — Buys (Qty, Price) and Sells (Qty, Price)</li>
+                </ul>
+                <p style={{ margin: "10px 0 0 0", fontSize: 11, color: "#64748B" }}>AI will extract symbol, strike, CE/PE, entry &amp; exit premium, and P&L.</p>
+              </div>
+            </div>
+          )}
 
           {/* ── SAMPLE IMAGE HINT (Forex only, before file selected) ── */}
           {!isInd && !file && (
@@ -583,25 +651,61 @@ function UploadTradeContent() {
               </span>
             </div>
 
+            {/* Debug: show OCR output when Indian market extraction fails */}
+            {isInd && !trade?.pair && extractedText && (
+              <details style={{ marginBottom: 20, background: "#FFF8E1", border: "1px solid #FFE082", borderRadius: 8, overflow: "hidden" }}>
+                <summary style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "#F57F17", cursor: "pointer", fontFamily: "'JetBrains Mono',monospace" }}>
+                  OCR read this — extraction missed. Edit symbol manually or try a clearer screenshot.
+                </summary>
+                <pre style={{ margin: 0, padding: 14, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#5D4037", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 120, overflow: "auto" }}>{extractedText}</pre>
+              </details>
+            )}
+
             {/* Fields grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14, marginBottom: 18 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isInd ? "1fr 1fr" : "repeat(auto-fit,minmax(190px,1fr))", gap: 14, marginBottom: 18 }}>
               {isInd ? (
                 <>
-                  <FormInput label="SYMBOL" name="pair" value={trade?.pair} onChange={handleChange} placeholder="e.g. RELIANCE" />
-                  <FormSelect label="SEGMENT" name="segment" value={trade?.segment} onChange={handleChange} options={[{ value: "Equity", label: "Equity" }, { value: "F&O", label: "F&O" }]} />
-                  <FormSelect label="INSTRUMENT" name="instrumentType" value={trade?.instrumentType} onChange={handleChange} options={[{ value: "EQUITY", label: "Equity" }, { value: "FUTURE", label: "Future" }, { value: "OPTION", label: "Option" }]} />
-                  <FormInput label="QUANTITY" name="quantity" value={trade?.quantity} onChange={handleChange} placeholder="100" />
-                  <FormInput label="ENTRY PRICE" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="1250.00" />
-                  <FormInput label="EXIT PRICE" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="1265.45" />
-                  <FormInput label="PROFIT (₹)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="+750.00" />
-                  {(trade.instrumentType === "OPTION" || trade.instrumentType === "FUTURE") && (
-                    <>
-                      <FormInput label="STRIKE PRICE" name="strikePrice" value={trade?.strikePrice} onChange={handleChange} placeholder="22000" />
-                      <FormInput label="EXPIRY DATE" name="expiryDate" value={trade?.expiryDate} onChange={handleChange} type="date" />
-                    </>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <FormInput label="SYMBOL" name="pair" value={trade?.pair} onChange={handleChange} placeholder="e.g. NIFTY 26100 CE" />
+                  </div>
+                  <FormSelect label="CE / PE" name="optionType" value={trade?.optionType} onChange={handleChange} options={[{ value: "CE", label: "CE" }, { value: "PE", label: "PE" }]} />
+                  <FormSelect label="BUY / SELL" name="action" value={trade?.action} onChange={handleChange} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
+                  <FormInput label="QTY (lots)" name="quantity" value={trade?.quantity} onChange={handleChange} placeholder="e.g. 3" />
+                  <FormInput label="PROFIT / LOSS (₹)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="e.g. 1500 or -500" />
+                  <FormSelect
+                    label="RISK : REWARD"
+                    name="riskRewardRatio"
+                    value={trade?.riskRewardRatio}
+                    onChange={(e) => { setShowCustomRR(e.target.value === "custom"); handleChange(e); }}
+                    options={[
+                      { value: "", label: "Select..." },
+                      { value: "1:1", label: "1:1" },
+                      { value: "1:1.5", label: "1:1.5" },
+                      { value: "1:2", label: "1:2" },
+                      { value: "1:3", label: "1:3" },
+                      { value: "1:4", label: "1:4" },
+                      { value: "1:5", label: "1:5" },
+                      { value: "custom", label: "Custom" }
+                    ]}
+                  />
+                  {showCustomRR && (
+                    <FormInput label="CUSTOM RR" name="riskRewardCustom" value={trade?.riskRewardCustom} onChange={handleChange} placeholder="e.g. 1:2.5" />
                   )}
-                  <FormInput label="BROKERAGE" name="brokerage" value={trade?.brokerage} onChange={handleChange} placeholder="20.00" />
-                  <FormInput label="STT/TAXES" name="sttTaxes" value={trade?.sttTaxes} onChange={handleChange} placeholder="15.00" />
+                  <FormSelect
+                    label="ENTRY BASIS"
+                    name="entryBasis"
+                    value={trade?.entryBasis}
+                    onChange={handleChange}
+                    options={[
+                      { value: "Plan", label: "Rule Based / Plan" },
+                      { value: "Emotion", label: "Emotional" },
+                      { value: "Impulsive", label: "Impulsive" },
+                      { value: "Custom", label: "Custom Basis" }
+                    ]}
+                  />
+                  {trade?.entryBasis === "Custom" && (
+                    <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
+                  )}
                 </>
               ) : (
                 <>
@@ -615,69 +719,65 @@ function UploadTradeContent() {
                   <FormInput label="TAKE PROFIT" name="takeProfit" value={trade?.takeProfit} onChange={handleChange} placeholder="1.2400" />
                   <FormInput label="COMMISSION" name="commission" value={trade?.commission} onChange={handleChange} placeholder="2.50" />
                   <FormInput label="SWAP" name="swap" value={trade?.swap} onChange={handleChange} placeholder="0.00" />
+                  <FormInput label="BALANCE" name="balance" value={trade?.balance} onChange={handleChange} placeholder="1000.00" />
+                  <FormSelect label="SESSION" name="session" value={trade?.session} onChange={handleChange} options={[{ value: "Asian", label: "Asian" }, { value: "London", label: "London" }, { value: "New York", label: "New York" }]} />
+                  <FormInput label="STRATEGY" name="strategy" value={trade?.strategy} onChange={handleChange} placeholder="Strategy name" />
+                  <FormSelect
+                    label="RISK : REWARD"
+                    name="riskRewardRatio"
+                    value={trade?.riskRewardRatio}
+                    onChange={(e) => { setShowCustomRR(e.target.value === "custom"); handleChange(e); }}
+                    options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]}
+                  />
+                  {showCustomRR && (
+                    <FormInput label="CUSTOM RR" name="riskRewardCustom" value={trade?.riskRewardCustom} onChange={handleChange} placeholder="e.g. 1:2.5" />
+                  )}
+                  <FormSelect
+                    label="ENTRY BASIS"
+                    name="entryBasis"
+                    value={trade?.entryBasis}
+                    onChange={handleChange}
+                    options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]}
+                  />
+                  {trade?.entryBasis === "Custom" && (
+                    <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
+                  )}
                 </>
-              )}
-
-              <FormInput label="BALANCE" name="balance" value={trade?.balance} onChange={handleChange} placeholder="1000.00" />
-              <FormSelect label="SESSION" name="session" value={trade?.session} onChange={handleChange} options={[{ value: "Asian", label: "Asian" }, { value: "London", label: "London" }, { value: "New York", label: "New York" }]} />
-              <FormInput label="STRATEGY" name="strategy" value={trade?.strategy} onChange={handleChange} placeholder="Strategy name" />
-              <FormSelect
-                label="RISK : REWARD"
-                name="riskRewardRatio"
-                value={trade?.riskRewardRatio}
-                onChange={(e) => {
-                  setShowCustomRR(e.target.value === "custom");
-                  handleChange(e);
-                }}
-                options={[
-                  { value: "", label: "Select..." },
-                  { value: "1:1", label: "1:1" },
-                  { value: "1:2", label: "1:2" },
-                  { value: "1:3", label: "1:3" },
-                  { value: "1:4", label: "1:4" },
-                  { value: "1:5", label: "1:5" },
-                  { value: "custom", label: "Custom" },
-                ]}
-              />
-              {showCustomRR && (
-                <FormInput
-                  label="CUSTOM RR"
-                  name="riskRewardCustom"
-                  value={trade?.riskRewardCustom}
-                  onChange={handleChange}
-                  placeholder="e.g. 1:2.5"
-                />
-              )}
-              <FormSelect
-                label="ENTRY BASIS"
-                name="entryBasis"
-                value={trade?.entryBasis}
-                onChange={handleChange}
-                options={[
-                  { value: "Plan", label: "Rule Based / Plan" },
-                  { value: "Emotion", label: "Emotional" },
-                  { value: "Impulsive", label: "Impulsive" },
-                  { value: "Custom", label: "Custom Basis" },
-                ]}
-              />
-              {trade?.entryBasis === "Custom" && (
-                <FormInput
-                  label="CUSTOM BASIS"
-                  name="entryBasisCustom"
-                  value={trade?.entryBasisCustom}
-                  onChange={handleChange}
-                  placeholder="Describe basis..."
-                />
               )}
             </div>
 
             {/* Notes */}
             <div style={{ marginBottom: 22 }}>
               <label style={labelStyle}>NOTES</label>
-              <textarea name="notes" placeholder="Trade observations, emotions, lessons..." value={trade?.notes || ""} onChange={handleChange} rows={4}
-                onFocus={e => { e.currentTarget.style.borderColor = "#0D9E6E"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(13,158,110,0.10)"; e.currentTarget.style.background = "#F0FDF9"; }}
-                onBlur={e => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#F8FAFC"; }}
-                style={{ width: "100%", padding: "12px 14px", fontSize: 13, fontFamily: "'Plus Jakarta Sans',sans-serif", color: "#0F1923", background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 8, outline: "none", resize: "vertical", transition: "all 0.2s ease" }}
+              <textarea
+                name="notes"
+                placeholder={isInd ? "Why you took this options trade, context, emotions..." : "Trade observations, emotions, lessons..."}
+                value={trade?.notes || ""}
+                onChange={handleChange}
+                rows={4}
+                onFocus={e => {
+                  e.currentTarget.style.borderColor = "#0D9E6E";
+                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(13,158,110,0.10)";
+                  e.currentTarget.style.background = "#F0FDF9";
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.borderColor = "#E2E8F0";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.background = "#F8FAFC";
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  fontSize: 13,
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  color: "#0F1923",
+                  background: "#F8FAFC",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 8,
+                  outline: "none",
+                  resize: "vertical",
+                  transition: "all 0.2s ease"
+                }}
               />
             </div>
 
@@ -710,7 +810,7 @@ function UploadTradeContent() {
               </button>
 
               {/* Re-upload */}
-              <button onClick={() => { setTrade(null); setFile(null); setError(null); }}
+              <button onClick={() => { setTrade(null); setFile(null); setError(null); setExtractedText(""); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 22px", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, letterSpacing: "0.1em", color: "#4A5568", background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 10, cursor: "pointer", transition: "all 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#F0EEE9"; e.currentTarget.style.borderColor = "#CBD5E1"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.borderColor = "#E2E8F0"; }}

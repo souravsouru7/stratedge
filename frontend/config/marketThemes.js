@@ -74,59 +74,59 @@ export const marketThemes = {
   },
   
   [MARKETS.INDIAN_MARKET]: {
-    // Primary Colors - Forest Green theme
-    primary: '#2E7D32',        // Forest Green
-    primaryLight: '#43A047',   // Light Forest Green
-    primaryDark: '#1B5E20',    // Dark Forest Green
+    // Primary Colors - Deep emerald / matches logo accent
+    primary: '#14532D',        // Deep Emerald
+    primaryLight: '#22C55E',   // Emerald
+    primaryDark: '#0B3A1F',    // Very Dark Emerald
     
-    // Secondary Colors - Earth tones
-    secondary: '#1B5E20',      // Dark Green
-    secondaryLight: '#2E7D32', // Medium Green
-    secondaryDark: '#0D3D12',  // Very Dark Green
+    // Secondary Colors - Supportive green for UI chrome
+    secondary: '#166534',      // Mid Green
+    secondaryLight: '#4ADE80', // Light Green
+    secondaryDark: '#052E16',  // Near-black green
     
-    // Background Colors - Warm beige
-    background: '#F5F5DC',     // Beige/Cream
-    backgroundLight: '#FAF9D6',// Light Cream
-    backgroundDark: '#E8E4C9', // Darker Beige
+    // Background Colors - Neutral, pro dashboard style
+    background: '#F3F4F6',     // Slate-Gray Light
+    backgroundLight: '#F9FAFB',// Softer Light
+    backgroundDark: '#E5E7EB', // Border Gray
     
-    // Accent Colors - Golden
-    accent: '#FFD700',         // Pure Gold
-    accentLight: '#FFE135',    // Light Gold
-    accentDark: '#DAA520',     // Golden Rod
+    // Accent Colors - Refined gold accent
+    accent: '#FBBF24',         // Amber / Gold
+    accentLight: '#FCD34D',    // Lighter Amber
+    accentDark: '#D97706',     // Deep Amber
     
     // Trading Colors
-    bull: '#2E7D32',           // Forest Green (Bullish)
-    bear: '#C62828',           // Deep Red (Bearish)
-    bullLight: 'rgba(46, 125, 50, 0.1)',
-    bearLight: 'rgba(198, 40, 40, 0.1)',
+    bull: '#16A34A',           // Positive (Buy)
+    bear: '#DC2626',           // Negative (Sell)
+    bullLight: 'rgba(22, 163, 74, 0.10)',
+    bearLight: 'rgba(220, 38, 38, 0.10)',
     
     // Text Colors
-    textPrimary: '#1B5E20',    // Dark Green
-    textSecondary: '#2E7D32',  // Forest Green
-    textMuted: '#6B8E23',      // Olive Green
+    textPrimary: '#0F172A',    // Slate 900
+    textSecondary: '#334155',  // Slate 700
+    textMuted: '#9CA3AF',      // Slate 400
     textLight: '#FFFFFF',      // White
     
     // UI Elements
-    border: '#D4C9A8',         // Beige Border
-    shadow: 'rgba(27, 94, 32, 0.08)', // Green-tinted Shadow
-    overlay: 'rgba(27, 94, 32, 0.5)', // Green Overlay
+    border: '#E5E7EB',         // Neutral border
+    shadow: 'rgba(15, 23, 42, 0.08)', // Subtle dark shadow
+    overlay: 'rgba(15, 23, 42, 0.55)', // Modal overlay
     
     // Gradients
     gradients: {
-      primary: 'linear-gradient(135deg, #2E7D32 0%, #43A047 100%)',
-      secondary: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)',
-      bull: 'linear-gradient(135deg, #2E7D32 0%, #43A047 100%)',
-      bear: 'linear-gradient(135deg, #C62828 0%, #E53935 100%)',
-      accent: 'linear-gradient(135deg, #FFD700 0%, #FFE135 100%)',
+      primary: 'linear-gradient(135deg, #14532D 0%, #22C55E 100%)',
+      secondary: 'linear-gradient(135deg, #052E16 0%, #166534 100%)',
+      bull: 'linear-gradient(135deg, #16A34A 0%, #22C55E 100%)',
+      bear: 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
+      accent: 'linear-gradient(135deg, #D97706 0%, #FBBF24 100%)',
     },
     
     // Box Shadows
     shadows: {
-      sm: '0 1px 3px rgba(27, 94, 32, 0.06)',
-      md: '0 2px 8px rgba(27, 94, 32, 0.08)',
-      lg: '0 4px 16px rgba(27, 94, 32, 0.12)',
-      xl: '0 8px 32px rgba(27, 94, 32, 0.18)',
-      glow: '0 0 20px rgba(46, 125, 50, 0.3)',
+      sm: '0 1px 3px rgba(15, 23, 42, 0.04)',
+      md: '0 2px 8px rgba(15, 23, 42, 0.06)',
+      lg: '0 4px 16px rgba(15, 23, 42, 0.10)',
+      xl: '0 8px 32px rgba(15, 23, 42, 0.16)',
+      glow: '0 0 24px rgba(34, 197, 94, 0.35)',
     },
     
     // Typography

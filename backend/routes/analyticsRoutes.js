@@ -16,16 +16,6 @@ const {
     getAdvancedAnalytics
 } = require("../controllers/analyticsController");
 
-// Middleware to default marketType to Forex for these routes
-const defaultMarketType = (req, res, next) => {
-    if (!req.query.marketType) {
-        req.query.marketType = "Forex";
-    }
-    next();
-};
-
-router.use(defaultMarketType);
-
 // Basic analytics
 router.get("/summary", protect, getSummary);
 router.get("/weekly", protect, getWeeklyStats);

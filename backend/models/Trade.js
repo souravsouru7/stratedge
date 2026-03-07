@@ -57,51 +57,6 @@ const tradeSchema = new mongoose.Schema(
     screenshot: {
       type: String,
       default: ""
-    },
-
-    marketType: {
-      type: String,
-      enum: ["Forex", "Indian_Market"],
-      default: "Forex"
-    },
-
-    // Indian Market Specific Fields
-    segment: {
-      type: String,
-      enum: ["Equity", "F&O", "Commodity", "Currency", ""],
-      default: ""
-    },
-
-    instrumentType: {
-      type: String,
-      enum: ["EQUITY", "FUTURE", "OPTION", ""],
-      default: ""
-    },
-
-    strikePrice: Number,
-
-    expiryDate: Date,
-
-    quantity: Number,
-
-    tradeType: {
-      type: String,
-      enum: ["INTRADAY", "DELIVERY", "SWING", ""],
-      default: ""
-    },
-
-    brokerage: Number,
-    sttTaxes: Number,
-
-    entryBasis: {
-      type: String,
-      enum: ["Plan", "Emotion", "Impulsive", "Custom", ""],
-      default: "Plan"
-    },
-
-    entryBasisCustom: {
-      type: String,
-      default: ""
     }
 
   },

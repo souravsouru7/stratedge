@@ -1,6 +1,7 @@
 const cloudinary = require("../config/cloudinary");
 const { extractText } = require("../services/ocrService");
-const { parseTrade } = require("../services/parsingService");
+const { parseTrade, parseIndianTrade } = require("../services/parsingService");
+const { extractIndianTradeWithAI } = require("../services/aiExtractionService");
 
 exports.uploadImage = async (req, res) => {
   try {
@@ -12,30 +13,44 @@ exports.uploadImage = async (req, res) => {
 
     console.log("File received:", file.originalname, file.mimetype, file.size);
 
-    // Convert buffer to base64 for Cloudinary
     const b64 = Buffer.from(file.buffer).toString("base64");
     const dataURI = `data:${file.mimetype};base64,${b64}`;
 
-    // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(dataURI, {
       folder: "trades"
     });
 
     const imageUrl = result.secure_url;
-    console.log("Image uploaded to Cloudinary:", imageUrl);
-
-    // Run OCR on the uploaded image
     const extractedText = await extractText(imageUrl);
-    console.log("Extracted text:", extractedText);
+    const marketType = String(req.body.marketType || req.query.marketType || "Forex").trim();
 
-    // Get marketType from body or query
-    const marketType = req.body.marketType || req.query.marketType || "Forex";
-    console.log("Parsing for marketType:", marketType);
+    console.log("[Upload] marketType:", marketType, "| OCR length:", extractedText?.length ?? 0, "| OCR preview:", (extractedText || "").slice(0, 120) + "...");
 
-    // Parse the extracted text to get trade data
-    const { parseTrade, parseIndianTrade } = require("../services/parsingService");
-    const parsedTrade = marketType === "Indian_Market" ? parseIndianTrade(extractedText) : parseTrade(extractedText);
-    console.log("Parsed trade:", parsedTrade);
+    let parsedTrade;
+    if (marketType === "Indian_Market") {
+      parsedTrade = parseIndianTrade(extractedText);
+      // AI fallback when parser misses pair or profit
+      const badPair =
+        !parsedTrade.pair ||
+        String(parsedTrade.pair).trim().length < 6 ||
+        !/\b\d{4,5}\b/.test(String(parsedTrade.pair)) ||
+        !/\b(CE|PE|CALL|PUT|FUT)\b/i.test(String(parsedTrade.pair));
+      const needsFallback = badPair || parsedTrade.profit == null;
+      if (needsFallback && extractedText.trim().length >= 10) {
+        const aiResult = await extractIndianTradeWithAI(extractedText);
+        if (aiResult) {
+          if (!parsedTrade.pair && aiResult.pair) parsedTrade.pair = aiResult.pair;
+          if (parsedTrade.profit == null && aiResult.profit != null) parsedTrade.profit = aiResult.profit;
+          if (!parsedTrade.quantity && aiResult.quantity != null) parsedTrade.quantity = aiResult.quantity;
+          if (!parsedTrade.strikePrice && aiResult.strikePrice != null) parsedTrade.strikePrice = aiResult.strikePrice;
+          if (aiResult.optionType) parsedTrade.optionType = aiResult.optionType;
+        }
+      }
+    } else {
+      parsedTrade = parseTrade(extractedText);
+    }
+
+    console.log("[Upload] parsedTrade:", JSON.stringify(parsedTrade));
 
     res.json({
       url: imageUrl,

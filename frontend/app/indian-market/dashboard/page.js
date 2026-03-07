@@ -10,39 +10,30 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
 
 /* ─────────────────────────────────────────
-   DESIGN TOKENS — Indian Market Theme (Green/Gold)
-   Base: subtle beige #F5F5DC
-   Cards: #FFFFFF
-   Bull: #2E7D32 (forest green)
-   Bear: #C62828 (deep red)
-   Gold: #FFD700 (bright gold)
-   Text primary: #1B5E20
-   Text secondary: #388E3C
-   Text muted: #757575
-   Border: #E0E0E0
+   DESIGN TOKENS — Indian Market Pro Theme
+   - Neutral light dashboard background
+   - Deep emerald + gold accents to match logo
 ───────────────────────────────────────── */
 
 const theme = {
-    bull: "#2E7D32",
-    bear: "#C62828",
-    gold: "#FFD700",
-    primary: "#1B5E20",
-    secondary: "#388E3C",
-    muted: "#757575",
-    border: "#E0E0E0",
-    bg: "#F5F5DC",
-    card: "#FFFFFF"
+    bull: "#16A34A",           // Emerald
+    bear: "#DC2626",           // Red
+    gold: "#FBBF24",           // Refined gold accent
+    primary: "#14532D",        // Deep emerald (logo-matching)
+    secondary: "#166534",      // Supporting green
+    muted: "#6B7280",          // Slate muted
+    border: "#E5E7EB",         // Neutral border
+    bg: "#F3F4F6",             // Light slate background
+    card: "#FFFFFF"            // Clean white cards
 };
 
 /* ─────────────────────────────────────────
-   TICKER TAPE — NSE/BSE Symbols
+   TICKER TAPE — Options (CE/PE)
 ───────────────────────────────────────── */
 const indianTickers = [
-    { sym: "NIFTY 50", val: "+1.24%", bull: true }, { sym: "BANK NIFTY", val: "-0.45%", bull: false },
-    { sym: "RELIANCE", val: "+2.15%", bull: true }, { sym: "TCS", val: "+0.87%", bull: true },
-    { sym: "HDFC BANK", val: "-1.12%", bull: false }, { sym: "INFY", val: "+3.40%", bull: true },
-    { sym: "ICICI BANK", val: "+0.55%", bull: true }, { sym: "TATAMOTORS", val: "-2.30%", bull: false },
-    { sym: "SBIN", val: "+1.05%", bull: true }, { sym: "ADANIENT", val: "-4.12%", bull: false },
+    { sym: "NIFTY CE", val: "+1.24%", bull: true }, { sym: "NIFTY PE", val: "-0.45%", bull: false },
+    { sym: "BANK NIFTY CE", val: "+2.15%", bull: true }, { sym: "BANK NIFTY PE", val: "+0.87%", bull: true },
+    { sym: "FIN NIFTY CE", val: "-0.30%", bull: false }, { sym: "MIDCPNIFTY PE", val: "+1.40%", bull: true },
 ];
 
 function TickerTape() {
@@ -185,7 +176,7 @@ function CreateTradeButton() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
                 </svg>
-                NEW TRADE
+                NEW OPTIONS TRADE
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
                     <polyline points="6 9 12 15 18 9" />
                 </svg>
@@ -197,7 +188,7 @@ function CreateTradeButton() {
                     background: "#FFFFFF", borderRadius: 12, border: `1px solid ${theme.border}`,
                     boxShadow: "0 8px 32px rgba(27,94,32,0.15)", overflow: "hidden", minWidth: 220, zIndex: 100,
                 }}>
-                    <button onClick={() => handleOptionClick("/add-trade?market=Indian_Market")} style={dropOptionStyle}
+                    <button onClick={() => handleOptionClick("/indian-market/add-trade")} style={dropOptionStyle}
                         onMouseEnter={e => e.currentTarget.style.background = "#F9F9F9"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
@@ -207,12 +198,12 @@ function CreateTradeButton() {
                             </svg>
                         </div>
                         <div>
-                            <div style={dropLabelStyle}>Manual Entry</div>
-                            <div style={dropSubStyle}>Log trade details by hand</div>
+                            <div style={dropLabelStyle}>Log options trade</div>
+                            <div style={dropSubStyle}>Underlying, strike, CE/PE, premium</div>
                         </div>
                     </button>
                     <div style={{ height: 1, background: theme.border, margin: "0 12px" }} />
-                    <button onClick={() => handleOptionClick("/upload-trade?market=Indian_Market")} style={dropOptionStyle}
+                    <button onClick={() => handleOptionClick("/indian-market/upload-trade")} style={dropOptionStyle}
                         onMouseEnter={e => e.currentTarget.style.background = "#F9F9F9"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
@@ -222,7 +213,7 @@ function CreateTradeButton() {
                             </svg>
                         </div>
                         <div>
-                            <div style={dropLabelStyle}>Extract from Image</div>
+                            <div style={dropLabelStyle}>Extract from image</div>
                             <div style={dropSubStyle}>AI reads your screenshot</div>
                         </div>
                     </button>
@@ -278,7 +269,7 @@ export default function IndianMarketDashboard() {
     return (
         <div style={{
             minHeight: "100vh",
-            background: theme.bg,
+            background: `radial-gradient(circle at top left, rgba(251,191,36,0.12), transparent 55%), ${theme.bg}`,
             fontFamily: "'Plus Jakarta Sans',sans-serif",
             color: theme.primary,
             position: "relative",
@@ -290,21 +281,22 @@ export default function IndianMarketDashboard() {
             <header style={{
                 position: "relative", zIndex: 20,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
-                background: "rgba(255,255,255,0.92)",
-                backdropFilter: "blur(20px)",
-                borderBottom: `1px solid ${theme.border}`,
-                boxShadow: "0 1px 12px rgba(27,94,32,0.06)",
+                padding: "12px 24px", minHeight: 68, flexWrap: "wrap", gap: 10,
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 40%, #020617 100%)`,
+                borderBottom: `1px solid rgba(15,23,42,0.4)`,
+                boxShadow: "0 8px 24px rgba(15,23,42,0.45)",
             }}>
                 {/* Logo */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+                    <div style={{ width: 40, height: 40, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "rgba(15,23,42,0.4)", padding: 6 }}>
+                        <img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    </div>
                     <div>
-                        <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
+                        <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#F9FAFB", lineHeight: 1 }}>
                             STRATEDGE
                         </div>
-                        <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                            INDIAN MARKET JOURNAL
+                        <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.gold, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+                            OPTIONS JOURNAL · NSE / BSE
                         </div>
                     </div>
                 </div>
@@ -314,28 +306,45 @@ export default function IndianMarketDashboard() {
                     <MarketSwitcher />
 
                     <div style={{
-                        fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
-                        color: theme.secondary, letterSpacing: "0.06em",
-                        background: "#FFF", border: `1px solid ${theme.border}`,
+                        fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
+                        color: "#E5E7EB", letterSpacing: "0.08em",
+                        background: "rgba(15,23,42,0.6)", border: `1px solid rgba(148,163,184,0.5)`,
                         borderRadius: 6, padding: "4px 10px",
                     }}>
                         IST: {time}
                     </div>
 
-                    <nav style={{ display: "flex", gap: 4 }}>
+                    <nav style={{ display: "flex", gap: 6 }}>
                         {[
                             { href: "/indian-market/trades", label: "Journal" },
-                            { href: "/indian-market/add-trade", label: "Log Trade" },
+                            { href: "/indian-market/add-trade", label: "Log option" },
                             { href: "/indian-market/analytics", label: "Analytics" },
                         ].map(n => (
-                            <Link key={n.href} href={n.href} style={{
-                                fontSize: 12, color: theme.secondary, fontWeight: 600,
-                                textDecoration: "none", padding: "5px 10px",
-                                borderRadius: 6, transition: "all 0.15s",
-                                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            }}
-                                onMouseEnter={e => { e.currentTarget.style.background = "rgba(46,125,50,0.1)"; e.currentTarget.style.color = theme.primary; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = theme.secondary; }}
+                            <Link
+                                key={n.href}
+                                href={n.href}
+                                style={{
+                                    fontSize: 11,
+                                    color: "#E5E7EB",
+                                    fontWeight: 600,
+                                    textDecoration: "none",
+                                    padding: "6px 12px",
+                                    borderRadius: 999,
+                                    transition: "all 0.15s",
+                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                    background: "rgba(15,23,42,0.6)",
+                                    border: "1px solid rgba(148,163,184,0.5)"
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.background = "rgba(251,191,36,0.18)";
+                                    e.currentTarget.style.color = "#0F172A";
+                                    e.currentTarget.style.borderColor = "rgba(251,191,36,0.7)";
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.background = "rgba(15,23,42,0.6)";
+                                    e.currentTarget.style.color = "#E5E7EB";
+                                    e.currentTarget.style.borderColor = "rgba(148,163,184,0.5)";
+                                }}
                             >
                                 {n.label}
                             </Link>
@@ -388,16 +397,16 @@ export default function IndianMarketDashboard() {
                 maxWidth: 1080, margin: "0 auto",
             }}>
                 {!stats ? (
-                    <LoadingSpinner message="SYNCING INDIAN MARKETS..." />
+                    <LoadingSpinner message="SYNCING OPTIONS..." />
                 ) : (
                     <>
                         <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 14 }}>
                             <div>
                                 <h1 style={{ fontSize: 28, fontWeight: 800, color: theme.primary, margin: 0 }}>
-                                    Nifty & Sensex <span style={{ color: theme.secondary }}>Dashboard</span>
+                                    Options <span style={{ color: theme.secondary }}>Dashboard</span>
                                 </h1>
                                 <p style={{ fontSize: 12, color: theme.muted, marginTop: 5, fontFamily: "'JetBrains Mono',monospace" }}>
-                                    WELCOME BACK — ANALYSING INDIAN MARKETS
+                                    WELCOME BACK — NSE / BSE OPTIONS
                                 </p>
                             </div>
                             <CreateTradeButton />
@@ -407,7 +416,7 @@ export default function IndianMarketDashboard() {
                             <StatCard
                                 label="TOTAL TRADES"
                                 value={stats.totalTrades}
-                                sub="Indian Market entries"
+                                sub="Options trades"
                                 accentColor={theme.primary}
                                 delay={0}
                                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>}
@@ -431,16 +440,16 @@ export default function IndianMarketDashboard() {
                         </div>
 
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-                            <NavCard href="/indian-market/trades" label="Trade Log" sub="NSE/BSE History" accentColor={theme.primary} delay={0.3}
+                            <NavCard href="/indian-market/trades" label="Options Journal" sub="CE/PE trade log" accentColor={theme.primary} delay={0.3}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>}
                             />
-                            <NavCard href="/add-trade?market=Indian_Market" label="New Indian Trade" sub="Add F&O or Equity" accentColor={theme.secondary} delay={0.4}
+                            <NavCard href="/indian-market/add-trade" label="New options trade" sub="Log CE/PE trade" accentColor={theme.secondary} delay={0.4}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
                             />
-                            <NavCard href="/upload-trade?market=Indian_Market" label="Extract from Image" sub="AI Data Extraction" accentColor={theme.gold} delay={0.45}
+                            <NavCard href="/indian-market/upload-trade" label="Extract from image" sub="AI from screenshot" accentColor={theme.gold} delay={0.45}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>}
                             />
-                            <NavCard href="/indian-market/analytics" label="Indian Analytics" sub="Depth analysis" accentColor={theme.gold} delay={0.5}
+                            <NavCard href="/indian-market/analytics" label="Options analytics" sub="Depth analysis" accentColor={theme.gold} delay={0.5}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>}
                             />
                         </div>
