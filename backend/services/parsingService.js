@@ -114,8 +114,14 @@ function correctStrikeOcrTypo(underlying, rawStrike) {
   if (strike >= range[0] && strike <= range[1]) return String(strike);
   const corrected = STRIKE_CORRECTIONS[String(strike)];
   if (corrected) return corrected;
-  if (strike < 10000 && u === "NIFTY" && strike >= 2000) return String(strike * 10);
-  if (strike < 1000 && u === "NIFTY") return String(strike * 100);
+  
+  // Nifty specific corrections for common OCR swaps
+  if (u === "NIFTY") {
+    if (strike === 62000) return "26200";
+    if (strike === 64000) return "26400";
+    if (strike < 10000 && strike >= 2000) return String(strike * 10);
+    if (strike < 1000) return String(strike * 100);
+  }
   return String(strike);
 }
 function fixInstrumentOcrTypos(line) {
@@ -133,6 +139,37 @@ function parseNumberWithSpaces(s) {
   if (!s || typeof s !== "string") return NaN;
   const cleaned = s.replace(/\s+/g, "").replace(/,/g, "");
   return parseFloat(cleaned);
+}
+
+/**
+ * Robust P&L Cleaning
+ * Handles cases where ₹ is misread as '3' or '2' at the start of a number.
+ * e.g., "+3325.00" -> 325.00 if we detect inflation.
+ */
+function cleanPnLValue(raw) {
+  if (!raw) return null;
+  // Remove currency symbols and spaces
+  let s = raw.replace(/[₹\s,]/g, "");
+  
+  // Regex to detect a digit prepended by OCR misreading symbol
+  const signMatch = raw.match(/[+\-]/);
+  const sign = signMatch ? signMatch[0] : "";
+  
+  // If it starts with +3 or -3 or +2 or -2 followed by more digits
+  if (sign && s.match(/^[+\-][32]\d{3,}\.?\d*$/)) {
+    // Strip the char at index 1 (the '3' or '2')
+    const stripped = s[0] + s.substring(2);
+    const originalVal = Math.abs(parseFloat(s));
+    
+    // Heuristic: If it's a "3" prefix and the result is more plausible
+    // or if the first two digits are both 3 (very common OCR error for ₹3)
+    if (s[1] === '3' && (s[2] === '3' || originalVal > 3000)) {
+       return parseFloat(stripped);
+    }
+  }
+
+  const parsed = parseFloat(s);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function looksLikeIndianInstrument(line) {
@@ -172,28 +209,25 @@ exports.parseIndianTrade = (text) => {
       /(Total|Overall)\s*P\s*&\s*L[^\d\-+]*([+\-]?\s*[\d,\s]+(?:\.\d+)?)/
     );
     if (overallMatch && !profit) {
-      const parsed = parseNumberWithSpaces(overallMatch[2]);
-      if (!Number.isNaN(parsed)) profit = parsed;
+      profit = cleanPnLValue(overallMatch[2]);
     }
     // "Total P&L" on one line, "+4 132.50" on next (OCR split, space in number)
     if (!profit && i > 0 && lines[i - 1].match(/(Total|Overall)\s*P\s*&\s*L/i)) {
       const numMatch = line.match(/^([+\-]?\s*[\d,\s]+\.?\d*)$/);
       if (numMatch) {
-        const parsed = parseNumberWithSpaces(numMatch[1]);
-        if (!Number.isNaN(parsed) && Math.abs(parsed) >= 1) profit = parsed;
+        const parsed = cleanPnLValue(numMatch[1]);
+        if (parsed !== null && Math.abs(parsed) >= 1) profit = parsed;
       }
     }
     // Broker card: "NRML +4,132.50 LTP 161.60"
     const nrmlMatch = line.match(/NRML\s*([+\-]?\s*[\d,\s]+\.?\d*)/);
     if (nrmlMatch && !profit) {
-      const parsed = parseNumberWithSpaces(nrmlMatch[1]);
-      if (!Number.isNaN(parsed)) profit = parsed;
+      profit = cleanPnLValue(nrmlMatch[1]);
     }
     // Standalone large P&L when context suggests broker screen (e.g. "+4 132.50")
     const standaloneMatch = line.match(/^([+\-]?\s*[\d,\s]+\.\d{2})$/);
     if (standaloneMatch && !profit && (rawText.includes("Total") || rawText.includes("P&L") || rawText.includes("NRML"))) {
-      const parsed = parseNumberWithSpaces(standaloneMatch[1]);
-      if (!Number.isNaN(parsed) && Math.abs(parsed) >= 100) profit = parsed;
+      profit = cleanPnLValue(standaloneMatch[1]);
     }
   }
 
@@ -361,4 +395,180 @@ exports.parseIndianTrade = (text) => {
     expiryDate: expiryDate || null,
     marketType: "Indian_Market",
   };
+};
+
+// ─────────────────────────────────────────────────────────────
+// Multi-Trade Parser: parseTradesFromOCR(text)
+// Splits OCR text into multiple trade blocks and returns an
+// array of { symbol, strike, optionType, quantity, entryPrice, pnl }
+// ─────────────────────────────────────────────────────────────
+
+// Lines that are UI chrome / noise – never part of a trade
+const NOISE_PATTERNS = [
+  /^Portfolio$/i,
+  /^Positions$/i,
+  /^Holdings$/i,
+  /^Markets$/i,
+  /^Watchlist$/i,
+  /^Orders$/i,
+  /^Options$/i,
+  /^Exit\s*all$/i,
+  /^Smart\s*Exit/i,
+  /^Disabled$/i,
+  /^Enabled$/i,
+  /^Total\s+P\s*&?\s*L/i,
+  /^Overall\s+P\s*&?\s*L/i,
+  /^[\u20B9₹]?\s*[+\-]?\s*[\d,\s]+\.\d{2}\s*$/,  // Total P&L value line like "+₹650.00"
+];
+
+function isNoiseLine(line) {
+  return NOISE_PATTERNS.some((re) => re.test(line.trim()));
+}
+
+// Regex to detect an Indian contract header:  SYMBOL [optional expiry info] STRIKE CE/PE
+const CONTRACT_HEADER_RE =
+  /\b(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX)\b[\s\w]*?\b(\d{4,6})\s*(CE|PE|CALL|PUT)\b/i;
+
+/**
+ * parseTradesFromOCR(text)
+ *
+ * Receives the raw OCR text extracted from an Indian broker screenshot,
+ * detects every contract header (SYMBOL STRIKE CE/PE), collects the
+ * subsequent lines as context for that trade, and extracts structured
+ * fields from each block.
+ *
+ * @param {string} text  – raw OCR text (may contain multiple trades)
+ * @returns {Array<{symbol:string, strike:number, optionType:string,
+ *                   quantity:number|null, entryPrice:number|null, pnl:number|null}>}
+ */
+exports.parseTradesFromOCR = (text) => {
+  if (!text || typeof text !== "string") return [];
+
+  // Normalize common OCR errors before splitting
+  let normalized = text
+    // Fix common symbol OCR typos
+    .replace(/N1FTY|NlFTY/gi, "NIFTY")
+    .replace(/BANKN1FTY|BANK\s*N1FTY/gi, "BANKNIFTY")
+    // Remove stray unicode / special chars that OCR injects
+    .replace(/[©®™●·○]/g, " ")
+    .replace(/@/g, " ")
+    // Normalize rupee symbols (₹ may OCR as various forms)
+    .replace(/[\u20B9]/g, "₹");
+
+  const lines = normalized
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  // ── Step 1: Identify trade block boundaries ──────────────────
+  // Each contract header starts a new block; lines between two
+  // headers belong to the preceding trade.
+  const blocks = []; // Array of { headerLine, contextLines[] }
+  let currentBlock = null;
+
+  for (const line of lines) {
+    // Skip pure noise
+    if (isNoiseLine(line)) continue;
+
+    const fixedLine = fixInstrumentOcrTypos(line);
+    const headerMatch = fixedLine.match(CONTRACT_HEADER_RE);
+
+    if (headerMatch) {
+      // Start a new block
+      currentBlock = { headerLine: fixedLine, contextLines: [] };
+      blocks.push(currentBlock);
+    } else if (currentBlock) {
+      currentBlock.contextLines.push(fixedLine);
+    }
+    // Lines before the first header are ignored (app chrome)
+  }
+
+  if (blocks.length === 0) return [];
+
+  // ── Step 2: Extract fields from each block ───────────────────
+  const trades = blocks.map((block) => {
+    const headerMatch = block.headerLine.match(CONTRACT_HEADER_RE);
+    const symbol = headerMatch[1].toUpperCase().replace(/\s+/g, "");
+    const rawStrike = headerMatch[2];
+    const rawType = headerMatch[3].toUpperCase().replace("CALL", "CE").replace("PUT", "PE");
+
+    // Correct OCR typos in strike
+    const strike = parseFloat(correctStrikeOcrTypo(symbol, rawStrike));
+
+    let quantity = null;
+    let entryPrice = null; // Prioritized Avg Price
+    let ltpPrice = null;   // Fallback
+    let pnl = null;
+
+    // Check the header line itself for inline P&L like "+₹325.00" or "+325.00"
+    const headerPnlMatch = block.headerLine.match(
+      /[+\-]\s*₹?\s*([\d,\s]+\.?\d*)\s*$/
+    );
+    if (headerPnlMatch) {
+      pnl = cleanPnLValue(headerPnlMatch[0]);
+    }
+
+    // Parse context lines
+    for (const ctx of block.contextLines) {
+      // ── Quantity ──
+      const qtyMatch = ctx.match(
+        /(?:Qty|QTY|Quantity|Net\s*Qty|Lots?)\s*[:\s]*(\d[\d,]*)/i
+      );
+      if (qtyMatch && quantity === null) {
+        quantity = parseInt(qtyMatch[1].replace(/,/g, ""), 10);
+      }
+
+      // ── Entry Price / Avg Price ──
+      const avgMatch = ctx.match(
+        /(?:Avg\.?\s*(?:Price)?|Average\s*Price|Entry|Buy\s*Avg)\s*[:\s]*([\d,]+\.?\d*)/i
+      );
+      if (avgMatch && entryPrice === null) {
+        entryPrice = parseFloat(avgMatch[1].replace(/,/g, ""));
+      }
+
+      // ── LTP Price (Candidate for fallback) ──
+      const ltpMatch = ctx.match(/LTP\s*[:\s]*([\d,]+\.?\d*)/i);
+      if (ltpMatch && ltpPrice === null) {
+        ltpPrice = parseFloat(ltpMatch[1].replace(/,/g, ""));
+      }
+
+      // ── P&L / PNL / Profit ──
+      if (pnl === null) {
+        // Explicit label + value
+        const pnlMatch = ctx.match(
+          /(?:P\s*&?\s*L|PNL|Profit)\s*[:\s]*([+\-]?\s*₹?\s*[\d,\s]+\.?\d*)/i
+        );
+        if (pnlMatch) {
+          pnl = cleanPnLValue(pnlMatch[1]);
+        }
+      }
+
+      // ── Standalone P&L value like "+₹325.00" or "-120.50" ──
+      if (pnl === null) {
+        const standalonePnl = ctx.match(/^[+\-]\s*₹?\s*([\d,]+\.?\d*)$/);
+        if (standalonePnl) {
+          pnl = cleanPnLValue(ctx);
+        }
+      }
+
+      // ── Inline P&L on same line as other data (e.g. after percentage) ──
+      if (pnl === null) {
+        const inlinePnl = ctx.match(/([+\-])\s*₹\s*([\d,]+\.?\d*)/);
+        if (inlinePnl) {
+          pnl = cleanPnLValue(inlinePnl[0]);
+        }
+      }
+    }
+
+    return {
+      symbol,
+      strike,
+      optionType: rawType,
+      quantity,
+      entryPrice: entryPrice !== null ? entryPrice : ltpPrice,
+      pnl,
+    };
+  });
+
+  return trades;
 };

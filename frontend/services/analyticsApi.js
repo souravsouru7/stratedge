@@ -96,3 +96,9 @@ export const getAdvancedAnalytics = async (marketType = 'Forex') => {
   const res = await fetch(`${baseUrl}/analytics/advanced?marketType=${marketType}`, getAuthHeaders());
   return handleResponse(res);
 };
+
+export const getPnLBreakdown = async (marketType = 'Forex') => {
+  const baseUrl = getBaseUrl(marketType);
+  const res = await fetch(`${baseUrl}/analytics/pnl-breakdown?marketType=${marketType}`, getAuthHeaders());
+  return handleResponse(res);
+};

@@ -44,15 +44,69 @@ exports.getSummary = async (req, res) => {
 
 exports.getWeeklyStats = async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req));
+    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
     const weekly = {};
+    
     trades.forEach(trade => {
       const date = new Date(trade.createdAt);
-      const week = `${date.getFullYear()}-W${Math.ceil(date.getDate() / 7)}`;
+      // ISO week calculation helper
+      const d = new Date(date.getTime());
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+      const yearStart = new Date(d.getFullYear(), 0, 1);
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      const week = `${d.getFullYear()}-W${weekNo}`;
+      
       if (!weekly[week]) weekly[week] = 0;
       weekly[week] += trade.profit || 0;
     });
     res.json(weekly);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * NEW: getPnLBreakdown
+ * Returns daily, weekly, and monthly P&L series for charts.
+ */
+exports.getPnLBreakdown = async (req, res) => {
+  try {
+    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
+    
+    const dailyMap = {};
+    const weeklyMap = {};
+    const monthlyMap = {};
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    trades.forEach(t => {
+      const date = new Date(t.createdAt);
+      const profit = t.profit || 0;
+
+      // Daily
+      const dKey = date.toISOString().split('T')[0];
+      dailyMap[dKey] = (dailyMap[dKey] || 0) + profit;
+
+      // Weekly (ISO)
+      const d = new Date(date.getTime());
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+      const yearStart = new Date(d.getFullYear(), 0, 1);
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      const wKey = `${d.getFullYear()}-W${weekNo}`;
+      weeklyMap[wKey] = (weeklyMap[wKey] || 0) + profit;
+
+      // Monthly
+      const mKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+      monthlyMap[mKey] = (monthlyMap[mKey] || 0) + profit;
+    });
+
+    const daily = Object.entries(dailyMap).map(([date, profit]) => ({ date, profit: parseFloat(profit.toFixed(2)) }));
+    const weekly = Object.entries(weeklyMap).map(([week, profit]) => ({ week, profit: parseFloat(profit.toFixed(2)) }));
+    const monthly = Object.entries(monthlyMap).map(([month, profit]) => ({ month, profit: parseFloat(profit.toFixed(2)) }));
+
+    res.json({ daily, weekly, monthly });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

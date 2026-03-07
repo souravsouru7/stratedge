@@ -9,8 +9,19 @@ import {
   getPerformanceMetrics,
   getTimeAnalysis,
   getDrawdownAnalysis,
-  getAIInsights
+  getAIInsights,
+  getPnLBreakdown
 } from "@/services/analyticsApi";
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  AreaChart,
+  Area
+} from "recharts";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
@@ -31,21 +42,32 @@ const theme = {
 function StatCard({ label, value, sub, color, delay = 0 }) {
   return (
     <div
+      className="premium-card"
       style={{
         background: theme.card,
-        borderRadius: 12,
+        borderRadius: 16,
         border: `1px solid ${theme.border}`,
-        padding: 20,
+        padding: "24px 20px",
         flex: "1 1 200px",
-        animation: `fadeUp 0.5s ease ${delay}s both`,
-        boxShadow: "0 2px 10px rgba(15,23,42,0.05)"
+        animation: `fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}s both`,
+        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        position: "relative",
+        overflow: "hidden"
       }}
     >
-      <div style={{ fontSize: 10, color: theme.muted, letterSpacing: "0.1em", marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: theme.muted, letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase" }}>
         {label}
       </div>
-      <div style={{ fontSize: 24, fontWeight: 800, color }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: theme.muted, marginTop: 4 }}>{sub}</div>}
+      <div style={{ fontSize: 28, fontWeight: 900, color, letterSpacing: "-0.02em" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: theme.muted, marginTop: 6, fontWeight: 500 }}>{sub}</div>}
+      <style jsx>{`
+        .premium-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.08);
+          border-color: ${theme.secondary}44;
+        }
+      `}</style>
     </div>
   );
 }
@@ -95,8 +117,10 @@ export default function IndianAnalyticsPage() {
     perf: null,
     time: null,
     drawdown: null,
-    ai: null
+    ai: null,
+    breakdown: null
   });
+  const [timeFilter, setTimeFilter] = useState("daily"); // daily, weekly, monthly
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -110,15 +134,16 @@ export default function IndianAnalyticsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [summary, rr, perf, time, drawdown, ai] = await Promise.all([
+      const [summary, rr, perf, time, drawdown, ai, breakdown] = await Promise.all([
         getSummary(MARKETS.INDIAN_MARKET),
         getRiskRewardAnalysis(MARKETS.INDIAN_MARKET),
         getPerformanceMetrics(MARKETS.INDIAN_MARKET),
         getTimeAnalysis(MARKETS.INDIAN_MARKET),
         getDrawdownAnalysis(MARKETS.INDIAN_MARKET),
-        getAIInsights(MARKETS.INDIAN_MARKET)
+        getAIInsights(MARKETS.INDIAN_MARKET),
+        getPnLBreakdown(MARKETS.INDIAN_MARKET)
       ]);
-      setData({ summary, rr, perf, time, drawdown, ai });
+      setData({ summary, rr, perf, time, drawdown, ai, breakdown });
     } finally {
       setLoading(false);
     }
@@ -259,6 +284,131 @@ export default function IndianAnalyticsPage() {
               />
             </div>
 
+            {/* P&L BREAKDOWN CHART */}
+            <div
+              style={{
+                background: theme.card,
+                borderRadius: 14,
+                border: `1px solid ${theme.border}`,
+                padding: 24,
+                marginBottom: 24,
+                boxShadow: "0 2px 10px rgba(15,23,42,0.05)"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>P&L Breakdown</div>
+                  <div style={{ fontSize: 11, color: theme.muted }}>Analyze your performance over time.</div>
+                </div>
+                <div style={{ display: "flex", gap: 4, background: theme.bg, padding: 4, borderRadius: 10 }}>
+                  {["daily", "weekly", "monthly"].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setTimeFilter(f)}
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 8,
+                        border: "none",
+                        cursor: "pointer",
+                        background: timeFilter === f ? theme.card : "transparent",
+                        color: timeFilter === f ? theme.primary : theme.muted,
+                        boxShadow: timeFilter === f ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ position: "relative", height: 350, width: "100%", marginTop: 10 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={data.breakdown?.[timeFilter] || []} margin={{ top: 20, right: 30, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={theme.bull} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={theme.bull} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorLoss" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={theme.bear} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={theme.bear} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="0" vertical={false} stroke="#E2E8F0" strokeOpacity={0.4} />
+                    <XAxis
+                      dataKey={timeFilter === "daily" ? "date" : timeFilter === "weekly" ? "week" : "month"}
+                      fontSize={11}
+                      fontWeight={600}
+                      tickLine={false}
+                      axisLine={false}
+                      dy={10}
+                      tick={{ fill: theme.muted }}
+                      tickFormatter={(val) => (timeFilter === "daily" ? val.split("-").slice(2).join("/") : val)}
+                    />
+                    <YAxis 
+                      fontSize={11} 
+                      fontWeight={600} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tick={{ fill: theme.muted }}
+                      tickFormatter={(val) => `₹${Math.abs(val) >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} 
+                    />
+                    <Tooltip
+                      cursor={{ stroke: theme.primary, strokeWidth: 1, strokeDasharray: '6 6', opacity: 0.3 }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const val = payload[0].value;
+                          const label = payload[0].payload[timeFilter === "daily" ? "date" : timeFilter === "weekly" ? "week" : "month"];
+                          return (
+                            <div
+                              style={{
+                                background: "rgba(255, 255, 255, 0.9)",
+                                backdropFilter: "blur(12px)",
+                                border: `1px solid rgba(255, 255, 255, 0.5)`,
+                                padding: "14px 20px",
+                                borderRadius: 16,
+                                boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.15)",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 4
+                              }}
+                            >
+                              <div style={{ fontSize: 10, color: theme.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</div>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: val >= 0 ? theme.bull : theme.bear }}>
+                                {val >= 0 ? "+" : ""}₹{Math.abs(val).toLocaleString("en-IN")}
+                              </div>
+                              <div style={{ fontSize: 9, color: theme.muted, fontStyle: "italic" }}>Model-verified performance</div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <ReferenceLine y={0} stroke={theme.border} strokeWidth={2} strokeDasharray="4 4" />
+                    <Area
+                      type="monotone"
+                      dataKey="profit"
+                      stroke={theme.bull}
+                      strokeWidth={4}
+                      fillOpacity={1}
+                      fill="url(#colorProfit)"
+                      connectNulls
+                      activeDot={{ 
+                        r: 8, 
+                        fill: theme.bull, 
+                        stroke: "#FFF", 
+                        strokeWidth: 3,
+                        style: { filter: `drop-shadow(0 4px 8px ${theme.bull}44)` }
+                      }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             {/* RISK / REWARD + DRAWDOWN */}
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
               <div
@@ -393,30 +543,84 @@ export default function IndianAnalyticsPage() {
                   background: theme.card,
                   borderRadius: 14,
                   border: `1px solid ${theme.border}`,
-                  padding: 20
+                  padding: 24,
+                  boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)"
                 }}
               >
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>AI Insights</div>
-                <div style={{ fontSize: 11, color: theme.muted, marginBottom: 10 }}>
-                  Model-derived notes from your Indian options journal.
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800 }}>Model Intelligence</div>
+                    <div style={{ fontSize: 11, color: theme.muted }}>AI-derived notes from your Nifty/BankNifty journal.</div>
+                  </div>
+                  <div style={{ 
+                    background: `${theme.gold}22`, 
+                    color: theme.gold, 
+                    fontSize: 10, 
+                    fontWeight: 800, 
+                    padding: "4px 8px", 
+                    borderRadius: 6,
+                    border: `1px solid ${theme.gold}44`
+                  }}>
+                    BETA MODEL V2
+                  </div>
                 </div>
-                {data.ai?.insights?.length ? (
-                  data.ai.insights.slice(0, 6).map((txt, idx) => (
-                    <InsightTag
-                      key={idx}
-                      text={txt}
-                      type={
-                        txt.includes("⚠️") || txt.includes("drawdown")
-                          ? "warning"
-                          : txt.includes("Excellent") || txt.includes("Great")
-                          ? "success"
-                          : "info"
-                      }
-                    />
-                  ))
-                ) : (
-                  <div style={{ fontSize: 12, color: theme.muted }}>Not enough data yet.</div>
-                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {data.ai?.insights?.length ? (
+                    data.ai.insights.slice(0, 6).map((txt, idx) => (
+                      <InsightTag
+                        key={idx}
+                        text={txt}
+                        type={
+                          txt.includes("⚠️") || txt.includes("drawdown")
+                            ? "warning"
+                            : txt.includes("Excellent") || txt.includes("Great")
+                            ? "success"
+                            : "info"
+                        }
+                      />
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 12, color: theme.muted }}>Not enough data yet.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* PERFORMANCE DEEP DIVE */}
+            <div
+              style={{
+                background: theme.card,
+                borderRadius: 14,
+                border: `1px solid ${theme.border}`,
+                padding: 24,
+                marginBottom: 24,
+                boxShadow: "0 2px 10px rgba(15,23,42,0.05)"
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 20 }}>Performance Deep Dive</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>PROFIT FACTOR</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: theme.gold }}>{data.perf?.profitFactor || "0.00"}</div>
+                  <div style={{ fontSize: 10, color: theme.muted }}>Gross Profit / Gross Loss</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>MAX STREAKS</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>
+                    <span style={{ color: theme.bull }}>{data.perf?.maxWinStreak || 0} Wins</span> / <span style={{ color: theme.bear }}>{data.perf?.maxLossStreak || 0} Losses</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: theme.muted }}>Consecutive wins vs losses</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>LARGEST WIN</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: theme.bull }}>₹{parseFloat(data.perf?.largestWin || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: theme.muted }}>Single best trade</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>LARGEST LOSS</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: theme.bear }}>₹{parseFloat(data.perf?.largestLoss || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: theme.muted }}>Single worst trade</div>
+                </div>
               </div>
             </div>
           </>

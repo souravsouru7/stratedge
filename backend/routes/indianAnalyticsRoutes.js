@@ -11,7 +11,8 @@ const {
   getTradeQuality,
   getDrawdownAnalysis,
   getAIInsights,
-  getAdvancedAnalytics
+  getAdvancedAnalytics,
+  getPnLBreakdown
 } = require("../controllers/indianAnalyticsController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -29,5 +30,6 @@ router.get("/quality", getTradeQuality);
 router.get("/drawdown", getDrawdownAnalysis);
 router.get("/ai-insights", getAIInsights);
 router.get("/advanced", getAdvancedAnalytics);
+router.get("/pnl-breakdown", getPnLBreakdown);
 
 module.exports = router;

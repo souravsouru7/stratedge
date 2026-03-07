@@ -1,6 +1,6 @@
 const cloudinary = require("../config/cloudinary");
 const { extractText } = require("../services/ocrService");
-const { parseTrade, parseIndianTrade } = require("../services/parsingService");
+const { parseTrade, parseIndianTrade, parseTradesFromOCR } = require("../services/parsingService");
 const { extractIndianTradeWithAI } = require("../services/aiExtractionService");
 
 exports.uploadImage = async (req, res) => {
@@ -27,8 +27,11 @@ exports.uploadImage = async (req, res) => {
     console.log("[Upload] marketType:", marketType, "| OCR length:", extractedText?.length ?? 0, "| OCR preview:", (extractedText || "").slice(0, 120) + "...");
 
     let parsedTrade;
+    let parsedTrades = null; // Multi-trade array for Indian Market
     if (marketType === "Indian_Market") {
       parsedTrade = parseIndianTrade(extractedText);
+      // Multi-trade extraction (returns array of trades)
+      parsedTrades = parseTradesFromOCR(extractedText);
       // AI fallback when parser misses pair or profit
       const badPair =
         !parsedTrade.pair ||
@@ -51,11 +54,13 @@ exports.uploadImage = async (req, res) => {
     }
 
     console.log("[Upload] parsedTrade:", JSON.stringify(parsedTrade));
+    if (parsedTrades) console.log("[Upload] parsedTrades:", JSON.stringify(parsedTrades));
 
     res.json({
       url: imageUrl,
       extractedText,
-      parsedTrade
+      parsedTrade,
+      ...(parsedTrades && parsedTrades.length > 0 && { parsedTrades })
     });
 
   } catch (error) {
