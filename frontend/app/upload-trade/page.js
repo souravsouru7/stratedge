@@ -252,6 +252,7 @@ function UploadTradeContent() {
   const [saved, setSaved] = useState(false);
   const [showCustomRR, setShowCustomRR] = useState(false);
   const [showSample, setShowSample] = useState(false);
+  const [broker, setBroker] = useState("AUTO");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -268,6 +269,9 @@ function UploadTradeContent() {
       const formData = new FormData();
       formData.append("image", file);
       formData.append("marketType", marketType); // Send marketType
+      if (marketType === MARKETS.INDIAN_MARKET) {
+        formData.append("broker", broker);
+      }
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/upload?marketType=${marketType}`, {
         method: "POST",
@@ -295,17 +299,27 @@ function UploadTradeContent() {
               action: "buy",
               quantity: t.quantity != null ? String(t.quantity) : "",
               profit: t.pnl != null ? String(t.pnl) : "",
+              entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
+              exitPrice: "",
               optionType: ot,
               screenshot: data.url,
               segment: "F&O",
               instrumentType: "OPTION",
               strikePrice: strike,
+              tradeType: "INTRADAY",
+              strategy: "",
+              strategyCustom: "",
               expiryDate: "",
               riskRewardRatio: "",
               riskRewardCustom: "",
               entryBasis: "Plan",
               entryBasisCustom: "",
               notes: "",
+              setup: "",
+              mistakeTag: "",
+              lesson: "",
+              brokerage: "",
+              sttTaxes: "",
             };
           });
           setTrades(tradeArr);
@@ -321,16 +335,27 @@ function UploadTradeContent() {
             action: (p.action || p.type || "BUY").toString().toUpperCase().slice(0, 4) === "SELL" ? "sell" : "buy",
             quantity: p.quantity != null ? String(p.quantity) : "",
             profit: p.profit != null && p.profit !== "" ? String(p.profit) : "",
+            entryPrice: p.entryPrice != null ? String(p.entryPrice) : "",
+            exitPrice: p.exitPrice != null ? String(p.exitPrice) : "",
             optionType: optionTypeFromPair,
             screenshot: data.url,
             segment: "F&O",
             instrumentType: "OPTION",
             strikePrice: p.strikePrice != null ? String(p.strikePrice) : "",
+            tradeType: "INTRADAY",
+            strategy: "",
+            strategyCustom: "",
             expiryDate: p.expiryDate || "",
             riskRewardRatio: "",
             riskRewardCustom: "",
             entryBasis: "Plan",
             entryBasisCustom: "",
+            notes: "",
+            setup: "",
+            mistakeTag: "",
+            lesson: "",
+            brokerage: "",
+            sttTaxes: "",
           });
           setTrades([]);
         }
@@ -391,10 +416,20 @@ function UploadTradeContent() {
         strikePrice: t.strikePrice ? parseFloat(t.strikePrice) : undefined,
         underlying: t.pair ? t.pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim() : undefined,
         screenshot: t.screenshot,
+        entryPrice: t.entryPrice ? parseFloat(t.entryPrice) : undefined,
+        exitPrice: t.exitPrice ? parseFloat(t.exitPrice) : undefined,
+        tradeType: t.tradeType || undefined,
+        strategy: t.strategy === "Custom" ? (t.strategyCustom?.trim() || "Custom") : (t.strategy || undefined),
+        expiryDate: t.expiryDate || undefined,
         riskRewardRatio: t.riskRewardRatio || undefined,
         entryBasis: t.entryBasis || "Plan",
         entryBasisCustom: t.entryBasis === "Custom" ? t.entryBasisCustom : undefined,
         notes: t.notes || undefined,
+        setup: t.setup || undefined,
+        mistakeTag: t.mistakeTag || undefined,
+        lesson: t.lesson || undefined,
+        brokerage: t.brokerage ? parseFloat(t.brokerage) : undefined,
+        sttTaxes: t.sttTaxes ? parseFloat(t.sttTaxes) : undefined,
       };
       const result = await createTrade(tradeData, marketType);
       if (result && result._id) {
@@ -444,6 +479,14 @@ function UploadTradeContent() {
         tradeData.profit = trade.profit ? parseFloat(trade.profit) : undefined;
         tradeData.strikePrice = trade.strikePrice ? parseFloat(trade.strikePrice) : undefined;
         tradeData.underlying = trade.pair ? trade.pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim() : undefined;
+        tradeData.tradeType = trade.tradeType || undefined;
+        tradeData.strategy = trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined);
+        tradeData.expiryDate = trade.expiryDate || undefined;
+        tradeData.setup = trade.setup || undefined;
+        tradeData.mistakeTag = trade.mistakeTag || undefined;
+        tradeData.lesson = trade.lesson || undefined;
+        tradeData.brokerage = trade.brokerage ? parseFloat(trade.brokerage) : undefined;
+        tradeData.sttTaxes = trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined;
       } else {
         tradeData.lotSize = trade.lotSize ? parseFloat(trade.lotSize) : undefined;
         tradeData.commission = trade.commission ? parseFloat(trade.commission) : undefined;
@@ -576,6 +619,34 @@ function UploadTradeContent() {
         <SectionCard accentColor={isInd ? "#1B5E20" : "#B8860B"} title="Upload Screenshot" subtitle={isInd ? "DROP YOUR OPTIONS TRADE SCREENSHOT (BROKER APP)" : "DROP YOUR TRADE SCREENSHOT TO BEGIN AI EXTRACTION"} delay={0.05}>
 
           <FileUploadZone selectedFile={file} onFileSelect={f => { setFile(f); setError(null); }} onClear={() => { setFile(null); setError(null); }} />
+
+          {/* Broker selector (Indian Market only) */}
+          {isInd && (
+            <div style={{ marginTop: 14 }}>
+              <FormSelect
+                label="BROKER (OPTIONAL)"
+                name="broker"
+                value={broker}
+                onChange={(e) => setBroker(e.target.value)}
+                options={[
+                  { value: "AUTO", label: "Auto-detect" },
+                  { value: "Zerodha", label: "Zerodha (Kite)" },
+                  { value: "Upstox", label: "Upstox" },
+                  { value: "Angel One", label: "Angel One" },
+                  { value: "Groww", label: "Groww" },
+                  { value: "Dhan", label: "Dhan" },
+                  { value: "Fyers", label: "Fyers" },
+                  { value: "5paisa", label: "5paisa" },
+                  { value: "ICICI Direct", label: "ICICI Direct" },
+                  { value: "Kotak", label: "Kotak Securities" },
+                  { value: "Paytm Money", label: "Paytm Money" },
+                ]}
+              />
+              <div style={{ marginTop: 6, fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                If extraction is wrong, pick your broker to apply the right screen template.
+              </div>
+            </div>
+          )}
 
           {/* ── INDIAN OPTIONS HINT (before file selected) ── */}
           {isInd && !file && (
@@ -737,8 +808,19 @@ function UploadTradeContent() {
                   <FormSelect label="BUY / SELL" name="action" value={t.action} onChange={e => handleTradeChange(idx, e)} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
                   <FormInput label="QTY (lots)" name="quantity" value={t.quantity} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 3" />
                   <FormInput label="PROFIT / LOSS (₹)" name="profit" value={t.profit} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 1500 or -500" />
+                  <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={t.entryPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 85.50" />
+                  <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={t.exitPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 120" />
+                  <FormSelect label="TRADE TYPE" name="tradeType" value={t.tradeType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />
+                  <FormSelect label="STRATEGY" name="strategy" value={t.strategy} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "Naked CE", label: "Naked CE" }, { value: "Naked PE", label: "Naked PE" }, { value: "Straddle", label: "Straddle" }, { value: "Spread", label: "Spread" }, { value: "Breakout", label: "Breakout" }, { value: "Support/Resistance", label: "Support/Resistance" }, { value: "IV crush", label: "IV crush" }, { value: "Other", label: "Other" }, { value: "Custom", label: "Custom" }]} />
+                  {t.strategy === "Custom" && (
+                    <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={t.strategyCustom} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. My own setup" />
+                  )}
+                  <FormInput label="EXPIRY DATE" name="expiryDate" value={t.expiryDate} onChange={e => handleTradeChange(idx, e)} placeholder="YYYY-MM-DD" />
                   <FormSelect label="ENTRY BASIS" name="entryBasis" value={t.entryBasis} onChange={e => handleTradeChange(idx, e)} options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]} />
                   <FormSelect label="RISK : REWARD" name="riskRewardRatio" value={t.riskRewardRatio} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }]} />
+                  <FormInput label="SETUP / PATTERN" name="setup" value={t.setup} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Breakout above 26200" />
+                  <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={t.mistakeTag} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />
+                  <FormInput label="LESSON (one line)" name="lesson" value={t.lesson} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Never add to a losing position" />
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={labelStyle}>NOTES</label>
@@ -818,6 +900,14 @@ function UploadTradeContent() {
                   <FormSelect label="BUY / SELL" name="action" value={trade?.action} onChange={handleChange} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
                   <FormInput label="QTY (lots)" name="quantity" value={trade?.quantity} onChange={handleChange} placeholder="e.g. 3" />
                   <FormInput label="PROFIT / LOSS (₹)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="e.g. 1500 or -500" />
+                  <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="e.g. 85.50" />
+                  <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="e.g. 120" />
+                  <FormSelect label="TRADE TYPE" name="tradeType" value={trade?.tradeType} onChange={handleChange} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />
+                  <FormSelect label="STRATEGY" name="strategy" value={trade?.strategy} onChange={handleChange} options={[{ value: "", label: "Select..." }, { value: "Naked CE", label: "Naked CE" }, { value: "Naked PE", label: "Naked PE" }, { value: "Straddle", label: "Straddle" }, { value: "Spread", label: "Spread" }, { value: "Breakout", label: "Breakout" }, { value: "Support/Resistance", label: "Support/Resistance" }, { value: "IV crush", label: "IV crush" }, { value: "Other", label: "Other" }, { value: "Custom", label: "Custom" }]} />
+                  {trade?.strategy === "Custom" && (
+                    <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={trade?.strategyCustom} onChange={handleChange} placeholder="e.g. My own setup" />
+                  )}
+                  <FormInput label="EXPIRY DATE" name="expiryDate" value={trade?.expiryDate} onChange={handleChange} placeholder="YYYY-MM-DD" />
                   <FormSelect
                     label="RISK : REWARD"
                     name="riskRewardRatio"
@@ -852,6 +942,9 @@ function UploadTradeContent() {
                   {trade?.entryBasis === "Custom" && (
                     <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
                   )}
+                  <FormInput label="SETUP / PATTERN" name="setup" value={trade?.setup} onChange={handleChange} placeholder="e.g. Breakout above 26200" />
+                  <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={trade?.mistakeTag} onChange={handleChange} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />
+                  <FormInput label="LESSON (one line)" name="lesson" value={trade?.lesson} onChange={handleChange} placeholder="e.g. Never add to a losing position" />
                 </>
               ) : (
                 <>

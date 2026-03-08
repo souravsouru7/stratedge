@@ -75,7 +75,12 @@ const indianTradeSchema = new mongoose.Schema(
       enum: ["Plan", "Emotion", "Impulsive", "Custom", ""],
       default: "Plan"
     },
-    entryBasisCustom: { type: String, default: "" }
+    entryBasisCustom: { type: String, default: "" },
+
+    // Journal: setup/pattern, mistake tag, one-line lesson
+    setup: { type: String, default: "" },
+    mistakeTag: { type: String, default: "" },
+    lesson: { type: String, default: "" }
   },
   { timestamps: true }
 );

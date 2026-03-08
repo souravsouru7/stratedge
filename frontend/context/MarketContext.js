@@ -140,13 +140,14 @@ export function MarketProvider({ children }) {
         bear: '#D63B3B'
       };
     } else {
+      // Same as Forex
       return {
-        primary: '#2E7D32',
-        secondary: '#1B5E20',
-        background: '#F5F5DC',
-        accent: '#FFD700',
-        bull: '#2E7D32',
-        bear: '#C62828'
+        primary: '#0D9E6E',
+        secondary: '#0F1923',
+        background: '#F0EEE9',
+        accent: '#B8860B',
+        bull: '#0D9E6E',
+        bear: '#D63B3B'
       };
     }
   };

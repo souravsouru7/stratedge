@@ -37,3 +37,6 @@ Thumbs.db
 
 # Cloudinary / Image processing
 *.traineddata
+
+# Google Cloud credentials (never commit service account keys)
+backend/config/even-plating-*.json

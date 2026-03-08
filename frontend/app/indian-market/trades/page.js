@@ -8,18 +8,16 @@ import MarketSwitcher from "@/components/MarketSwitcher";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import InstallPWA from "@/components/InstallPWA";
 
-/* ─────────────────────────────────────────
-   DESIGN TOKENS — Indian Market Pro Theme
-───────────────────────────────────────── */
+/* Same theme as Forex */
 const theme = {
-    bull: "#16A34A",
-    bear: "#DC2626",
-    gold: "#FBBF24",
-    primary: "#14532D",
-    secondary: "#166534",
-    muted: "#6B7280",
-    border: "#E5E7EB",
-    bg: "#F3F4F6",
+    bull: "#0D9E6E",
+    bear: "#D63B3B",
+    gold: "#B8860B",
+    primary: "#0D9E6E",
+    secondary: "#0F1923",
+    muted: "#94A3B8",
+    border: "#E2E8F0",
+    bg: "#F0EEE9",
     card: "#FFFFFF"
 };
 
@@ -31,7 +29,7 @@ function TickerTape() {
     ];
     const items = [...options, ...options];
     return (
-        <div style={{ overflow: "hidden", background: "#1B5E20", borderBottom: `3px solid ${theme.gold}`, padding: "7px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10 }}>
+        <div style={{ overflow: "hidden", background: theme.secondary, borderBottom: `3px solid ${theme.gold}`, padding: "7px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10 }}>
             <div style={{ display: "inline-flex", gap: "48px", animation: "ticker 32s linear infinite" }}>
                 {items.map((t, i) => (
                     <span key={i} style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>
@@ -66,7 +64,7 @@ function TradeRow({ trade, onDelete, idx }) {
                 <span style={{ fontSize: 10, fontWeight: 700, color: optType === "CE" ? theme.bull : theme.bear, letterSpacing: "0.06em" }}>{optType}</span>
             </td>
             <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 9, letterSpacing: "0.12em", color: isLong ? theme.bull : theme.bear, background: isLong ? "rgba(46,125,50,0.1)" : "rgba(198,40,40,0.1)", borderRadius: 20, padding: "3px 10px", fontFamily: "'JetBrains Mono',monospace" }}>
+                <span style={{ fontSize: 9, letterSpacing: "0.12em", color: isLong ? theme.bull : theme.bear, background: isLong ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)", borderRadius: 20, padding: "3px 10px", fontFamily: "'JetBrains Mono',monospace" }}>
                     {isLong ? "▲ LONG" : "▼ SHORT"}
                 </span>
             </td>
@@ -80,7 +78,7 @@ function TradeRow({ trade, onDelete, idx }) {
                 </span>
             </td>
             <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 9, letterSpacing: "0.08em", color: trade.entryBasis === "Plan" ? theme.primary : trade.entryBasis === "Emotion" ? theme.bear : "#B8860B", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, textTransform: "uppercase" }}>
+                <span style={{ fontSize: 9, letterSpacing: "0.08em", color: trade.entryBasis === "Plan" ? theme.primary : trade.entryBasis === "Emotion" ? theme.bear : theme.gold, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, textTransform: "uppercase" }}>
                     {trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}
                 </span>
             </td>

@@ -1,7 +1,27 @@
 const cloudinary = require("../config/cloudinary");
 const { extractText } = require("../services/ocrService");
+const { extractTextWithVision, isVisionAvailable } = require("../services/visionOcrService");
 const { parseTrade, parseIndianTrade, parseTradesFromOCR } = require("../services/parsingService");
 const { extractIndianTradeWithAI } = require("../services/aiExtractionService");
+
+/**
+ * Get OCR text - uses Google Vision for Indian market (high accuracy),
+ * Tesseract for others
+ */
+async function getExtractedText(file, marketType, imageUrl) {
+  const isIndian = marketType === "Indian_Market";
+
+  if (isIndian && isVisionAvailable()) {
+    const visionResult = await extractTextWithVision(file.buffer);
+    if (visionResult && visionResult.text) {
+      console.log("[Upload] Using Google Vision OCR | confidence:", visionResult.confidence?.toFixed(2) ?? "N/A");
+      return visionResult.text;
+    }
+    console.warn("[Upload] Vision OCR failed/empty, falling back to Tesseract");
+  }
+
+  return extractText(imageUrl);
+}
 
 exports.uploadImage = async (req, res) => {
   try {
@@ -11,7 +31,14 @@ exports.uploadImage = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    console.log("File received:", file.originalname, file.mimetype, file.size);
+    const marketType = String(req.body.marketType || req.query.marketType || "Forex").trim();
+    const brokerOverrideRaw = String(req.body.broker || req.query.broker || "").trim();
+    const brokerOverride =
+      brokerOverrideRaw && brokerOverrideRaw.toUpperCase() !== "AUTO"
+        ? brokerOverrideRaw
+        : null;
+    console.log("File received:", file.originalname, file.mimetype, file.size, "| market:", marketType);
+    if (brokerOverride) console.log("[Upload] broker override:", brokerOverride);
 
     const b64 = Buffer.from(file.buffer).toString("base64");
     const dataURI = `data:${file.mimetype};base64,${b64}`;
@@ -21,18 +48,16 @@ exports.uploadImage = async (req, res) => {
     });
 
     const imageUrl = result.secure_url;
-    const extractedText = await extractText(imageUrl);
-    const marketType = String(req.body.marketType || req.query.marketType || "Forex").trim();
+
+    let extractedText = await getExtractedText(file, marketType, imageUrl);
 
     console.log("[Upload] marketType:", marketType, "| OCR length:", extractedText?.length ?? 0, "| OCR preview:", (extractedText || "").slice(0, 120) + "...");
 
     let parsedTrade;
-    let parsedTrades = null; // Multi-trade array for Indian Market
+    let parsedTrades = null;
     if (marketType === "Indian_Market") {
-      parsedTrade = parseIndianTrade(extractedText);
-      // Multi-trade extraction (returns array of trades)
-      parsedTrades = parseTradesFromOCR(extractedText);
-      // AI fallback when parser misses pair or profit
+      parsedTrade = parseIndianTrade(extractedText, { broker: brokerOverride });
+      parsedTrades = parseTradesFromOCR(extractedText, { broker: brokerOverride });
       const badPair =
         !parsedTrade.pair ||
         String(parsedTrade.pair).trim().length < 6 ||

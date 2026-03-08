@@ -2,57 +2,75 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSummary } from "@/services/analyticsApi";
+import {
+    getSummary,
+    getPerformanceMetrics,
+    getDrawdownAnalysis,
+    getAIInsights,
+    getPnLBreakdown
+} from "@/services/analyticsApi";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
+import { getTrades } from "@/services/tradeApi";
+import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    Tooltip,
+    CartesianGrid,
+    ReferenceLine,
+    XAxis,
+    YAxis
+} from "recharts";
 
 /* ─────────────────────────────────────────
-   DESIGN TOKENS — Indian Market Pro Theme
-   - Neutral light dashboard background
-   - Deep emerald + gold accents to match logo
+   Same as Forex — Bull Green, Deep Navy, Gold
 ───────────────────────────────────────── */
 
 const theme = {
-    bull: "#16A34A",           // Emerald
-    bear: "#DC2626",           // Red
-    gold: "#FBBF24",           // Refined gold accent
-    primary: "#14532D",        // Deep emerald (logo-matching)
-    secondary: "#166534",      // Supporting green
-    muted: "#6B7280",          // Slate muted
-    border: "#E5E7EB",         // Neutral border
-    bg: "#F3F4F6",             // Light slate background
-    card: "#FFFFFF"            // Clean white cards
+    bull: "#0D9E6E",
+    bear: "#D63B3B",
+    gold: "#B8860B",
+    primary: "#0D9E6E",
+    secondary: "#0F1923",
+    muted: "#94A3B8",
+    border: "#E2E8F0",
+    bg: "#F0EEE9",
+    card: "#FFFFFF",
+    ink: "#0F1923"
 };
 
 /* ─────────────────────────────────────────
-   TICKER TAPE — Options (CE/PE)
+   TICKER TAPE — Real recent trades
 ───────────────────────────────────────── */
-const indianTickers = [
-    { sym: "NIFTY CE", val: "+1.24%", bull: true }, { sym: "NIFTY PE", val: "-0.45%", bull: false },
-    { sym: "BANK NIFTY CE", val: "+2.15%", bull: true }, { sym: "BANK NIFTY PE", val: "+0.87%", bull: true },
-    { sym: "FIN NIFTY CE", val: "-0.30%", bull: false }, { sym: "MIDCPNIFTY PE", val: "+1.40%", bull: true },
-];
-
-function TickerTape() {
-    const items = [...indianTickers, ...indianTickers];
+function TickerTape({ items }) {
+    const safe = Array.isArray(items) ? items.filter(Boolean) : [];
+    const loopItems = safe.length > 0 ? [...safe, ...safe] : [];
     return (
         <div style={{
-            overflow: "hidden", background: "#1B5E20",
+            overflow: "hidden",
+            background: theme.secondary,
             borderBottom: `3px solid ${theme.gold}`,
             padding: "7px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10,
         }}>
-            <div style={{ display: "inline-flex", gap: "48px", animation: "ticker 32s linear infinite" }}>
-                {items.map((t, i) => (
-                    <span key={i} style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>
-                        <span style={{ color: "#E8F5E9", marginRight: 6 }}>{t.sym}</span>
+            <div style={{ display: "inline-flex", gap: "48px", animation: loopItems.length > 0 ? "ticker 32s linear infinite" : "none" }}>
+                {loopItems.length > 0 ? (
+                    loopItems.map((t, i) => (
+                        <span key={i} style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>
+                        <span style={{ color: "#E8F5E9", marginRight: 8 }}>{t.sym}</span>
                         <span style={{ color: t.bull ? "#A5D6A7" : "#EF9A9A" }}>
-                            {t.bull ? "▲" : "▼"} {t.val}
+                                {t.bull ? "▲" : "▼"} {t.val}
+                            </span>
                         </span>
+                    ))
+                ) : (
+                    <span style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", color: "#E8F5E9", letterSpacing: "0.04em" }}>
+                        Log trades to activate tape · Recent trades · Real P&L · NSE · BSE
                     </span>
-                ))}
+                )}
             </div>
         </div>
     );
@@ -69,7 +87,7 @@ function StatCard({ label, value, sub, accentColor, icon, delay = 0 }) {
             background: theme.card, borderRadius: 12,
             border: `1px solid ${theme.border}`,
             flex: "1 1 160px", overflow: "hidden",
-            boxShadow: "0 2px 12px rgba(27,94,32,0.06)",
+            boxShadow: "0 2px 12px rgba(15,25,35,0.06)",
             animation: `fadeUp 0.5s ease ${delay}s both`,
             position: "relative",
         }}>
@@ -114,12 +132,12 @@ function NavCard({ href, label, sub, icon, accentColor = theme.primary, delay = 
                     background: theme.card, borderRadius: 12, padding: "18px",
                     border: `1px solid ${theme.border}`, cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow: "0 2px 8px rgba(27,94,32,0.05)",
+                    boxShadow: "0 2px 8px rgba(15,25,35,0.05)",
                     animation: `fadeUp 0.5s ease ${delay}s both`,
                     position: "relative", overflow: "hidden",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 8px 24px ${accentColor}22`; e.currentTarget.style.borderColor = `${accentColor}55`; e.currentTarget.style.transform = "translateY(-3px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(27,94,32,0.05)"; e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.transform = "translateY(0)"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(15,25,35,0.05)"; e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.transform = "translateY(0)"; }}
             >
                 <div style={{
                     width: 36, height: 36, borderRadius: 9, marginBottom: 12,
@@ -137,6 +155,34 @@ function NavCard({ href, label, sub, icon, accentColor = theme.primary, delay = 
             </div>
         </Link>
     );
+}
+
+function MetricBar({ label, value, sub, percent = 0, color = theme.bull }) {
+    const p = Math.max(0, Math.min(100, percent));
+    return (
+        <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
+                <div>
+                    <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+                        {label}
+                    </div>
+                    {sub && <div style={{ fontSize: 11, color: theme.muted, marginTop: 4 }}>{sub}</div>}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 14, fontWeight: 800, color }}>
+                    {value}
+                </div>
+            </div>
+            <div style={{ height: 10, background: "#EEF2F7", borderRadius: 999, overflow: "hidden", border: `1px solid ${theme.border}` }}>
+                <div style={{ height: "100%", width: `${p}%`, background: `linear-gradient(90deg, ${color}, ${color}88)`, borderRadius: 999, transition: "width 0.6s ease" }} />
+            </div>
+        </div>
+    );
+}
+
+function formatINR(val) {
+    const n = Number(val);
+    if (Number.isNaN(n)) return "₹0";
+    return `₹${Math.round(n).toLocaleString("en-IN")}`;
 }
 
 /* ─────────────────────────────────────────
@@ -157,20 +203,20 @@ function CreateTradeButton() {
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
                     display: "flex", alignItems: "center", gap: 10,
-                    background: `linear-gradient(135deg, ${theme.primary} 0%, #2e7d32 100%)`,
-                    color: theme.gold, borderRadius: 10, padding: "12px 20px",
+                    background: `linear-gradient(135deg, ${theme.primary} 0%, #22C78E 100%)`,
+                    color: "#FFFFFF", borderRadius: 10, padding: "12px 20px",
                     fontSize: 12, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700,
                     letterSpacing: "0.08em", border: `1px solid ${theme.gold}44`,
-                    boxShadow: "0 4px 16px rgba(27,94,32,0.2), 0 0 20px rgba(255,215,0,0.1)",
+                    boxShadow: "0 4px 16px rgba(13,158,110,0.25), 0 0 20px rgba(184,134,11,0.15)",
                     cursor: "pointer", transition: "all 0.25s ease",
                 }}
                 onMouseEnter={e => {
                     e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 6px 24px rgba(27,94,32,0.3), 0 0 30px rgba(255,215,0,0.2)";
+                    e.currentTarget.style.boxShadow = "0 6px 24px rgba(13,158,110,0.35), 0 0 30px rgba(184,134,11,0.2)";
                 }}
                 onMouseLeave={e => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(27,94,32,0.2), 0 0 20px rgba(255,215,0,0.1)";
+                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(13,158,110,0.25), 0 0 20px rgba(184,134,11,0.15)";
                 }}
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -186,13 +232,13 @@ function CreateTradeButton() {
                 <div style={{
                     position: "absolute", top: "100%", right: 0, marginTop: 8,
                     background: "#FFFFFF", borderRadius: 12, border: `1px solid ${theme.border}`,
-                    boxShadow: "0 8px 32px rgba(27,94,32,0.15)", overflow: "hidden", minWidth: 220, zIndex: 100,
+                    boxShadow: "0 8px 32px rgba(15,25,35,0.15)", overflow: "hidden", minWidth: 220, zIndex: 100,
                 }}>
                     <button onClick={() => handleOptionClick("/indian-market/add-trade")} style={dropOptionStyle}
                         onMouseEnter={e => e.currentTarget.style.background = "#F9F9F9"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                        <div style={{ ...dropIconBox, background: "rgba(46,125,50,0.12)", color: theme.bull }}>
+                        <div style={{ ...dropIconBox, background: "rgba(13,158,110,0.12)", color: theme.bull }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
@@ -207,7 +253,7 @@ function CreateTradeButton() {
                         onMouseEnter={e => e.currentTarget.style.background = "#F9F9F9"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                        <div style={{ ...dropIconBox, background: "rgba(255,215,0,0.12)", color: "#B8860B" }}>
+                        <div style={{ ...dropIconBox, background: "rgba(184,134,11,0.12)", color: theme.gold }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
                             </svg>
@@ -233,14 +279,34 @@ export default function IndianMarketDashboard() {
     const router = useRouter();
     const { currentMarket, toggleMarket } = useMarket();
     const [stats, setStats] = useState(null);
+    const [perf, setPerf] = useState(null);
+    const [drawdown, setDrawdown] = useState(null);
+    const [ai, setAi] = useState(null);
+    const [breakdown, setBreakdown] = useState(null);
+    const [recentTrades, setRecentTrades] = useState([]);
     const [mounted, setMounted] = useState(false);
     const [time, setTime] = useState("");
 
     const fetchStats = async () => {
         try {
-            // Pass 'Indian_Market' to the service
-            const data = await getSummary(MARKETS.INDIAN_MARKET);
-            setStats(data);
+            const [summaryRes, perfRes, ddRes, aiRes, pnlRes, tradesRes] = await Promise.all([
+                getSummary(MARKETS.INDIAN_MARKET),
+                getPerformanceMetrics(MARKETS.INDIAN_MARKET),
+                getDrawdownAnalysis(MARKETS.INDIAN_MARKET),
+                getAIInsights(MARKETS.INDIAN_MARKET),
+                getPnLBreakdown(MARKETS.INDIAN_MARKET),
+                getTrades(MARKETS.INDIAN_MARKET)
+            ]);
+
+            setStats(summaryRes);
+            setPerf(perfRes);
+            setDrawdown(ddRes);
+            setAi(aiRes);
+            setBreakdown(pnlRes);
+
+            const list = Array.isArray(tradesRes) ? tradesRes : (Array.isArray(tradesRes?.trades) ? tradesRes.trades : []);
+            const sorted = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setRecentTrades(sorted.slice(0, 10));
         } catch (error) {
             console.error("Failed to fetch Indian Market stats:", error);
         }
@@ -261,15 +327,36 @@ export default function IndianMarketDashboard() {
         return () => clearInterval(t);
     }, [router, currentMarket, toggleMarket]);
 
-    const profitBull = stats ? parseFloat(stats.totalProfit) >= 0 : true;
+    const profitBull = stats ? parseFloat(stats.netProfit ?? stats.totalProfit) >= 0 : true;
     const winBull = stats ? parseFloat(stats.winRate) >= 50 : true;
 
     if (!mounted) return null;
 
+    const todayKey = new Date().toISOString().split("T")[0];
+    const todayPnl = breakdown?.daily?.find(d => d.date === todayKey)?.profit ?? 0;
+    const totalTrades = stats?.totalTrades ?? 0;
+    const planPct = parseFloat(ai?.behaviorDiscipline?.ruleEmotion?.planPct || 0);
+    const recoveryFactor = parseFloat(drawdown?.recoveryFactor || 0);
+    const profitFactor = perf?.profitFactor === "∞" ? "∞" : parseFloat(perf?.profitFactor || 0).toFixed(2);
+    const maxWinStreak = perf?.maxWinStreak ?? 0;
+
+    const tapeItems = recentTrades.slice(0, 6).map(t => {
+        const pnl = Number(t.profit || 0);
+        return {
+            sym: (t.pair || "TRADE").toString().toUpperCase().slice(0, 26),
+            val: `${pnl >= 0 ? "+" : ""}${formatINR(pnl)}`,
+            bull: pnl >= 0
+        };
+    });
+
+    const equity = Array.isArray(drawdown?.equityCurve)
+        ? drawdown.equityCurve.map((p, idx) => ({ idx, balance: Number(p.balance || 0) }))
+        : [];
+
     return (
         <div style={{
             minHeight: "100vh",
-            background: `radial-gradient(circle at top left, rgba(251,191,36,0.12), transparent 55%), ${theme.bg}`,
+            background: theme.bg,
             fontFamily: "'Plus Jakarta Sans',sans-serif",
             color: theme.primary,
             position: "relative",
@@ -336,9 +423,9 @@ export default function IndianMarketDashboard() {
                                     border: "1px solid rgba(148,163,184,0.5)"
                                 }}
                                 onMouseEnter={e => {
-                                    e.currentTarget.style.background = "rgba(251,191,36,0.18)";
-                                    e.currentTarget.style.color = "#0F172A";
-                                    e.currentTarget.style.borderColor = "rgba(251,191,36,0.7)";
+                                    e.currentTarget.style.background = "rgba(184,134,11,0.2)";
+                                    e.currentTarget.style.color = "#0F1923";
+                                    e.currentTarget.style.borderColor = "rgba(184,134,11,0.7)";
                                 }}
                                 onMouseLeave={e => {
                                     e.currentTarget.style.background = "rgba(15,23,42,0.6)";
@@ -390,7 +477,7 @@ export default function IndianMarketDashboard() {
                 </div>
             </header>
 
-            <TickerTape />
+            <TickerTape items={tapeItems} />
 
             <main style={{
                 position: "relative", zIndex: 5, padding: "28px 20px",
@@ -406,7 +493,7 @@ export default function IndianMarketDashboard() {
                                     Options <span style={{ color: theme.secondary }}>Dashboard</span>
                                 </h1>
                                 <p style={{ fontSize: 12, color: theme.muted, marginTop: 5, fontFamily: "'JetBrains Mono',monospace" }}>
-                                    WELCOME BACK — NSE / BSE OPTIONS
+                                    COMMAND CENTER — EDGE • DISCIPLINE • PROFITABILITY
                                 </p>
                             </div>
                             <CreateTradeButton />
@@ -415,27 +502,35 @@ export default function IndianMarketDashboard() {
                         <div style={{ display: "flex", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
                             <StatCard
                                 label="TOTAL TRADES"
-                                value={stats.totalTrades}
+                                value={totalTrades}
                                 sub="Options trades"
                                 accentColor={theme.primary}
                                 delay={0}
                                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>}
                             />
                             <StatCard
-                                label="NET PROFIT"
-                                value={`${profitBull ? "+" : ""}₹${parseFloat(stats.totalProfit).toLocaleString('en-IN')}`}
-                                sub={profitBull ? "Green day in Dalal Street" : "Red zone today"}
+                                label="NET AFTER COSTS"
+                                value={`${profitBull ? "+" : ""}${formatINR(stats.netProfit ?? stats.totalProfit)}`}
+                                sub={`Costs: ${formatINR(stats.totalCosts || 0)}`}
                                 accentColor={profitBull ? theme.bull : theme.bear}
                                 delay={0.1}
                                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
                             />
                             <StatCard
-                                label="STRATEGY WIN RATE"
+                                label="WIN RATE"
                                 value={`${parseFloat(stats.winRate).toFixed(1)}%`}
-                                sub={winBull ? "Strong Edge" : "Review Setups"}
+                                sub={`${stats.winningTrades || 0}W / ${stats.losingTrades || 0}L`}
                                 accentColor={winBull ? theme.bull : theme.bear}
                                 delay={0.2}
                                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>}
+                            />
+                            <StatCard
+                                label="TODAY P&L (UTC DAY)"
+                                value={`${todayPnl >= 0 ? "+" : ""}${formatINR(todayPnl)}`}
+                                sub="From your logged trades today"
+                                accentColor={todayPnl >= 0 ? theme.bull : theme.bear}
+                                delay={0.25}
+                                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 6v6l4 2" /><circle cx="12" cy="12" r="10" /></svg>}
                             />
                         </div>
 
@@ -454,25 +549,120 @@ export default function IndianMarketDashboard() {
                             />
                         </div>
 
-                        <div style={{
-                            background: "#FFF", borderRadius: 16, padding: 24,
-                            border: `1px solid ${theme.border}`, boxShadow: "0 4px 20px rgba(0,0,0,0.05)"
-                        }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Quick Overview</h3>
-                                <span style={{ fontSize: 10, padding: "4px 8px", background: "rgba(46,125,50,0.1)", borderRadius: 4, color: theme.primary, fontWeight: 700 }}>LIVE STATS</span>
-                            </div>
-                            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                                <div style={{ flex: 1, minWidth: 200 }}>
-                                    <div style={{ fontSize: 12, color: theme.muted, marginBottom: 8 }}>Winning Streaks</div>
-                                    <div style={{ height: 8, background: "#F5F5F5", borderRadius: 4, overflow: "hidden" }}>
-                                        <div style={{ height: "100%", width: "65%", background: theme.bull, borderRadius: 4 }} />
+                        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+                            <div style={{
+                                flex: "1 1 520px",
+                                background: "linear-gradient(135deg, rgba(13,158,110,0.06), rgba(184,134,11,0.06))",
+                                borderRadius: 18,
+                                padding: 22,
+                                border: `1px solid ${theme.border}`,
+                                boxShadow: "0 10px 30px rgba(15,25,35,0.08)",
+                                overflow: "hidden",
+                                position: "relative"
+                            }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+                                    <div>
+                                        <div style={{ fontSize: 10, letterSpacing: "0.14em", fontFamily: "'JetBrains Mono',monospace", color: theme.muted, fontWeight: 700 }}>
+                                            EDGE OVERVIEW
+                                        </div>
+                                        <div style={{ fontSize: 18, fontWeight: 900, color: theme.ink, marginTop: 6 }}>
+                                            Winning streaks, recovery, discipline — from real data
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        fontSize: 10,
+                                        padding: "6px 10px",
+                                        background: "rgba(15,23,42,0.06)",
+                                        borderRadius: 999,
+                                        color: theme.primary,
+                                        fontWeight: 800,
+                                        border: `1px solid ${theme.border}`,
+                                        fontFamily: "'JetBrains Mono',monospace",
+                                        letterSpacing: "0.1em"
+                                    }}>
+                                        MODEL-DRIVEN
                                     </div>
                                 </div>
-                                <div style={{ flex: 1, minWidth: 200 }}>
-                                    <div style={{ fontSize: 12, color: theme.muted, marginBottom: 8 }}>Loss Recovery</div>
-                                    <div style={{ height: 8, background: "#F5F5F5", borderRadius: 4, overflow: "hidden" }}>
-                                        <div style={{ height: "100%", width: "82%", background: theme.gold, borderRadius: 4 }} />
+
+                                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                                    <MetricBar
+                                        label="WIN STREAK (MAX)"
+                                        value={`${maxWinStreak}`}
+                                        sub="From performance metrics"
+                                        percent={Math.min(100, (Number(maxWinStreak) || 0) * 12)}
+                                        color={theme.bull}
+                                    />
+                                    <MetricBar
+                                        label="LOSS RECOVERY"
+                                        value={`${recoveryFactor.toFixed(2)}×`}
+                                        sub="Recovery factor (profit / max DD)"
+                                        percent={Math.min(100, (recoveryFactor / 2) * 100)}
+                                        color={theme.gold}
+                                    />
+                                    <MetricBar
+                                        label="PLAN ADHERENCE"
+                                        value={`${planPct.toFixed(1)}%`}
+                                        sub="Plan vs emotion / impulsive"
+                                        percent={planPct}
+                                        color={planPct >= 70 ? theme.bull : theme.bear}
+                                    />
+                                    <MetricBar
+                                        label="PROFIT FACTOR"
+                                        value={`${profitFactor}`}
+                                        sub="Gross profit / gross loss"
+                                        percent={perf?.profitFactor === "∞" ? 100 : Math.min(100, (parseFloat(profitFactor || 0) / 2) * 100)}
+                                        color={(perf?.profitFactor === "∞" || parseFloat(profitFactor || 0) >= 1.2) ? theme.bull : theme.bear}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{
+                                flex: "1 1 360px",
+                                background: "#FFF",
+                                borderRadius: 18,
+                                padding: 22,
+                                border: `1px solid ${theme.border}`,
+                                boxShadow: "0 10px 30px rgba(15,25,35,0.08)",
+                            }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+                                    <div style={{ fontSize: 14, fontWeight: 900, color: theme.ink }}>Equity curve</div>
+                                    <div style={{ fontSize: 10, color: theme.muted, fontFamily: "'JetBrains Mono',monospace" }}>
+                                        {equity.length > 0 ? `Last ${equity.length} points` : "No equity data yet"}
+                                    </div>
+                                </div>
+                                <div style={{ height: 210 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={equity} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor={theme.bull} stopOpacity={0.25} />
+                                                    <stop offset="100%" stopColor={theme.bull} stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" strokeOpacity={0.6} />
+                                            <XAxis dataKey="idx" tickLine={false} axisLine={false} hide />
+                                            <YAxis tickLine={false} axisLine={false} tick={{ fill: theme.muted, fontSize: 10 }} width={40} />
+                                            <Tooltip
+                                                content={({ active, payload }) => {
+                                                    if (!active || !payload || !payload.length) return null;
+                                                    const v = payload[0].value;
+                                                    return (
+                                                        <div style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "10px 12px", boxShadow: "0 10px 30px rgba(15,25,35,0.12)" }}>
+                                                            <div style={{ fontSize: 10, color: theme.muted, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.1em" }}>BALANCE</div>
+                                                            <div style={{ fontSize: 16, fontWeight: 900, color: theme.ink }}>{formatINR(v)}</div>
+                                                        </div>
+                                                    );
+                                                }}
+                                            />
+                                            <ReferenceLine y={0} stroke={theme.border} strokeWidth={2} strokeDasharray="6 6" />
+                                            <Area type="monotone" dataKey="balance" stroke={theme.bull} strokeWidth={3} fill="url(#eqFill)" dot={false} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                                    <div style={{ fontSize: 11, color: theme.muted }}>Max drawdown</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 800, color: theme.bear }}>
+                                        {formatINR(drawdown?.maxDrawdown || 0)} ({drawdown?.maxDrawdownPercent || 0}%)
                                     </div>
                                 </div>
                             </div>

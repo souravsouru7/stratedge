@@ -8,16 +8,16 @@ import { MARKETS } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
 
 const theme = {
-  bull: "#2E7D32",
-  bear: "#C62828",
-  gold: "#FFD700",
-  primary: "#1B5E20",
-  secondary: "#388E3C",
-  muted: "#64748B",
+  bull: "#0D9E6E",
+  bear: "#D63B3B",
+  gold: "#B8860B",
+  primary: "#0D9E6E",
+  secondary: "#0F1923",
+  muted: "#94A3B8",
   border: "#E2E8F0",
-  bg: "#F8FAFC",
+  bg: "#F0EEE9",
   card: "#FFFFFF",
-  nseTag: "#7C3AED"
+  nseTag: "#0D9E6E"
 };
 
 function CollapsibleSection({ title, defaultOpen = true, children }) {

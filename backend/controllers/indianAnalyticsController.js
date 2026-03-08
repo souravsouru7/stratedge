@@ -266,7 +266,56 @@ exports.getTradeDistribution = async (req, res) => {
       bySession[session].winRate = bySession[session].total ? ((bySession[session].wins / bySession[session].total) * 100).toFixed(1) : 0;
     });
 
-    res.json({ byPair, byType, byStrategy, bySession });
+    // By trade type (INTRADAY / DELIVERY / SWING)
+    const byTradeType = {};
+    trades.forEach(t => {
+      const key = t.tradeType && t.tradeType.trim() ? t.tradeType : "Unspecified";
+      if (!byTradeType[key]) byTradeType[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      byTradeType[key].total++;
+      if (t.profit > 0) byTradeType[key].wins++;
+      else if (t.profit < 0) byTradeType[key].losses++;
+      byTradeType[key].profit += t.profit || 0;
+    });
+    Object.keys(byTradeType).forEach(k => (byTradeType[k].winRate = byTradeType[k].total ? ((byTradeType[k].wins / byTradeType[k].total) * 100).toFixed(1) : 0));
+
+    // By entry basis (Plan / Emotion / Impulsive / Custom)
+    const byEntryBasis = {};
+    trades.forEach(t => {
+      const key = t.entryBasis && t.entryBasis.trim() ? t.entryBasis : "Unspecified";
+      if (!byEntryBasis[key]) byEntryBasis[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      byEntryBasis[key].total++;
+      if (t.profit > 0) byEntryBasis[key].wins++;
+      else if (t.profit < 0) byEntryBasis[key].losses++;
+      byEntryBasis[key].profit += t.profit || 0;
+    });
+    Object.keys(byEntryBasis).forEach(k => (byEntryBasis[k].winRate = byEntryBasis[k].total ? ((byEntryBasis[k].wins / byEntryBasis[k].total) * 100).toFixed(1) : 0));
+
+    // By mistake tag (Overtraded, Held too long, etc.)
+    const byMistakeTag = {};
+    trades.forEach(t => {
+      const key = t.mistakeTag && t.mistakeTag.trim() ? t.mistakeTag : "None";
+      if (!byMistakeTag[key]) byMistakeTag[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      byMistakeTag[key].total++;
+      if (t.profit > 0) byMistakeTag[key].wins++;
+      else if (t.profit < 0) byMistakeTag[key].losses++;
+      byMistakeTag[key].profit += t.profit || 0;
+    });
+    Object.keys(byMistakeTag).forEach(k => (byMistakeTag[k].winRate = byMistakeTag[k].total ? ((byMistakeTag[k].wins / byMistakeTag[k].total) * 100).toFixed(1) : 0));
+
+    // By underlying (NIFTY, BANK NIFTY, etc.)
+    const byUnderlying = {};
+    trades.forEach(t => {
+      const raw = (t.underlying && t.underlying.trim()) ? t.underlying.replace(/\s+/g, " ").trim() : (t.pair ? t.pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim() : "");
+      const key = raw || "Unspecified";
+      if (!byUnderlying[key]) byUnderlying[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      byUnderlying[key].total++;
+      if (t.profit > 0) byUnderlying[key].wins++;
+      else if (t.profit < 0) byUnderlying[key].losses++;
+      byUnderlying[key].profit += t.profit || 0;
+    });
+    Object.keys(byUnderlying).forEach(k => (byUnderlying[k].winRate = byUnderlying[k].total ? ((byUnderlying[k].wins / byUnderlying[k].total) * 100).toFixed(1) : 0));
+
+    res.json({ byPair, byType, byStrategy, bySession, byTradeType, byEntryBasis, byMistakeTag, byUnderlying });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

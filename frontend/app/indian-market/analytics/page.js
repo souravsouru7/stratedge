@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   getSummary,
   getRiskRewardAnalysis,
+  getTradeDistribution,
   getPerformanceMetrics,
   getTimeAnalysis,
   getDrawdownAnalysis,
@@ -28,14 +29,14 @@ import InstallPWA from "@/components/InstallPWA";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 
 const theme = {
-  bull: "#16A34A",
-  bear: "#DC2626",
-  gold: "#FBBF24",
-  primary: "#14532D",
-  secondary: "#166534",
-  muted: "#6B7280",
-  border: "#E5E7EB",
-  bg: "#F3F4F6",
+  bull: "#0D9E6E",
+  bear: "#D63B3B",
+  gold: "#B8860B",
+  primary: "#0D9E6E",
+  secondary: "#0F1923",
+  muted: "#94A3B8",
+  border: "#E2E8F0",
+  bg: "#F0EEE9",
   card: "#FFFFFF"
 };
 
@@ -68,6 +69,110 @@ function StatCard({ label, value, sub, color, delay = 0 }) {
           border-color: ${theme.secondary}44;
         }
       `}</style>
+    </div>
+  );
+}
+
+function DistList({ title, data, currency = "₹", maxItems = 6 }) {
+  if (!data || Object.keys(data).length === 0) return null;
+  const entries = Object.entries(data)
+    .filter(([_, v]) => v.total > 0)
+    .sort((a, b) => parseFloat(b[1].profit) - parseFloat(a[1].profit))
+    .slice(0, maxItems);
+  if (entries.length === 0) return null;
+  return (
+    <div style={{ marginBottom: title ? 20 : 0 }}>
+      {title && <div style={{ fontSize: 11, fontWeight: 700, color: theme.muted, letterSpacing: "0.08em", marginBottom: 10 }}>{title}</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {entries.map(([name, v]) => (
+          <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${theme.border}` }}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>{name}</span>
+            <span style={{ fontSize: 11, color: theme.muted, marginRight: 8 }}>{v.winRate}% WR</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(v.profit) >= 0 ? theme.bull : theme.bear }}>
+              {parseFloat(v.profit) >= 0 ? "+" : ""}{currency}{parseFloat(v.profit).toFixed(0)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PathToAdvanced({ summary, ai, perf, currency }) {
+  const totalTrades = summary?.totalTrades ?? 0;
+  const totalProfit = parseFloat(summary?.totalProfit || 0);
+  const winRate = parseFloat(summary?.winRate || 0);
+  const planPct = parseFloat(ai?.behaviorDiscipline?.ruleEmotion?.planPct || 0);
+  const aiScore = parseFloat(ai?.score || 0);
+  const profitFactor = parseFloat(perf?.profitFactor || 0);
+
+  const checks = [
+    { label: "Log at least 5 trades with details (strategy, entry basis)", done: totalTrades >= 5, value: `${totalTrades} / 5` },
+    { label: "Log at least 10 trades for advanced insights", done: totalTrades >= 10, value: `${totalTrades} / 10` },
+    { label: "Win rate ≥ 50%", done: winRate >= 50, value: `${winRate}%` },
+    { label: "Total P&L positive", done: totalProfit > 0, value: `${currency}${totalProfit.toFixed(0)}` },
+    { label: "Plan-based entries ≥ 70%", done: planPct >= 70, value: `${planPct}%` },
+    { label: "AI discipline score ≥ 60", done: aiScore >= 60, value: `${aiScore}` },
+    { label: "Profit factor ≥ 1.2", done: profitFactor >= 1.2, value: profitFactor.toFixed(2) }
+  ];
+  const doneCount = checks.filter((c) => c.done).length;
+  const totalCount = checks.length;
+  const percent = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
+  const isAdvanced = doneCount >= 5 && totalProfit > 0 && winRate >= 50;
+
+  return (
+    <div
+      style={{
+        background: isAdvanced ? "linear-gradient(135deg, rgba(22,163,74,0.08), rgba(22,163,74,0.02))" : "linear-gradient(135deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02))",
+        border: `2px solid ${isAdvanced ? theme.bull : theme.gold}`,
+        borderRadius: 16,
+        padding: 24,
+        marginBottom: 24
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: theme.primary }}>Path to Advanced & Profitable</div>
+          <div style={{ fontSize: 11, color: theme.muted, marginTop: 4 }}>
+            Complete these to unlock advanced-level analytics and build a profitable edge.
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontSize: 28, fontWeight: 900, color: isAdvanced ? theme.bull : theme.gold }}>{percent}%</div>
+          <div style={{ width: 100, height: 10, background: theme.border, borderRadius: 5, overflow: "hidden" }}>
+            <div style={{ width: `${percent}%`, height: "100%", background: isAdvanced ? theme.bull : theme.gold, borderRadius: 5, transition: "width 0.5s ease" }} />
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+        {checks.map((c, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 14px",
+              background: c.done ? "rgba(22,163,74,0.08)" : "rgba(0,0,0,0.02)",
+              borderRadius: 10,
+              border: `1px solid ${c.done ? theme.bull + "44" : theme.border}`
+            }}
+          >
+            <span style={{ fontSize: 18, flexShrink: 0 }}>{c.done ? "✓" : "○"}</span>
+            <span style={{ fontSize: 12, color: theme.primary, flex: 1 }}>{c.label}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: c.done ? theme.bull : theme.muted }}>{c.value}</span>
+          </div>
+        ))}
+      </div>
+      {isAdvanced && (
+        <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(22,163,74,0.15)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🏆</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: theme.bull }}>Advanced level unlocked</div>
+            <div style={{ fontSize: 11, color: theme.secondary }}>You’re building a data-driven edge. Keep journaling and reviewing analytics to stay profitable.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -118,7 +223,8 @@ export default function IndianAnalyticsPage() {
     time: null,
     drawdown: null,
     ai: null,
-    breakdown: null
+    breakdown: null,
+    distribution: null
   });
   const [timeFilter, setTimeFilter] = useState("daily"); // daily, weekly, monthly
 
@@ -134,16 +240,17 @@ export default function IndianAnalyticsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [summary, rr, perf, time, drawdown, ai, breakdown] = await Promise.all([
+      const [summary, rr, perf, time, drawdown, ai, breakdown, distribution] = await Promise.all([
         getSummary(MARKETS.INDIAN_MARKET),
         getRiskRewardAnalysis(MARKETS.INDIAN_MARKET),
         getPerformanceMetrics(MARKETS.INDIAN_MARKET),
         getTimeAnalysis(MARKETS.INDIAN_MARKET),
         getDrawdownAnalysis(MARKETS.INDIAN_MARKET),
         getAIInsights(MARKETS.INDIAN_MARKET),
-        getPnLBreakdown(MARKETS.INDIAN_MARKET)
+        getPnLBreakdown(MARKETS.INDIAN_MARKET),
+        getTradeDistribution(MARKETS.INDIAN_MARKET)
       ]);
-      setData({ summary, rr, perf, time, drawdown, ai, breakdown });
+      setData({ summary, rr, perf, time, drawdown, ai, breakdown, distribution });
     } finally {
       setLoading(false);
     }
@@ -623,6 +730,44 @@ export default function IndianAnalyticsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Distribution by new Indian form fields */}
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, marginTop: 8 }}>Performance by your journal fields</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
+              {data.distribution?.byStrategy && Object.keys(data.distribution.byStrategy).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Strategy</div>
+                  <DistList title="" data={data.distribution.byStrategy} currency={currency} maxItems={6} />
+                </div>
+              )}
+              {data.distribution?.byTradeType && Object.keys(data.distribution.byTradeType).filter(k => data.distribution.byTradeType[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Trade Type</div>
+                  <DistList title="" data={data.distribution.byTradeType} currency={currency} maxItems={5} />
+                </div>
+              )}
+              {data.distribution?.byEntryBasis && Object.keys(data.distribution.byEntryBasis).filter(k => data.distribution.byEntryBasis[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Entry Basis</div>
+                  <DistList title="" data={data.distribution.byEntryBasis} currency={currency} maxItems={5} />
+                </div>
+              )}
+              {data.distribution?.byUnderlying && Object.keys(data.distribution.byUnderlying).filter(k => data.distribution.byUnderlying[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Underlying</div>
+                  <DistList title="" data={data.distribution.byUnderlying} currency={currency} maxItems={6} />
+                </div>
+              )}
+              {data.distribution?.byMistakeTag && Object.keys(data.distribution.byMistakeTag).filter(k => k !== "None" && data.distribution.byMistakeTag[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Mistake Tag</div>
+                  <DistList title="" data={data.distribution.byMistakeTag} currency={currency} maxItems={6} />
+                </div>
+              )}
+            </div>
+
+            {/* Path to Advanced / Profitable */}
+            <PathToAdvanced summary={data.summary} ai={data.ai} perf={data.perf} currency={currency} />
           </>
         )}
       </main>
