@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { loginUser } from "@/services/api";
+import { googleLogin, loginUser } from "@/services/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { GoogleLogin } from "@react-oauth/google";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -137,6 +138,7 @@ export default function LoginPage() {
   const [form, setForm]         = useState({ email:"", password:"" });
   const [focused, setFocused]   = useState(null);
   const [loading, setLoading]   = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [mounted, setMounted]   = useState(false);
   const [shake, setShake]       = useState(false);
@@ -171,6 +173,31 @@ export default function LoginPage() {
       alert("Login failed. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (resp) => {
+    if (!resp?.credential) {
+      alert("Google login failed. Please try again.");
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      const data = await googleLogin(resp.credential);
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        router.push("/dashboard");
+      } else {
+        setShake(true);
+        setTimeout(() => setShake(false), 600);
+        alert(data.message || "Google login failed.");
+      }
+    } catch {
+      setShake(true);
+      setTimeout(() => setShake(false), 600);
+      alert("Google login failed. Please try again.");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -421,6 +448,46 @@ export default function LoginPage() {
                 }}>
                   Forgot password?
                 </span>
+              </div>
+
+              {/* Divider */}
+              <div style={{ height:1, background:"#F1F5F9", marginBottom:16 }}/>
+
+              {/* Google */}
+              <div style={{ marginBottom: 16 }}>
+                {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+                  <div
+                    style={{
+                      opacity: googleLoading ? 0.7 : 1,
+                      pointerEvents: googleLoading ? "none" : "auto",
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => alert("Google login failed. Please try again.")}
+                      useOneTap={false}
+                      theme="outline"
+                      size="large"
+                      shape="rectangular"
+                      width="380"
+                    />
+                  </div>
+                ) : (
+                  <div style={{
+                    fontSize: 11,
+                    color: "#94A3B8",
+                    fontFamily: "'JetBrains Mono',monospace",
+                    textAlign: "center",
+                    padding: "10px 12px",
+                    background: "#F8FAFC",
+                    border: "1px dashed #E2E8F0",
+                    borderRadius: 8,
+                  }}>
+                    Google login is not configured (missing <b>NEXT_PUBLIC_GOOGLE_CLIENT_ID</b>).
+                  </div>
+                )}
               </div>
 
               {/* Divider */}

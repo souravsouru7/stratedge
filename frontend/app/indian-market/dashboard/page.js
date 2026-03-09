@@ -15,6 +15,7 @@ import { useMarket, MARKETS } from "@/context/MarketContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
 import { getTrades } from "@/services/tradeApi";
+import DailyThought from "@/components/DailyThought";
 import {
     ResponsiveContainer,
     AreaChart,
@@ -483,6 +484,15 @@ export default function IndianMarketDashboard() {
                 position: "relative", zIndex: 5, padding: "28px 20px",
                 maxWidth: 1080, margin: "0 auto",
             }}>
+                <DailyThought
+                    accent={theme.primary}
+                    gold={theme.gold}
+                    background={theme.card}
+                    border={theme.border}
+                    ink={theme.ink}
+                    muted={theme.muted}
+                    storageKeyPrefix="indian_daily_thought_dismissed"
+                />
                 {!stats ? (
                     <LoadingSpinner message="SYNCING OPTIONS..." />
                 ) : (
@@ -546,6 +556,9 @@ export default function IndianMarketDashboard() {
                             />
                             <NavCard href="/indian-market/analytics" label="Options analytics" sub="Depth analysis" accentColor={theme.gold} delay={0.5}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>}
+                            />
+                            <NavCard href="/indian-market/setups" label="Options setups" sub="Define strategies + rules" accentColor={theme.primary} delay={0.55}
+                                icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10" /><path d="M7 12h6" /><path d="M7 16h3" /></svg>}
                             />
                         </div>
 

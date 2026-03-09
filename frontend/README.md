@@ -68,3 +68,31 @@ Narrative insights
 Plain‑language weekly review: “This week you followed your plan on 70% of trades, made most of your profit in New York, and lost mainly when trading outside your focus hours.”
 Next‑week checklist: 3 auto‑generated, specific action items (e.g. “Avoid new trades after 3 consecutive losses”, “Trade only New York session for EURUSD”).
 .
+Backend (saved with each trade)
+
+Extended the Trade model with:
+setupRules: [{ label: String, followed: Boolean }]
+setupScore: Number (0–100, percent of rules followed)
+When you save a trade from the Upload Trade page, the app now:
+Takes all non-empty rules,
+Counts how many are ticked,
+Computes setupScore = (followed / total) * 100,
+Sends both setupRules and setupScore to the backend.
+Frontend – checklist in upload/add trade (Forex + Indian single trade)
+
+On upload-trade page, inside the single trade form (the big “Trade Details” card), I added a “SETUP CHECKLIST” block above Notes:
+Shows a list of rules with:
+A tick box (you click to mark followed / not followed),
+An editable text input for the rule text (you can fully customize).
+Default rules I added (you can edit them per trade):
+Only trade during my session window
+RR at least 1:2 or better
+Entered on clear confirmation candle
+Stop placed at invalidation level (not random)
+Sizing matched pre-defined risk per trade
+Controls:
+CLEAR TICKS button: unchecks all rules for that trade.
++ ADD RULE: adds a new empty rule row you can type into.
+So now, for every trade you log via the Upload Trade screen, you can define your setup rules, tick what you actually followed, and the platform stores both the checklist and a numeric accuracy score for later analytics.
+
+On the Upload Trade page, the Strategy field shows all available setups. When I select a setup, it should display the corresponding checklist.

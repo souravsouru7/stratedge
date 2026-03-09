@@ -127,7 +127,12 @@ function correctStrikeOcrTypo(underlying, rawStrike) {
 function fixInstrumentOcrTypos(line) {
   return line
     .replace(/N1FTY|NIFT[Y1]|NlFTY/gi, "NIFTY")
-    .replace(/BANKN1FTY|BANK\s*N1FTY/gi, "BANKNIFTY")
+    // Underlying spacing / OCR variants
+    .replace(/\bNIFTY\s*50\b/gi, "NIFTY")
+    .replace(/BANKN1FTY|BANK\s*N1FTY|\bBANK\s*NIFTY\b/gi, "BANKNIFTY")
+    .replace(/\bFIN\s*NIFTY\b/gi, "FINNIFTY")
+    .replace(/\bMID\s*CP\s*NIFTY\b/gi, "MIDCPNIFTY")
+    .replace(/\bMIDCP\s*NIFTY\b/gi, "MIDCPNIFTY")
     .replace(/0(9|g|q|O)th|0(9|g)TH|09lh|0glh|O9th/gi, "09th")
     .replace(/\s*[©®™●·○]\s*/g, " ")
     .replace(/@/g, " ")
@@ -182,17 +187,109 @@ function looksLikeIndianInstrument(line) {
 
 // Indian broker detection + label normalization (different brokers use different field names)
 const BROKER_KEYWORDS = [
-  { broker: "Zerodha", patterns: [/zerodha/i, /kite/i, /rainmatter/i] },
-  { broker: "Upstox", patterns: [/upstox/i, /rksv/i] },
-  { broker: "Angel One", patterns: [/angel\s*one/i, /angel\s*broking/i, /smartapi/i] },
-  { broker: "ICICI Direct", patterns: [/icici\s*direct/i, /icicidirect/i] },
-  { broker: "Groww", patterns: [/groww/i] },
-  { broker: "5paisa", patterns: [/5paisa/i, /5\s*paisa/i] },
-  { broker: "Fyers", patterns: [/fyers/i] },
-  { broker: "Dhan", patterns: [/dhan\.?co/i, /\bdhan\b/i] },
-  { broker: "Paytm Money", patterns: [/paytm\s*money/i] },
-  { broker: "Kotak", patterns: [/kotak\s*securities/i, /kite\s*kotak/i] },
+  {
+    broker: "Zerodha",
+    patterns: [
+      /zerodha/i,
+      /zer0dha/i, // OCR: o -> 0
+      /\bkite\b/i,
+      /kite\s*by\s*zerodha/i,
+      /rainmatter/i,
+      /coin\s*by\s*zerodha/i,
+      /console\s*zerodha/i,
+    ],
+  },
+  {
+    broker: "Upstox",
+    patterns: [
+      /upstox/i,
+      /upst0x/i, // OCR: o -> 0
+      /upstox\s*pro/i,
+      /rksv/i,
+      /rk\s*sv/i,
+    ],
+  },
+  {
+    broker: "Angel One",
+    patterns: [
+      /angel\s*one/i,
+      /angel\s*broking/i,
+      /angel\s*brok/i, // OCR truncation
+      /\bsmartapi\b/i,
+      /\bangel\s*trade\b/i,
+      /\bangel\s*eye\b/i,
+    ],
+  },
+  {
+    broker: "ICICI Direct",
+    patterns: [
+      /icici\s*direct/i,
+      /icici\s*securities/i,
+      /icicidirect/i,
+      /icici\s*dir(e|c)t/i, // OCR swap
+    ],
+  },
+  {
+    broker: "Groww",
+    patterns: [
+      /\bgroww\b/i,
+      /groww\s*app/i,
+    ],
+  },
+  {
+    broker: "Dhan",
+    patterns: [
+      /\bdhan\b/i,
+      /dhan\.?co/i,
+      /dhan\s*hq/i,
+      /dhan\s*trader/i,
+    ],
+  },
+  {
+    broker: "Fyers",
+    patterns: [
+      /\bfyers\b/i,
+      /fyers\s*one/i,
+      /fyers\s*markets/i,
+    ],
+  },
+  {
+    broker: "5paisa",
+    patterns: [
+      /\b5paisa\b/i,
+      /\b5\s*paisa\b/i,
+      /\bfive\s*paisa\b/i,
+    ],
+  },
+  {
+    broker: "Kotak",
+    patterns: [
+      /\bkotak\b/i,
+      /kotak\s*securities/i,
+      /kotak\s*sec/i,
+      /kotak\s*neo/i,
+      /\bneo\s*kotak\b/i,
+    ],
+  },
+  {
+    broker: "Paytm Money",
+    patterns: [
+      /paytm\s*money/i,
+      /\bpaytmmoney\b/i,
+    ],
+  },
 ];
+
+function canonicalizeBroker(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return null;
+  if (t.toUpperCase() === "AUTO") return null;
+  for (const { broker, patterns } of BROKER_KEYWORDS) {
+    if (broker.toLowerCase() === t.toLowerCase()) return broker;
+    if (patterns.some((re) => re.test(t))) return broker;
+  }
+  return t;
+}
 
 function detectBroker(text) {
   const t = String(text || "").toLowerCase();
@@ -206,6 +303,8 @@ function detectBroker(text) {
 function normalizeBrokerLabels(text) {
   return String(text || "")
     .replace(/\bNet\s*Qty\b/gi, "Qty")
+    .replace(/\bNet\s*Quantity\b/gi, "Qty")
+    .replace(/\bNetQty\b/gi, "Qty")
     .replace(/\bGross\s*Qty\b/gi, "Qty")
     .replace(/\bTraded\s*Qty\b/gi, "Qty")
     .replace(/\bOrder\s*Qty\b/gi, "Qty")
@@ -213,16 +312,21 @@ function normalizeBrokerLabels(text) {
     .replace(/\bAvg\.?\s*Rate\b/gi, "Avg Price")
     .replace(/\bAverage\s*Rate\b/gi, "Avg Price")
     .replace(/\bTrade\s*Price\b/gi, "Avg Price")
+    .replace(/\bAvg\.?\s*Price\b/gi, "Avg Price")
     .replace(/\bRealized\s*P&L\b/gi, "P&L")
     .replace(/\bRealised\s*P&L\b/gi, "P&L")
     .replace(/\bNet\s*P&L\b/gi, "P&L")
     .replace(/\bMTM\s*P&L\b/gi, "P&L")
+    .replace(/\bProfit\s*\/\s*Loss\b/gi, "P&L")
+    .replace(/\bP\s*\/\s*L\b/gi, "P&L")
+    .replace(/\bPNL\b/gi, "P&L")
     .replace(/\bContract\s*Note\b/gi, "Contract Note")
     .replace(/\bScrip\s*Name\b/gi, "Symbol")
     .replace(/\bInstrument\b/gi, "Symbol");
 }
 
 exports.parseIndianTrade = (text, opts = {}) => {
+  const broker = canonicalizeBroker(opts?.broker) || detectBroker(text);
   const normalizedText = normalizeBrokerLabels(text);
   const rawText = normalizedText;
   const lines = normalizedText
@@ -294,9 +398,20 @@ exports.parseIndianTrade = (text, opts = {}) => {
         const ot = (instrumentWithPnL[3] || "CE").toUpperCase().replace("CALL", "CE").replace("PUT", "PE");
         // Standard pair form: "NIFTY 24750 PE" (underlying + strike + CE/PE)
         pair = `${u} ${strike} ${ot}`;
-        if (instrumentWithPnL[4] && !profit) {
-          const pParsed = cleanPnLValue(instrumentWithPnL[4]);
-          if (pParsed != null) profit = pParsed;
+        // Dhan shows profit without "+" (e.g. "1,000.00") but loss has "-" (e.g. "-717.50")
+        if (!profit) {
+          const maybePnl = instrumentWithPnL[4];
+          if (maybePnl) {
+            const pParsed = cleanPnLValue(maybePnl);
+            if (pParsed != null) profit = pParsed;
+          } else if (broker === "Dhan") {
+            const tailPnl = fixedLineForMatch.match(/\s(-?\s*₹?\s*[\d,\s]+\.\d{2})\s*$/);
+            if (tailPnl) {
+              const cleaned = tailPnl[1].replace(/[₹\s,]/g, "");
+              const parsed = parseFloat(cleaned);
+              if (!Number.isNaN(parsed)) profit = parsed;
+            }
+          }
         }
         segment = "F&O";
         instrumentType = "OPTION";
@@ -335,8 +450,25 @@ exports.parseIndianTrade = (text, opts = {}) => {
       }
     }
 
+    // ── DHAN: "Qty. 50 x 83.00 NSE" (quantity + avg price on one line) ──
+    if (broker === "Dhan") {
+      const dhanQtyPrice = line.match(/\bQty\.?\s*(\d[\d,]*)\s*x\s*([\d,]+(?:\.\d+)?)\b/i);
+      if (dhanQtyPrice) {
+        if (quantity == null) quantity = dhanQtyPrice[1].replace(/,/g, "");
+        if (entryPrice == null) entryPrice = dhanQtyPrice[2].replace(/,/g, "");
+      }
+      // Dhan row P&L can appear as a standalone number without '+', sometimes with commas.
+      if (!profit) {
+        const dhanStandalonePnl = line.match(/^\s*(-?\s*[\d,]+\.\d{2})\s*$/);
+        if (dhanStandalonePnl) {
+          const parsed = parseNumberWithSpaces(dhanStandalonePnl[1]);
+          if (!Number.isNaN(parsed)) profit = parsed;
+        }
+      }
+    }
+
     // Quantity (from contract-note style or some apps)
-    const qtyMatch = line.match(/(?:Qty|Quantity|Lots?|Net\s*Qty)[:\s]*([\d,]+)/i);
+    const qtyMatch = line.match(/(?:Qty\.?|Quantity|Lots?|Net\s*Qty)[:\s]*([\d,]+)/i);
     if (qtyMatch) {
       quantity = qtyMatch[1].replace(/,/g, "");
     }
@@ -422,7 +554,6 @@ exports.parseIndianTrade = (text, opts = {}) => {
     strikePrice = corrected;
   }
 
-  const broker = opts?.broker || detectBroker(text);
   return {
     pair: pair || null,
     type: action,
@@ -449,6 +580,8 @@ exports.parseIndianTrade = (text, opts = {}) => {
 const NOISE_PATTERNS = [
   /^Portfolio$/i,
   /^Positions$/i,
+  /^Closed\s*Positions$/i,
+  /^Closed$/i,
   /^Holdings$/i,
   /^Markets$/i,
   /^Watchlist$/i,
@@ -493,13 +626,16 @@ const CONTRACT_HEADER_RE =
  */
 exports.parseTradesFromOCR = (text, opts = {}) => {
   if (!text || typeof text !== "string") return [];
-  const broker = opts?.broker || detectBroker(text);
+  const broker = canonicalizeBroker(opts?.broker) || detectBroker(text);
 
   // Normalize broker labels + common OCR errors before splitting
   let normalized = normalizeBrokerLabels(text)
     // Fix common symbol OCR typos
-    .replace(/N1FTY|NlFTY/gi, "NIFTY")
-    .replace(/BANKN1FTY|BANK\s*N1FTY/gi, "BANKNIFTY")
+    .replace(/N1FTY|NlFTY|NIFTY\s*50/gi, "NIFTY")
+    .replace(/BANKN1FTY|BANK\s*N1FTY|\bBANK\s*NIFTY\b/gi, "BANKNIFTY")
+    .replace(/\bFIN\s*NIFTY\b/gi, "FINNIFTY")
+    .replace(/\bMID\s*CP\s*NIFTY\b/gi, "MIDCPNIFTY")
+    .replace(/\bMIDCP\s*NIFTY\b/gi, "MIDCPNIFTY")
     // Remove stray unicode / special chars that OCR injects
     .replace(/[©®™●·○]/g, " ")
     .replace(/@/g, " ")
@@ -569,12 +705,23 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
     let entryPrice = null; // Prioritized Avg Price
     let ltpPrice = null;   // Fallback
     let pnl = null;
+    let pnlHasRupee = false;
 
     // P&L on header line: "+₹8,164.00" or "+₹1,15,943.75" (Indian lakh) or "NIFTY ... Put  +₹1,15,943.75 B>"
     const headerPnlMatch = block.headerLine.match(/([+\-]\s*₹?\s*[\d,\s]+\.?\d*)/);
     if (headerPnlMatch) {
       const val = cleanPnLValue(headerPnlMatch[0]);
-      if (val != null && Math.abs(val) >= 1) pnl = val;
+      if (val != null && Math.abs(val) >= 1) {
+        pnl = val;
+        pnlHasRupee = headerPnlMatch[0].includes("₹");
+      }
+    } else if (broker === "Dhan") {
+      // Dhan can show pnl without "+" at the end of the instrument line (e.g. "1,000.00")
+      const dhanHeaderPnl = block.headerLine.match(/\s(-?\s*[\d,]+\.\d{2})\s*$/);
+      if (dhanHeaderPnl) {
+        const val = parseNumberWithSpaces(dhanHeaderPnl[1]);
+        if (!Number.isNaN(val)) pnl = val;
+      }
     }
 
     // Collect all P&L candidates – index changes (e.g. SENSEX +232.19) are small; position P&L is larger
@@ -587,10 +734,19 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
     for (const ctx of block.contextLines) {
       // ── Quantity ──
       const qtyMatch = ctx.match(
-        /(?:Qty|QTY|Quantity|Net\s*Qty|Lots?)\s*[:\s]*(\d[\d,]*)/i
+        /(?:Qty\.?|QTY\.?|Quantity|Net\s*Qty|Lots?)\s*[:\s]*(\d[\d,]*)/i
       );
       if (qtyMatch && quantity === null) {
         quantity = parseInt(qtyMatch[1].replace(/,/g, ""), 10);
+      }
+
+      // ── DHAN: Qty. 50 x 83.00 NSE ──
+      if (broker === "Dhan") {
+        const dhanQtyX = ctx.match(/\bQty\.?\s*(\d[\d,]*)\s*x\s*([\d,]+(?:\.\d+)?)\b/i);
+        if (dhanQtyX) {
+          if (quantity === null) quantity = parseInt(dhanQtyX[1].replace(/,/g, ""), 10);
+          if (entryPrice === null) entryPrice = parseFloat(dhanQtyX[2].replace(/,/g, ""));
+        }
       }
 
       // ── Entry Price / Avg Price (handle "Avg ₹0.00" or "Avg 135.70") ──
@@ -619,6 +775,14 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       const standalonePnl = ctx.match(/^[+\-]\s*₹?\s*([\d,\s]+\.?\d*)\s*$/);
       if (standalonePnl) addPnlCandidate(cleanPnLValue(ctx), ctx.includes("₹"));
 
+      // DHAN: standalone pnl without '+' (e.g. "1,000.00") or with '-' (e.g. "-717.50")
+      if (broker === "Dhan") {
+        const dhanStandalone = ctx.match(/^\s*(-?\s*[\d,]+\.\d{2})\s*(?:Closed)?\s*$/i);
+        if (dhanStandalone) addPnlCandidate(parseNumberWithSpaces(dhanStandalone[1]), false);
+        const dhanAnywhere = ctx.match(/(-?\s*[\d,]+\.\d{2})\s*(?:Closed)?\s*$/i);
+        if (dhanAnywhere) addPnlCandidate(parseNumberWithSpaces(dhanAnywhere[1]), false);
+      }
+
       const anywherePnl = ctx.match(/([+\-]\s*₹?\s*[\d,\s]+\.?\d*)/);
       if (anywherePnl) addPnlCandidate(cleanPnLValue(anywherePnl[1]), anywherePnl[1].includes("₹"));
 
@@ -633,10 +797,17 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       const best = pool.reduce((a, b) =>
         Math.abs(b.val) > Math.abs(a.val) ? b : a
       );
-      // Reject obvious index changes: small values without ₹ when a larger one exists
-      const hasLarger = pool.some((c) => Math.abs(c.val) >= 500);
-      if (!hasLarger || Math.abs(best.val) >= 500) {
+      if (broker === "Dhan") {
+        // Dhan P&L can be small (e.g. -472.50) and has no ₹ or + sign.
         pnl = best.val;
+        pnlHasRupee = false;
+      } else {
+        // Reject obvious index changes: small values without ₹ when a larger one exists
+        const hasLarger = pool.some((c) => Math.abs(c.val) >= 500);
+        if (!hasLarger || Math.abs(best.val) >= 500) {
+          pnl = best.val;
+          pnlHasRupee = !!best.hasRupee;
+        }
       }
     }
 
@@ -647,6 +818,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       quantity,
       entryPrice: entryPrice !== null ? entryPrice : ltpPrice,
       pnl,
+      _pnlHasRupee: pnlHasRupee,
     };
   });
 
@@ -666,20 +838,27 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
   const withNullPnl = trades.filter((t) => t.pnl == null);
   if (globalBestRupeePnl != null && withNullPnl.length === 1) {
     withNullPnl[0].pnl = globalBestRupeePnl;
+    withNullPnl[0]._pnlHasRupee = true;
   }
 
   // If trade pnl is suspiciously small (< 500) but we do have a strong ₹ candidate elsewhere,
   // override it (this is the "232.19" issue).
-  if (globalBestRupeePnl != null) {
+  if (broker !== "Dhan" && globalBestRupeePnl != null) {
     for (const t of trades) {
+      if (t._pnlHasRupee) continue;
       if (t.pnl != null && Math.abs(t.pnl) > 0 && Math.abs(t.pnl) < 500) {
         t.pnl = globalBestRupeePnl;
+        t._pnlHasRupee = true;
       }
     }
   }
 
-  return trades.map((t) => ({
-    ...t,
-    ...(broker && { broker }),
-  }));
+  return trades.map((t) => {
+    // eslint-disable-next-line no-unused-vars
+    const { _pnlHasRupee, ...rest } = t;
+    return {
+      ...rest,
+      ...(broker && { broker }),
+    };
+  });
 };

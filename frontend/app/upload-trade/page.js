@@ -8,6 +8,7 @@ import { useMarket, MARKETS } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import InstallPWA from "@/components/InstallPWA";
 import { API_URL } from "@/config/api";
+import { fetchSetups } from "@/services/setupApi";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -228,6 +229,9 @@ function SectionCard({ accentColor = "#0D9E6E", title, subtitle, children, delay
   );
 }
 
+// Start with no static rules; rules will come from selected setup
+const DEFAULT_SETUP_RULES = [];
+
 /* ─────────────────────────────────────────
    MAIN COMPONENT
  ───────────────────────────────────────── */
@@ -243,6 +247,8 @@ function UploadTradeContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [extractedText, setExtractedText] = useState("");
+  const [strategies, setStrategies] = useState([]);
+  const [setupsLoading, setSetupsLoading] = useState(false);
 
   const marketType = pathname?.startsWith("/indian-market")
     ? MARKETS.INDIAN_MARKET
@@ -253,6 +259,7 @@ function UploadTradeContent() {
   const [showCustomRR, setShowCustomRR] = useState(false);
   const [showSample, setShowSample] = useState(false);
   const [broker, setBroker] = useState("AUTO");
+  const [setupRules, setSetupRules] = useState(DEFAULT_SETUP_RULES);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -261,6 +268,44 @@ function UploadTradeContent() {
     const tick = () => setTime(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }));
     tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
   }, [router]);
+
+  // Load saved setups/strategies for current market so Strategy field shows them
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    const loadSetups = async () => {
+      try {
+        setSetupsLoading(true);
+        const serverStrategies = await fetchSetups(marketType);
+        if (cancelled) return;
+        if (Array.isArray(serverStrategies) && serverStrategies.length) {
+          const mapped = serverStrategies.map((s, sIdx) => ({
+            id: sIdx + 1,
+            name: s.name || "",
+            rules: Array.isArray(s.rules)
+              ? s.rules.map((r, rIdx) => ({
+                  id: rIdx + 1,
+                  label: r.label || "",
+                  followed: false,
+                }))
+              : [],
+          }));
+          setStrategies(mapped);
+        } else {
+          setStrategies([]);
+        }
+      } catch (e) {
+        console.error("Failed to load setups", e);
+        setStrategies([]);
+      } finally {
+        if (!cancelled) setSetupsLoading(false);
+      }
+    };
+    loadSetups();
+    return () => {
+      cancelled = true;
+    };
+  }, [marketType, mounted]);
 
   const handleUpload = async () => {
     if (!file) { setError("Please select an image file first"); return; }
@@ -393,6 +438,24 @@ function UploadTradeContent() {
   };
 
   const handleChange = e => setTrade({ ...trade, [e.target.name]: e.target.value });
+  const handleStrategyChange = e => {
+    const value = e.target.value;
+    setTrade(prev => ({ ...prev, strategy: value }));
+
+    const selected = strategies.find(s => s.name === value);
+    if (selected && Array.isArray(selected.rules) && selected.rules.length) {
+      setSetupRules(
+        selected.rules.map((r, idx) => ({
+          id: r.id ?? idx + 1,
+          label: r.label || "",
+          followed: false,
+        }))
+      );
+    } else {
+      // No strategy or no rules -> start with empty checklist
+      setSetupRules([]);
+    }
+  };
 
   // Multi-trade: change handler for a specific index
   const handleTradeChange = (index, e) => {
@@ -454,6 +517,11 @@ function UploadTradeContent() {
     setError(null);
     try {
       const isInd = marketType === MARKETS.INDIAN_MARKET;
+
+      const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
+      const followedCount = activeRules.filter(r => r.followed).length;
+      const setupScore = activeRules.length > 0 ? Math.round((followedCount / activeRules.length) * 100) : null;
+
       const tradeData = {
         pair: trade.pair,
         type: trade.action.toUpperCase(),
@@ -471,6 +539,8 @@ function UploadTradeContent() {
         riskRewardCustom: trade.riskRewardCustom || undefined,
         entryBasis: trade.entryBasis || "Plan",
         entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : undefined,
+        setupRules: activeRules.map(({ label, followed }) => ({ label: label.trim(), followed })),
+        setupScore,
       };
 
       if (isInd) {
@@ -505,6 +575,33 @@ function UploadTradeContent() {
     } catch (err) {
       setError(err.message || "Failed to save trade. Please try again.");
     }
+  };
+
+  const toggleSetupRule = (id) => {
+    setSetupRules(prev =>
+      prev.map(r => (r.id === id ? { ...r, followed: !r.followed } : r))
+    );
+  };
+
+  const updateSetupRuleLabel = (id, value) => {
+    setSetupRules(prev =>
+      prev.map(r => (r.id === id ? { ...r, label: value } : r))
+    );
+  };
+
+  const addSetupRule = () => {
+    setSetupRules(prev => [
+      ...prev,
+      {
+        id: (prev[prev.length - 1]?.id || 0) + 1,
+        label: "",
+        followed: false,
+      },
+    ]);
+  };
+
+  const clearSetupRules = () => {
+    setSetupRules(prev => prev.map(r => ({ ...r, followed: false })));
   };
 
   /* ── step progress state ── */
@@ -903,7 +1000,21 @@ function UploadTradeContent() {
                   <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="e.g. 85.50" />
                   <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="e.g. 120" />
                   <FormSelect label="TRADE TYPE" name="tradeType" value={trade?.tradeType} onChange={handleChange} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />
-                  <FormSelect label="STRATEGY" name="strategy" value={trade?.strategy} onChange={handleChange} options={[{ value: "", label: "Select..." }, { value: "Naked CE", label: "Naked CE" }, { value: "Naked PE", label: "Naked PE" }, { value: "Straddle", label: "Straddle" }, { value: "Spread", label: "Spread" }, { value: "Breakout", label: "Breakout" }, { value: "Support/Resistance", label: "Support/Resistance" }, { value: "IV crush", label: "IV crush" }, { value: "Other", label: "Other" }, { value: "Custom", label: "Custom" }]} />
+                  <FormSelect
+                    label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
+                    name="strategy"
+                    value={trade?.strategy}
+                    onChange={handleStrategyChange}
+                    options={
+                      [
+                        { value: "", label: "Select setup..." },
+                        ...strategies
+                          .filter(s => s.name && s.name.trim().length > 0)
+                          .map(s => ({ value: s.name, label: s.name })),
+                        { value: "Custom", label: "Custom" },
+                      ]
+                    }
+                  />
                   {trade?.strategy === "Custom" && (
                     <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={trade?.strategyCustom} onChange={handleChange} placeholder="e.g. My own setup" />
                   )}
@@ -960,7 +1071,24 @@ function UploadTradeContent() {
                   <FormInput label="SWAP" name="swap" value={trade?.swap} onChange={handleChange} placeholder="0.00" />
                   <FormInput label="BALANCE" name="balance" value={trade?.balance} onChange={handleChange} placeholder="1000.00" />
                   <FormSelect label="SESSION" name="session" value={trade?.session} onChange={handleChange} options={[{ value: "Asian", label: "Asian" }, { value: "London", label: "London" }, { value: "New York", label: "New York" }]} />
-                  <FormInput label="STRATEGY" name="strategy" value={trade?.strategy} onChange={handleChange} placeholder="Strategy name" />
+                  <FormSelect
+                    label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
+                    name="strategy"
+                    value={trade?.strategy}
+                    onChange={handleStrategyChange}
+                    options={
+                      [
+                        { value: "", label: "Select setup..." },
+                        ...strategies
+                          .filter(s => s.name && s.name.trim().length > 0)
+                          .map(s => ({ value: s.name, label: s.name })),
+                        { value: "Custom", label: "Custom" },
+                      ]
+                    }
+                  />
+                  {trade?.strategy === "Custom" && (
+                    <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={trade?.strategyCustom} onChange={handleChange} placeholder="e.g. My own setup" />
+                  )}
                   <FormSelect
                     label="RISK : REWARD"
                     name="riskRewardRatio"
@@ -983,6 +1111,113 @@ function UploadTradeContent() {
                   )}
                 </>
               )}
+            </div>
+
+            {/* Setup checklist */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                    SETUP CHECKLIST
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
+                    Tick the rules you actually followed on this trade.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSetupRules}
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    letterSpacing: "0.08em",
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: "1px solid #E2E8F0",
+                    background: "#F8FAFC",
+                    color: "#64748B",
+                    cursor: "pointer",
+                  }}
+                >
+                  CLEAR TICKS
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {setupRules.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                    Select a setup above to load its checklist, or add your own rules.
+                  </div>
+                ) : (
+                  setupRules.map(rule => (
+                    <div
+                      key={rule.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 10px",
+                        borderRadius: 10,
+                        background: rule.followed ? "rgba(13,158,110,0.04)" : "transparent",
+                        border: "1px solid #E2E8F0",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSetupRule(rule.id)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 5,
+                          border: rule.followed ? "1.5px solid #0D9E6E" : "1.5px solid #CBD5E1",
+                          background: rule.followed ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {rule.followed && (
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                      <input
+                        type="text"
+                        value={rule.label}
+                        onChange={e => updateSetupRuleLabel(rule.id, e.target.value)}
+                        placeholder="Add setup rule..."
+                        style={{
+                          flex: 1,
+                          border: "none",
+                          outline: "none",
+                          background: "transparent",
+                          fontSize: 12,
+                          fontFamily: "'Plus Jakarta Sans',sans-serif",
+                          color: "#0F1923",
+                        }}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={addSetupRule}
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: "0.08em",
+                  color: "#0D9E6E",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                + ADD RULE
+              </button>
             </div>
 
             {/* Notes */}

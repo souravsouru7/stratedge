@@ -1,12 +1,20 @@
 const User = require("../models/Users");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 
 // Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d"
   });
+};
+
+const getGoogleClient = () => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("Missing GOOGLE_CLIENT_ID in backend env");
+  }
+  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 };
 
 // Register User
@@ -30,7 +38,8 @@ exports.registerUser = async (req, res) => {
     const user = await User.create({
       name,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      authProvider: "local"
     });
 
     res.status(201).json({
@@ -51,9 +60,13 @@ exports.loginUser = async (req, res) => {
 
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
 
-    if (user && (await bcrypt.compare(password, user.password))) {
+    if (user && user.authProvider === "google") {
+      return res.status(401).json({ message: "This account uses Google sign-in. Please continue with Google." });
+    }
+
+    if (user && user.password && (await bcrypt.compare(password, user.password))) {
 
       res.json({
         _id: user._id,
@@ -68,6 +81,66 @@ exports.loginUser = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Google Login (ID token -> verify -> find/create -> JWT)
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ message: "Missing credential" });
+    }
+
+    const client = getGoogleClient();
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload?.email;
+    const emailVerified = payload?.email_verified;
+
+    if (!email || !emailVerified) {
+      return res.status(401).json({ message: "Google email not verified" });
+    }
+
+    const googleId = payload.sub;
+    const name = payload.name || (payload.given_name ? `${payload.given_name} ${payload.family_name || ""}`.trim() : "Trader");
+    const avatar = payload.picture || null;
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        password: undefined,
+        authProvider: "google",
+        googleId,
+        avatar
+      });
+    } else {
+      // Upgrade existing local user to have googleId/avatar if missing (keep provider local unless it was google)
+      const updates = {};
+      if (!user.googleId) updates.googleId = googleId;
+      if (!user.avatar && avatar) updates.avatar = avatar;
+      if (user.authProvider !== "google" && user.authProvider !== "local") updates.authProvider = "local";
+      if (Object.keys(updates).length > 0) {
+        await User.updateOne({ _id: user._id }, { $set: updates });
+        user = await User.findById(user._id);
+      }
+    }
+
+    return res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user._id)
+    });
+  } catch (error) {
+    console.error("[Auth] googleLogin error:", error);
+    return res.status(401).json({ message: "Google authentication failed" });
   }
 };
 

@@ -33,6 +33,7 @@ app.use(express.json());
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/trades", require("./routes/tradeRoutes"));
+app.use("/api/setups", require("./routes/setupRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 

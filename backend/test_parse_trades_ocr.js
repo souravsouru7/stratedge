@@ -119,6 +119,67 @@ assert(result5[0].optionType === "PE", "OptionType = PE");
 assert(result5[0].pnl === -450, "PNL = -450");
 assert(result5[0].quantity === 40, "Quantity = 40");
 
+// ─── Sample 6: DHAN closed positions (no "+" for profit) ─────────
+console.log("\n--- Sample 6: Dhan closed positions layout ---");
+const sample6 = `
+Positions
+Overall P&L
+₹ -190.00 on 3 positions
+Closed Positions
+
+NIFTY 14 NOV 24000 PUT
+Qty. 50 x 83.00 NSE
+-717.50
+Closed
+
+NIFTY 14 NOV 24000 PUT
+Qty. 25 x 80.00 NSE
+-472.50
+Closed
+
+NIFTY 14 NOV 24100 PUT
+Qty. 50 x 76.80 NSE
+1,000.00
+Closed
+`;
+
+const result6 = parseTradesFromOCR(sample6, { broker: "Dhan" });
+console.log("  Trades found:", result6.length);
+assert(result6.length === 3, "Should find 3 Dhan trades");
+assert(result6[0].symbol === "NIFTY", "Dhan Trade 1 symbol = NIFTY");
+assert(result6[0].strike === 24000, "Dhan Trade 1 strike = 24000");
+assert(result6[0].optionType === "PE", "Dhan Trade 1 optionType = PE (PUT -> PE)");
+assert(result6[0].quantity === 50, "Dhan Trade 1 quantity = 50");
+assert(result6[0].entryPrice === 83.00, "Dhan Trade 1 entryPrice = 83.00");
+assert(result6[0].pnl === -717.50, "Dhan Trade 1 pnl = -717.50");
+assert(result6[2].strike === 24100, "Dhan Trade 3 strike = 24100");
+assert(result6[2].pnl === 1000.00, "Dhan Trade 3 pnl = 1000.00 (no '+')");
+
+// ─── Sample 7: Spaced underlyings / index aliases (BANK NIFTY, NIFTY 50) ──
+console.log("\n--- Sample 7: Spaced underlyings / NIFTY 50 alias ---");
+const sample7 = `
+Total P&L
++₹1500.00
+BANK NIFTY  48000  CE     +₹1500.00
+NSE  |  10 Feb 2026
+Qty 25
+LTP 210.30   Avg 150.32
+
+NIFTY 50  26200  PE     -₹250.00
+Qty 50
+Avg  90.00
+LTP 85.00
+`;
+const result7 = parseTradesFromOCR(sample7);
+console.log("  Trades found:", result7.length);
+assert(result7.length === 2, "Should find 2 trades (spaced underlyings)");
+assert(result7[0].symbol === "BANKNIFTY", "BANK NIFTY corrected to BANKNIFTY");
+assert(result7[0].strike === 48000, "BANKNIFTY strike = 48000");
+assert(result7[0].optionType === "CE", "BANKNIFTY optionType = CE");
+assert(result7[1].symbol === "NIFTY", "NIFTY 50 corrected to NIFTY");
+assert(result7[1].strike === 26200, "NIFTY strike = 26200");
+assert(result7[1].optionType === "PE", "NIFTY optionType = PE");
+
 // ─── Summary ──────────────────────────────────────────────────────
 console.log(`\n${"=".repeat(50)}`);
 console.log(`Results: ${passed} passed, ${failed} failed out of ${passed + failed} assertions`);

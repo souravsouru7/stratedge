@@ -7,6 +7,7 @@ import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
+import DailyThought from "@/components/DailyThought";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -486,8 +487,15 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, [router]);
 
-  const profitBull = stats ? parseFloat(stats.totalProfit) >= 0 : true;
+  const profitBull = stats ? parseFloat(stats.netProfit ?? stats.totalProfit) >= 0 : true;
   const winBull = stats ? parseFloat(stats.winRate) >= 50 : true;
+
+  const formatPnl = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n === 0) return "$0.00";
+    const sign = n > 0 ? "+" : "-";
+    return `${sign}$${Math.abs(n).toFixed(2)}`;
+  };
 
   return (
     <div style={{
@@ -624,6 +632,15 @@ export default function Dashboard() {
         transform: mounted ? "translateY(0)" : "translateY(16px)",
         transition: "all 0.55s cubic-bezier(0.22,1,0.36,1)",
       }}>
+        <DailyThought
+          accent="#0D9E6E"
+          gold="#B8860B"
+          background="#FFFFFF"
+          border="#E2E8F0"
+          ink="#0F1923"
+          muted="#4A5568"
+          storageKeyPrefix="forex_daily_thought_dismissed"
+        />
         {!stats ? (
           <LoadingSpinner message="ANALYZING FOREX DATA..." />
         ) : (
@@ -689,8 +706,18 @@ export default function Dashboard() {
                 </div>
                 <div style={{ display: "flex", gap: 20 }}>
                   {[
-                    { label: "PEAK", val: `+$${(parseFloat(stats.totalProfit) * 1.3).toFixed(2)}`, col: "#0D9E6E" },
-                    { label: "CURRENT", val: `${profitBull ? "+" : ""}$${parseFloat(stats.totalProfit).toFixed(2)}`, col: profitBull ? "#0D9E6E" : "#D63B3B" },
+                    {
+                      label: "PEAK",
+                      // Best point so far — never negative
+                      val: formatPnl(Math.max(0, parseFloat(stats.netProfit ?? stats.totalProfit))),
+                      col: "#0D9E6E",
+                    },
+                    {
+                      label: "CURRENT",
+                      // Current net P&L (after costs if available)
+                      val: formatPnl(parseFloat(stats.netProfit ?? stats.totalProfit)),
+                      col: profitBull ? "#0D9E6E" : "#D63B3B",
+                    },
                   ].map(m => (
                     <div key={m.label} style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", marginBottom: 2 }}>{m.label}</div>
@@ -769,8 +796,8 @@ export default function Dashboard() {
                 <NavCard href="/analytics" label="AI Analytics" sub="Deep pattern analysis" accentColor="#B8860B" delay={0.40}
                   icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>}
                 />
-                <NavCard href="/settings" label="Settings" sub="Preferences & profile" accentColor="#4A5568" delay={0.44}
-                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}
+                <NavCard href="/setups" label="Setups & Strategies" sub="Define rules per strategy" accentColor="#0D9E6E" delay={0.44}
+                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10" /><path d="M7 12h6" /><path d="M7 16h3" /></svg>}
                 />
               </div>
             </div>

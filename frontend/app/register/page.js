@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { registerUser } from "@/services/api";
+import { googleLogin, registerUser } from "@/services/api";
 import { useRouter } from "next/navigation";
+import { GoogleLogin } from "@react-oauth/google";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -182,6 +183,7 @@ export default function RegisterPage() {
   const [form, setForm]         = useState({ name:"", email:"", password:"" });
   const [focused, setFocused]   = useState(null);
   const [loading, setLoading]   = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [strength, setStrength] = useState(0);
   const [mounted, setMounted]   = useState(false);
 
@@ -220,6 +222,27 @@ export default function RegisterPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (resp) => {
+    if (!resp?.credential) {
+      alert("Google login failed. Please try again.");
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      const data = await googleLogin(resp.credential);
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        router.push("/dashboard");
+      } else {
+        alert(data.message || "Google login failed.");
+      }
+    } catch {
+      alert("Google login failed. Please try again.");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -464,7 +487,47 @@ export default function RegisterPage() {
               ))}
 
               {/* Divider */}
-              <div style={{ height:1, background:"#F1F5F9", margin:"4px 0 18px" }}/>
+              <div style={{ height:1, background:"#F1F5F9", margin:"4px 0 14px" }}/>
+
+              {/* Google */}
+              <div style={{ marginBottom: 14 }}>
+                {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+                  <div
+                    style={{
+                      opacity: googleLoading ? 0.7 : 1,
+                      pointerEvents: googleLoading ? "none" : "auto",
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => alert("Google login failed. Please try again.")}
+                      useOneTap={false}
+                      theme="outline"
+                      size="large"
+                      shape="rectangular"
+                      width="380"
+                    />
+                  </div>
+                ) : (
+                  <div style={{
+                    fontSize: 11,
+                    color: "#94A3B8",
+                    fontFamily: "'JetBrains Mono',monospace",
+                    textAlign: "center",
+                    padding: "10px 12px",
+                    background: "#F8FAFC",
+                    border: "1px dashed #E2E8F0",
+                    borderRadius: 8,
+                  }}>
+                    Google login is not configured (missing <b>NEXT_PUBLIC_GOOGLE_CLIENT_ID</b>).
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div style={{ height:1, background:"#F1F5F9", margin:"0 0 18px" }}/>
 
               {/* Terms */}
               <p style={{ fontSize:11, color:"#94A3B8", marginBottom:20, lineHeight:1.7, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>

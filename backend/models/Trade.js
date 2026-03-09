@@ -57,6 +57,20 @@ const tradeSchema = new mongoose.Schema(
     screenshot: {
       type: String,
       default: ""
+    },
+
+    // Per-trade setup checklist: rules and how many were followed
+    setupRules: [
+      {
+        label: { type: String, trim: true },
+        followed: { type: Boolean, default: false }
+      }
+    ],
+
+    setupScore: {
+      // 0–100 percentage of rules followed for this trade
+      type: Number,
+      default: null
     }
 
   },
