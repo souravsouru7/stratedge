@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const connectDB = require("./config/db");
 const { globalRateLimiter, authRateLimiter } = require("./middleware/rateLimit");
 const { sanitizeInput } = require("./middleware/sanitizeInput");
+const { errorHandler } = require("./middleware/errorHandler");
 
 dotenv.config();
 connectDB();
@@ -58,6 +59,13 @@ app.get("/", (req, res) => {
   res.send("Trading Journal API Running - Forex & Indian Markets");
 });
 
+// Fallback 404 for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ message: "Endpoint not found" });
+});
+
+// Central error handler (must be last)
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
