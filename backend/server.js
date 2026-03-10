@@ -1,8 +1,11 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const helmet = require("helmet");
 
 const connectDB = require("./config/db");
+const { globalRateLimiter, authRateLimiter } = require("./middleware/rateLimit");
+const { sanitizeInput } = require("./middleware/sanitizeInput");
 
 dotenv.config();
 connectDB();
@@ -28,10 +31,20 @@ app.use(cors({
   },
   credentials: true
 }));
+
+// HTTP security headers
+app.use(helmet());
+
 app.use(express.json());
 
+// Apply global input sanitization (body, query, params)
+app.use(sanitizeInput);
 
-app.use("/api/auth", require("./routes/authRoutes"));
+// Apply global rate limiter to all routes
+app.use(globalRateLimiter);
+
+// Apply stricter rate limiter to authentication-related routes
+app.use("/api/auth", authRateLimiter, require("./routes/authRoutes"));
 app.use("/api/trades", require("./routes/tradeRoutes"));
 app.use("/api/setups", require("./routes/setupRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
