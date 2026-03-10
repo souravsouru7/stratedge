@@ -10,11 +10,22 @@ const generateToken = (id) => {
   });
 };
 
+const getGoogleClientId = () => {
+  return (
+    process.env.GOOGLE_CLIENT_ID ||
+    process.env.GOOGLE_OAUTH_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  );
+};
+
 const getGoogleClient = () => {
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    throw new Error("Missing GOOGLE_CLIENT_ID in backend env");
+  const clientId = getGoogleClientId();
+  if (!clientId) {
+    const err = new Error("Missing Google OAuth client id in backend env (set GOOGLE_CLIENT_ID)");
+    err.code = "GOOGLE_OAUTH_CONFIG_MISSING";
+    throw err;
   }
-  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  return new OAuth2Client(clientId);
 };
 
 // Register User
@@ -93,9 +104,10 @@ exports.googleLogin = async (req, res) => {
     }
 
     const client = getGoogleClient();
+    const clientId = getGoogleClientId();
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID
+      audience: clientId
     });
 
     const payload = ticket.getPayload();
@@ -140,6 +152,9 @@ exports.googleLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("[Auth] googleLogin error:", error);
+    if (error?.code === "GOOGLE_OAUTH_CONFIG_MISSING") {
+      return res.status(500).json({ message: "Server misconfigured for Google login" });
+    }
     return res.status(401).json({ message: "Google authentication failed" });
   }
 };
