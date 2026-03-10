@@ -7,6 +7,7 @@ import Link from "next/link";
 import { MARKETS } from "@/context/MarketContext";
 import InstallPWA from "@/components/InstallPWA";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import { fetchSetups } from "@/services/setupApi";
 
 const theme = {
   bull: "#0D9E6E",
@@ -50,15 +51,79 @@ export default function IndianOptionsAddTradePage() {
     sttTaxes: ""
   });
   const [loading, setLoading] = useState(false);
+  const [strategies, setStrategies] = useState([]);
+  const [setupsLoading, setSetupsLoading] = useState(false);
+  const [setupRules, setSetupRules] = useState([]);
 
   useEffect(() => {
     const t = localStorage.getItem("token");
     if (!t) router.push("/login");
   }, [router]);
 
+  // Load saved setups/strategies for Indian market
+  useEffect(() => {
+    let cancelled = false;
+    const loadSetups = async () => {
+      try {
+        setSetupsLoading(true);
+        const serverStrategies = await fetchSetups(MARKETS.INDIAN_MARKET);
+        if (cancelled) return;
+        if (Array.isArray(serverStrategies) && serverStrategies.length) {
+          const mapped = serverStrategies.map((s, sIdx) => ({
+            id: sIdx + 1,
+            name: s.name || "",
+            rules: Array.isArray(s.rules)
+              ? s.rules.map((r, rIdx) => ({
+                  id: rIdx + 1,
+                  label: r.label || "",
+                  followed: false,
+                }))
+              : [],
+          }));
+          setStrategies(mapped);
+        } else {
+          setStrategies([]);
+        }
+      } catch (e) {
+        console.error("Failed to load setups", e);
+        setStrategies([]);
+      } finally {
+        if (!cancelled) setSetupsLoading(false);
+      }
+    };
+    loadSetups();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setTrade((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleStrategyChange = (e) => {
+    const value = e.target.value;
+    setTrade(prev => ({ ...prev, strategy: value }));
+    const selected = strategies.find(s => s.name === value);
+    if (selected && Array.isArray(selected.rules) && selected.rules.length) {
+      setSetupRules(selected.rules.map((r, idx) => ({ id: r.id ?? idx + 1, label: r.label || "", followed: false })));
+    } else {
+      setSetupRules([]);
+    }
+  };
+
+  const toggleSetupRule = (id) => {
+    setSetupRules(prev => prev.map(r => (r.id === id ? { ...r, followed: !r.followed } : r)));
+  };
+  const updateSetupRuleLabel = (id, value) => {
+    setSetupRules(prev => prev.map(r => (r.id === id ? { ...r, label: value } : r)));
+  };
+  const addSetupRule = () => {
+    setSetupRules(prev => [...prev, { id: (prev[prev.length - 1]?.id || 0) + 1, label: "", followed: false }]);
+  };
+  const clearSetupRules = () => {
+    setSetupRules(prev => prev.map(r => ({ ...r, followed: false })));
   };
 
   const getUnderlyingLabel = () => trade.underlying === "Other" ? trade.underlyingOther : trade.underlying;
@@ -113,6 +178,12 @@ export default function IndianOptionsAddTradePage() {
       brokerage: trade.brokerage ? parseFloat(trade.brokerage) : undefined,
       sttTaxes: trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined
     };
+
+    const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
+    const followedCount = activeRules.filter(r => r.followed).length;
+    const setupScore = activeRules.length > 0 ? Math.round((followedCount / activeRules.length) * 100) : null;
+    tradeData.setupRules = activeRules.map(({ label, followed }) => ({ label: label.trim(), followed }));
+    tradeData.setupScore = setupScore;
 
     setLoading(true);
     try {
@@ -255,17 +326,21 @@ export default function IndianOptionsAddTradePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Strategy / Setup</label>
-              <select name="strategy" value={trade.strategy} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
-                <option value="">Select...</option>
-                <option value="Naked CE">Naked CE</option>
-                <option value="Naked PE">Naked PE</option>
-                <option value="Straddle">Straddle</option>
-                <option value="Spread">Spread</option>
-                <option value="Breakout">Breakout</option>
-                <option value="Support/Resistance">Support / Resistance</option>
-                <option value="IV crush">IV crush</option>
-                <option value="Other">Other</option>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>
+                Strategy / Setup{setupsLoading ? " (loading...)" : ""}
+              </label>
+              <select
+                name="strategy"
+                value={trade.strategy}
+                onChange={handleStrategyChange}
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}
+              >
+                <option value="">Select setup...</option>
+                {strategies
+                  .filter(s => s.name && s.name.trim().length > 0)
+                  .map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
                 <option value="Custom">Custom</option>
               </select>
               {trade.strategy === "Custom" && (
@@ -277,6 +352,77 @@ export default function IndianOptionsAddTradePage() {
                   style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14, marginTop: 8 }}
                 />
               )}
+            </div>
+
+            {/* Setup checklist */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, fontFamily: "'JetBrains Mono',monospace", fontWeight: 800 }}>
+                    SETUP CHECKLIST
+                  </div>
+                  <div style={{ fontSize: 12, color: theme.muted, marginTop: 4 }}>
+                    Tick the rules you followed for this setup.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSetupRules}
+                  style={{ padding: "8px 10px", borderRadius: 999, border: `1px solid ${theme.border}`, background: "#F8FAFC", cursor: "pointer", fontSize: 11, fontWeight: 700, color: theme.muted }}
+                >
+                  CLEAR
+                </button>
+              </div>
+
+              {setupRules.length === 0 ? (
+                <div style={{ fontSize: 12, color: theme.muted }}>
+                  Select a setup above to load its checklist, or add your own rules.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {setupRules.map(rule => (
+                    <div key={rule.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.card }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSetupRule(rule.id)}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 6,
+                          border: rule.followed ? `1.5px solid ${theme.bull}` : "1.5px solid #CBD5E1",
+                          background: rule.followed ? `linear-gradient(135deg, ${theme.bull}, #22C78E)` : "#FFFFFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                        aria-label="Toggle rule followed"
+                      >
+                        {rule.followed && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.8">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                      <input
+                        value={rule.label}
+                        onChange={e => updateSetupRuleLabel(rule.id, e.target.value)}
+                        placeholder="Add setup rule..."
+                        style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={addSetupRule}
+                style={{ marginTop: 10, background: "transparent", border: "none", color: theme.bull, fontWeight: 800, cursor: "pointer" }}
+              >
+                + ADD RULE
+              </button>
             </div>
 
             <div>

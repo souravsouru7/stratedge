@@ -4,6 +4,7 @@ import { createTrade } from "@/services/tradeApi";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import InstallPWA from "@/components/InstallPWA";
+import { fetchSetups } from "@/services/setupApi";
 
 function AddTradePageContent() {
   const router = useRouter();
@@ -35,6 +36,7 @@ function AddTradePageContent() {
     swap: "",
     balance: "",
     strategy: "",
+    strategyCustom: "",
     session: "",
     notes: "",
     riskRewardRatio: "",
@@ -56,6 +58,9 @@ function AddTradePageContent() {
   const [showCustomRR, setShowCustomRR] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [strategies, setStrategies] = useState([]);
+  const [setupsLoading, setSetupsLoading] = useState(false);
+  const [setupRules, setSetupRules] = useState([]);
 
   useEffect(() => {
     // Automatic session detection based on current time
@@ -84,6 +89,80 @@ function AddTradePageContent() {
       setTrade(prev => ({ ...prev, entryBasisCustom: value === "Custom" ? prev.entryBasisCustom : "" }));
     }
     setTrade(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Load saved setups/strategies for current market
+  useEffect(() => {
+    let cancelled = false;
+    const loadSetups = async () => {
+      try {
+        setSetupsLoading(true);
+        const serverStrategies = await fetchSetups(marketType);
+        if (cancelled) return;
+        if (Array.isArray(serverStrategies) && serverStrategies.length) {
+          const mapped = serverStrategies.map((s, sIdx) => ({
+            id: sIdx + 1,
+            name: s.name || "",
+            rules: Array.isArray(s.rules)
+              ? s.rules.map((r, rIdx) => ({
+                  id: rIdx + 1,
+                  label: r.label || "",
+                  followed: false,
+                }))
+              : [],
+          }));
+          setStrategies(mapped);
+        } else {
+          setStrategies([]);
+        }
+      } catch (e) {
+        console.error("Failed to load setups", e);
+        setStrategies([]);
+      } finally {
+        if (!cancelled) setSetupsLoading(false);
+      }
+    };
+    loadSetups();
+    return () => {
+      cancelled = true;
+    };
+  }, [marketType]);
+
+  const handleStrategyChange = (e) => {
+    const value = e.target.value;
+    setTrade(prev => ({ ...prev, strategy: value }));
+
+    const selected = strategies.find(s => s.name === value);
+    if (selected && Array.isArray(selected.rules) && selected.rules.length) {
+      setSetupRules(
+        selected.rules.map((r, idx) => ({
+          id: r.id ?? idx + 1,
+          label: r.label || "",
+          followed: false,
+        }))
+      );
+    } else {
+      setSetupRules([]);
+    }
+  };
+
+  const toggleSetupRule = (id) => {
+    setSetupRules(prev => prev.map(r => (r.id === id ? { ...r, followed: !r.followed } : r)));
+  };
+
+  const updateSetupRuleLabel = (id, value) => {
+    setSetupRules(prev => prev.map(r => (r.id === id ? { ...r, label: value } : r)));
+  };
+
+  const addSetupRule = () => {
+    setSetupRules(prev => [
+      ...prev,
+      { id: (prev[prev.length - 1]?.id || 0) + 1, label: "", followed: false },
+    ]);
+  };
+
+  const clearSetupRules = () => {
+    setSetupRules(prev => prev.map(r => ({ ...r, followed: false })));
   };
 
   const handleScreenshotChange = async (e) => {
@@ -138,7 +217,7 @@ function AddTradePageContent() {
       profit: trade.profit ? parseFloat(trade.profit) : undefined,
       balance: trade.balance ? parseFloat(trade.balance) : undefined,
       session: trade.session || undefined,
-      strategy: trade.strategy || undefined,
+      strategy: trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined),
       notes: trade.notes || undefined,
       riskRewardRatio: trade.riskRewardRatio || undefined,
       riskRewardCustom: trade.riskRewardCustom || undefined,
@@ -159,6 +238,12 @@ function AddTradePageContent() {
       entryBasis: trade.entryBasis || "Plan",
       entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : undefined,
     };
+
+    const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
+    const followedCount = activeRules.filter(r => r.followed).length;
+    const setupScore = activeRules.length > 0 ? Math.round((followedCount / activeRules.length) * 100) : null;
+    tradeData.setupRules = activeRules.map(({ label, followed }) => ({ label: label.trim(), followed }));
+    tradeData.setupScore = setupScore;
 
     try {
       const result = await createTrade(tradeData, marketType);
@@ -319,8 +404,86 @@ function AddTradePageContent() {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Strategy</label>
-            <input name="strategy" placeholder="SMC / Trendline" className="w-full border-gray-200 border p-3 rounded-xl focus:ring-2 focus:ring-green-500 transition outline-none" onChange={handleChange} value={trade.strategy} />
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Strategy / Setup{setupsLoading ? " (loading...)" : ""}
+            </label>
+            <select
+              name="strategy"
+              className="w-full border-gray-200 border p-3 rounded-xl focus:ring-2 focus:ring-green-500 transition outline-none bg-white"
+              onChange={handleStrategyChange}
+              value={trade.strategy}
+            >
+              <option value="">Select setup...</option>
+              {strategies
+                .filter(s => s.name && s.name.trim().length > 0)
+                .map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              <option value="Custom">Custom</option>
+            </select>
+            {trade.strategy === "Custom" && (
+              <input
+                name="strategyCustom"
+                placeholder="Enter setup name"
+                className="w-full border-gray-200 border p-3 rounded-xl focus:ring-2 focus:ring-green-500 transition outline-none mt-3"
+                onChange={handleChange}
+                value={trade.strategyCustom}
+              />
+            )}
+          </div>
+
+          {/* Setup checklist */}
+          <div className="md:col-span-3">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Setup checklist</label>
+              <button
+                type="button"
+                onClick={clearSetupRules}
+                className="text-[11px] px-3 py-2 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition"
+              >
+                Clear ticks
+              </button>
+            </div>
+            <div className="space-y-2">
+              {setupRules.length === 0 ? (
+                <div className="text-sm text-gray-400">
+                  Select a setup above to load its checklist, or add your own rules.
+                </div>
+              ) : (
+                setupRules.map(rule => (
+                  <div key={rule.id} className="flex items-center gap-3 border border-gray-200 rounded-xl p-3 bg-white">
+                    <button
+                      type="button"
+                      onClick={() => toggleSetupRule(rule.id)}
+                      className={`w-5 h-5 rounded-md border flex items-center justify-center ${
+                        rule.followed ? "border-green-600 bg-green-600" : "border-gray-300 bg-white"
+                      }`}
+                      aria-label="Toggle rule followed"
+                    >
+                      {rule.followed && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.8">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                    <input
+                      type="text"
+                      value={rule.label}
+                      onChange={e => updateSetupRuleLabel(rule.id, e.target.value)}
+                      placeholder="Add setup rule..."
+                      className="flex-1 outline-none bg-transparent text-sm"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={addSetupRule}
+              className="mt-3 text-sm font-semibold text-green-700 hover:text-green-800"
+            >
+              + Add rule
+            </button>
           </div>
 
           <div>

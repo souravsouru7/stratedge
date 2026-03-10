@@ -66,9 +66,9 @@ export const getPerformanceMetrics = async (marketType = 'Forex') => {
   return handleResponse(res);
 };
 
-export const getTimeAnalysis = async (marketType = 'Forex') => {
+export const getTimeAnalysis = async (marketType = 'Forex', range = 'thisWeek') => {
   const baseUrl = getBaseUrl(marketType);
-  const res = await fetch(`${baseUrl}/analytics/time-analysis?marketType=${marketType}`, getAuthHeaders());
+  const res = await fetch(`${baseUrl}/analytics/time-analysis?marketType=${marketType}&range=${encodeURIComponent(range)}`, getAuthHeaders());
   return handleResponse(res);
 };
 

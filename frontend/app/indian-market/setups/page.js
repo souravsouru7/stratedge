@@ -129,6 +129,22 @@ export default function IndianSetupStrategiesPage() {
     );
   };
 
+  const deleteStrategy = (strategyId) => {
+    setStrategies(prev => prev.filter(s => s.id !== strategyId));
+  };
+
+  const deleteRule = (strategyId, ruleId) => {
+    setStrategies(prev =>
+      prev.map(s => {
+        if (s.id !== strategyId) return s;
+        return {
+          ...s,
+          rules: s.rules.filter(r => r.id !== ruleId),
+        };
+      })
+    );
+  };
+
   if (!mounted) return null;
 
   return (
@@ -351,6 +367,23 @@ export default function IndianSetupStrategiesPage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => deleteStrategy(strategy.id)}
+                      style={{
+                        fontSize: 9,
+                        fontFamily: "'JetBrains Mono',monospace",
+                        letterSpacing: "0.08em",
+                        padding: "5px 9px",
+                        borderRadius: 999,
+                        border: "1px solid #FCA5A5",
+                        background: "#FEF2F2",
+                        color: "#B91C1C",
+                        cursor: "pointer",
+                      }}
+                    >
+                      DELETE SETUP
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => addRuleToStrategy(strategy.id)}
                       style={{
                         fontSize: 9,
@@ -369,7 +402,7 @@ export default function IndianSetupStrategiesPage() {
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {strategy.rules.map(rule => (
+                        {strategy.rules.map(rule => (
                       <div
                         key={rule.id}
                         style={{
@@ -419,6 +452,23 @@ export default function IndianSetupStrategiesPage() {
                             color: "#0F1923",
                           }}
                         />
+                        <button
+                          type="button"
+                          onClick={() => deleteRule(strategy.id, rule.id)}
+                          style={{
+                            fontSize: 9,
+                            fontFamily: "'JetBrains Mono',monospace",
+                            padding: "3px 6px",
+                            borderRadius: 999,
+                            border: "1px solid #FCA5A5",
+                            background: "#FEF2F2",
+                            color: "#B91C1C",
+                            cursor: "pointer",
+                            flexShrink: 0,
+                          }}
+                        >
+                          ✕
+                        </button>
                       </div>
                     ))}
                     {strategy.rules.length === 0 && (

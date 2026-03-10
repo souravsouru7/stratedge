@@ -1,5 +1,17 @@
 const Trade = require("../models/Trade");
 
+// Small helper to shift trade timestamps into a configurable
+// "trader timezone" before bucketing by day/hour.
+// Set TIMEZONE_OFFSET_HOURS in your backend .env (e.g. 5.5 for IST),
+// leave unset/0 to keep server-local time.
+const getAnalyticsLocalDate = (dateLike) => {
+  const base = new Date(dateLike);
+  const offsetHours = parseFloat(process.env.TIMEZONE_OFFSET_HOURS || "0");
+  if (!offsetHours || Number.isNaN(offsetHours)) return base;
+  const shiftedMs = base.getTime() + offsetHours * 60 * 60 * 1000;
+  return new Date(shiftedMs);
+};
+
 // ============================================
 // BASIC ANALYTICS
 // ============================================
@@ -325,14 +337,35 @@ exports.getPerformanceMetrics = async (req, res) => {
 exports.getTimeAnalysis = async (req, res) => {
   try {
     const query = { user: req.user._id };
-    const trades = await Trade.find(query);
+    let trades = await Trade.find(query);
+
+    // Optional date range filter for "byDay/byHour" style widgets.
+    // range=all (default) | range=thisWeek
+    const range = (req.query.range || "all").toString();
+    if (range === "thisWeek") {
+      const nowLocal = getAnalyticsLocalDate(new Date());
+      const startOfToday = new Date(nowLocal);
+      startOfToday.setHours(0, 0, 0, 0);
+      // Monday-based week start
+      const day = startOfToday.getDay(); // 0=Sun..6=Sat
+      const daysSinceMonday = (day + 6) % 7;
+      const weekStart = new Date(startOfToday);
+      weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+
+      trades = trades.filter(t => {
+        const d = getAnalyticsLocalDate(t.createdAt);
+        return d >= weekStart && d < weekEnd;
+      });
+    }
 
     // By Month
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const byMonth = {};
 
     trades.forEach(t => {
-      const date = new Date(t.createdAt);
+      const date = getAnalyticsLocalDate(t.createdAt);
       const key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
       if (!byMonth[key]) byMonth[key] = { total: 0, wins: 0, losses: 0, profit: 0, avgProfit: 0 };
       byMonth[key].total++;
@@ -360,7 +393,7 @@ exports.getTimeAnalysis = async (req, res) => {
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
     trades.forEach(t => {
-      const day = dayNames[new Date(t.createdAt).getDay()];
+      const day = dayNames[getAnalyticsLocalDate(t.createdAt).getDay()];
       if (byDay[day]) {
         byDay[day].total++;
         if (t.profit > 0) byDay[day].wins++;
@@ -379,7 +412,7 @@ exports.getTimeAnalysis = async (req, res) => {
     for (let i = 0; i < 24; i++) { byHour[i] = { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 }; }
 
     trades.forEach(t => {
-      const hour = new Date(t.createdAt).getHours();
+      const hour = getAnalyticsLocalDate(t.createdAt).getHours();
       byHour[hour].total++;
       if (t.profit > 0) byHour[hour].wins++;
       else if (t.profit < 0) byHour[hour].losses++;
@@ -758,7 +791,7 @@ exports.getAIInsights = async (req, res) => {
     const dayStats = { Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0 };
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     trades.forEach(t => {
-      const day = dayNames[new Date(t.createdAt).getDay()];
+      const day = dayNames[getAnalyticsLocalDate(t.createdAt).getDay()];
       if (dayStats[day] !== undefined) dayStats[day] += t.profit || 0;
     });
     const bestDay = Object.entries(dayStats).reduce((a, b) => a[1] > b[1] ? a : b);

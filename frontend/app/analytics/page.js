@@ -768,29 +768,19 @@ export default function AnalyticsPage() {
               <div style={{ color: colors.muted, textAlign: "center", padding: 12 }}>Keep trading to get recommendations</div>
             )}
 
-            {/* Weekly narrative + next week checklist from backend */}
-            {aiInsights?.weeklyNarrative && (
+            {/* Next week checklist from backend (weekly narrative hidden) */}
+            {Array.isArray(aiInsights?.nextWeekChecklist) && aiInsights.nextWeekChecklist.length > 0 && (
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: colors.secondary, marginBottom: 4 }}>
-                  Weekly Review
+                  Next Week Checklist
                 </div>
-                <div style={{ fontSize: 12, color: colors.primary, marginBottom: 8 }}>
-                  {aiInsights.weeklyNarrative}
-                </div>
-                {Array.isArray(aiInsights.nextWeekChecklist) && aiInsights.nextWeekChecklist.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: colors.secondary, marginBottom: 4 }}>
-                      Next Week Checklist
-                    </div>
-                    <ul style={{ paddingLeft: 18, margin: 0 }}>
-                      {aiInsights.nextWeekChecklist.slice(0, 3).map((item, idx) => (
-                        <li key={idx} style={{ fontSize: 11, color: colors.muted, marginBottom: 2 }}>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {aiInsights.nextWeekChecklist.slice(0, 3).map((item, idx) => (
+                    <li key={idx} style={{ fontSize: 11, color: colors.muted, marginBottom: 2 }}>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </SectionCard>
