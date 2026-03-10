@@ -7,7 +7,6 @@ import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
-import DailyThought from "@/components/DailyThought";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -632,15 +631,6 @@ export default function Dashboard() {
         transform: mounted ? "translateY(0)" : "translateY(16px)",
         transition: "all 0.55s cubic-bezier(0.22,1,0.36,1)",
       }}>
-        <DailyThought
-          accent="#0D9E6E"
-          gold="#B8860B"
-          background="#FFFFFF"
-          border="#E2E8F0"
-          ink="#0F1923"
-          muted="#4A5568"
-          storageKeyPrefix="forex_daily_thought_dismissed"
-        />
         {!stats ? (
           <LoadingSpinner message="ANALYZING FOREX DATA..." />
         ) : (

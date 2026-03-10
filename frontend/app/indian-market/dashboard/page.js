@@ -15,7 +15,6 @@ import { useMarket, MARKETS } from "@/context/MarketContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import InstallPWA from "@/components/InstallPWA";
 import { getTrades } from "@/services/tradeApi";
-import DailyThought from "@/components/DailyThought";
 import {
     ResponsiveContainer,
     AreaChart,
@@ -484,15 +483,6 @@ export default function IndianMarketDashboard() {
                 position: "relative", zIndex: 5, padding: "28px 20px",
                 maxWidth: 1080, margin: "0 auto",
             }}>
-                <DailyThought
-                    accent={theme.primary}
-                    gold={theme.gold}
-                    background={theme.card}
-                    border={theme.border}
-                    ink={theme.ink}
-                    muted={theme.muted}
-                    storageKeyPrefix="indian_daily_thought_dismissed"
-                />
                 {!stats ? (
                     <LoadingSpinner message="SYNCING OPTIONS..." />
                 ) : (
