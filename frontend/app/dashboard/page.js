@@ -558,6 +558,7 @@ export default function Dashboard() {
               { href: "/trades", label: "Journal" },
               { href: "/add-trade", label: "Log Trade" },
               { href: "/analytics", label: "Analytics" },
+              { href: "/weekly-reports?market=Forex", label: "Weekly AI" },
             ].map(n => (
               <Link key={n.href} href={n.href} style={{
                 fontSize: 12, color: "#4A5568", fontWeight: 600,
@@ -788,6 +789,12 @@ export default function Dashboard() {
                 />
                 <NavCard href="/setups" label="Setups & Strategies" sub="Define rules per strategy" accentColor="#0D9E6E" delay={0.44}
                   icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10" /><path d="M7 12h6" /><path d="M7 16h3" /></svg>}
+                />
+                <NavCard href="/weekly-reports?market=Forex" label="Weekly AI Feedback" sub="Last 7 days review" accentColor="#B8860B" delay={0.48}
+                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 4h18M5 4v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4" />
+                    <path d="M8 8h8M8 12h5M8 16h3" />
+                  </svg>}
                 />
               </div>
             </div>
