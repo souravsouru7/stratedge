@@ -635,7 +635,7 @@ export default function IndianMarketDashboard() {
                                 </div>
                                 <div style={{ height: 210 }}>
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={equity} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
+                                        <AreaChart data={equity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="0%" stopColor={theme.bull} stopOpacity={0.25} />
@@ -644,7 +644,13 @@ export default function IndianMarketDashboard() {
                                             </defs>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" strokeOpacity={0.6} />
                                             <XAxis dataKey="idx" tickLine={false} axisLine={false} hide />
-                                            <YAxis tickLine={false} axisLine={false} tick={{ fill: theme.muted, fontSize: 10 }} width={40} />
+                                            <YAxis
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fill: theme.muted, fontSize: 10 }}
+                                                width={56}
+                                                tickFormatter={(v) => formatINR(v)}
+                                            />
                                             <Tooltip
                                                 content={({ active, payload }) => {
                                                     if (!active || !payload || !payload.length) return null;

@@ -192,6 +192,11 @@ const onBlurReset = e => {
   e.currentTarget.style.background = "#F8FAFC";
 };
 
+function isFilled(v) {
+  if (v == null) return false;
+  return String(v).trim() !== "";
+}
+
 function FormInput({ label, name, value, onChange, placeholder, type = "text" }) {
   return (
     <div>
@@ -365,6 +370,7 @@ function UploadTradeContent() {
               lesson: "",
               brokerage: "",
               sttTaxes: "",
+              setupRules: [],
             };
           });
           setTrades(tradeArr);
@@ -464,12 +470,58 @@ function UploadTradeContent() {
     setTrades(updated);
   };
 
+  // Multi-trade: when strategy changes, load that strategy's checklist rules (same logic as single-trade)
+  const handleMultiTradeStrategyChange = (index, e) => {
+    const value = e.target.value;
+    const updated = [...trades];
+    updated[index] = { ...updated[index], strategy: value };
+    const selected = strategies.find(s => s.name === value);
+    const newRules = selected && Array.isArray(selected.rules) && selected.rules.length
+      ? selected.rules.map((r, idx) => ({ id: r.id ?? idx + 1, label: r.label || "", followed: false }))
+      : [];
+    updated[index].setupRules = newRules;
+    setTrades(updated);
+  };
+
+  // Multi-trade: setup checklist actions per trade index
+  const toggleSetupRuleMulti = (tradeIdx, ruleId) => {
+    setTrades(prev => prev.map((t, i) => {
+      if (i !== tradeIdx || !Array.isArray(t.setupRules)) return t;
+      return { ...t, setupRules: t.setupRules.map(r => r.id === ruleId ? { ...r, followed: !r.followed } : r) };
+    }));
+  };
+  const updateSetupRuleLabelMulti = (tradeIdx, ruleId, value) => {
+    setTrades(prev => prev.map((t, i) => {
+      if (i !== tradeIdx || !Array.isArray(t.setupRules)) return t;
+      return { ...t, setupRules: t.setupRules.map(r => r.id === ruleId ? { ...r, label: value } : r) };
+    }));
+  };
+  const addSetupRuleMulti = (tradeIdx) => {
+    setTrades(prev => prev.map((t, i) => {
+      if (i !== tradeIdx) return t;
+      const rules = Array.isArray(t.setupRules) ? t.setupRules : [];
+      const nextId = (rules[rules.length - 1]?.id || 0) + 1;
+      return { ...t, setupRules: [...rules, { id: nextId, label: "", followed: false }] };
+    }));
+  };
+  const clearSetupRulesMulti = (tradeIdx) => {
+    setTrades(prev => prev.map((t, i) => {
+      if (i !== tradeIdx || !Array.isArray(t.setupRules)) return t;
+      return { ...t, setupRules: t.setupRules.map(r => ({ ...r, followed: false })) };
+    }));
+  };
+
   // Multi-trade: save a single trade by index
   const saveIndianTrade = async (index) => {
     const t = trades[index];
     if (!t.pair) { setError("Please enter a symbol"); return; }
     setError(null);
     try {
+      const rules = Array.isArray(t.setupRules) ? t.setupRules : [];
+      const activeRules = rules.filter(r => r.label && String(r.label).trim().length > 0);
+      const followedCount = activeRules.filter(r => r.followed).length;
+      const setupScore = activeRules.length > 0 ? Math.round((followedCount / activeRules.length) * 100) : null;
+
       const tradeData = {
         pair: t.pair,
         type: (t.action || "BUY").toUpperCase(),
@@ -493,6 +545,8 @@ function UploadTradeContent() {
         lesson: t.lesson || undefined,
         brokerage: t.brokerage ? parseFloat(t.brokerage) : undefined,
         sttTaxes: t.sttTaxes ? parseFloat(t.sttTaxes) : undefined,
+        setupRules: activeRules.map(({ label, followed }) => ({ label: String(label).trim(), followed })),
+        setupScore,
       };
       const result = await createTrade(tradeData, marketType);
       if (result && result._id) {
@@ -877,6 +931,30 @@ function UploadTradeContent() {
         {/* ── MULTI-TRADE CARDS (Indian Market with multiple trades) ── */}
         {isInd && trades.length > 1 && (
           <>
+            {/* Overall P&L (frontend-only, not stored) */}
+            {(() => {
+              const totalPnl = trades.reduce((sum, t) => {
+                const p = t.profit != null && String(t.profit).trim() !== "" ? parseFloat(String(t.profit).replace(/,/g, "")) : NaN;
+                return sum + (Number.isFinite(p) ? p : 0);
+              }, 0);
+              const isProfit = totalPnl >= 0;
+              const formatted = Number.isFinite(totalPnl)
+                ? (totalPnl >= 0 ? "₹" : "-₹") + Math.abs(totalPnl).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : "—";
+              return (
+                <SectionCard accentColor={isProfit ? "#0D9E6E" : "#D63B3B"} title="Overall P&L" subtitle={`${formatted} on ${trades.length} positions · Any broker · For reference only (not saved)`} delay={0.08}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                    <span style={{ fontSize: 22, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: isProfit ? "#0D9E6E" : "#D63B3B", letterSpacing: "0.02em" }}>
+                      {formatted}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                      Sum of all P&L below
+                    </span>
+                  </div>
+                </SectionCard>
+              );
+            })()}
+
             {/* Screenshot preview + badge */}
             <SectionCard accentColor="#1B5E20" title={`${trades.length} Trades Detected`} subtitle="AI FOUND MULTIPLE TRADES IN YOUR SCREENSHOT" delay={0.1}>
               {trades[0]?.screenshot && (
@@ -903,25 +981,66 @@ function UploadTradeContent() {
                   </div>
                   <FormSelect label="CE / PE" name="optionType" value={t.optionType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "CE", label: "CE" }, { value: "PE", label: "PE" }]} />
                   <FormSelect label="BUY / SELL" name="action" value={t.action} onChange={e => handleTradeChange(idx, e)} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
-                  <FormInput label="QTY (lots)" name="quantity" value={t.quantity} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 3" />
-                  <FormInput label="PROFIT / LOSS (₹)" name="profit" value={t.profit} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 1500 or -500" />
-                  <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={t.entryPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 85.50" />
-                  <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={t.exitPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 120" />
-                  <FormSelect label="TRADE TYPE" name="tradeType" value={t.tradeType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />
-                  <FormSelect label="STRATEGY" name="strategy" value={t.strategy} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "Naked CE", label: "Naked CE" }, { value: "Naked PE", label: "Naked PE" }, { value: "Straddle", label: "Straddle" }, { value: "Spread", label: "Spread" }, { value: "Breakout", label: "Breakout" }, { value: "Support/Resistance", label: "Support/Resistance" }, { value: "IV crush", label: "IV crush" }, { value: "Other", label: "Other" }, { value: "Custom", label: "Custom" }]} />
+                  {isFilled(t.quantity) && <FormInput label="QTY (lots)" name="quantity" value={t.quantity} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 3" />}
+                  {isFilled(t.profit) && <FormInput label="PROFIT / LOSS (₹)" name="profit" value={t.profit} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 1500 or -500" />}
+                  {isFilled(t.entryPrice) && <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={t.entryPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 85.50" />}
+                  {isFilled(t.exitPrice) && <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={t.exitPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 120" />}
+                  {isFilled(t.tradeType) && <FormSelect label="TRADE TYPE" name="tradeType" value={t.tradeType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />}
+                  <FormSelect
+                    label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
+                    name="strategy"
+                    value={t.strategy}
+                    onChange={e => handleMultiTradeStrategyChange(idx, e)}
+                    options={[
+                      { value: "", label: "Select setup..." },
+                      ...strategies.filter(s => s.name && s.name.trim().length > 0).map(s => ({ value: s.name, label: s.name })),
+                      { value: "Custom", label: "Custom" },
+                    ]}
+                  />
                   {t.strategy === "Custom" && (
                     <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={t.strategyCustom} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. My own setup" />
                   )}
-                  <FormInput label="EXPIRY DATE" name="expiryDate" value={t.expiryDate} onChange={e => handleTradeChange(idx, e)} placeholder="YYYY-MM-DD" />
-                  <FormSelect label="ENTRY BASIS" name="entryBasis" value={t.entryBasis} onChange={e => handleTradeChange(idx, e)} options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]} />
-                  <FormSelect label="RISK : REWARD" name="riskRewardRatio" value={t.riskRewardRatio} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }]} />
-                  <FormInput label="SETUP / PATTERN" name="setup" value={t.setup} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Breakout above 26200" />
-                  <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={t.mistakeTag} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />
-                  <FormInput label="LESSON (one line)" name="lesson" value={t.lesson} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Never add to a losing position" />
+                  {isFilled(t.expiryDate) && <FormInput label="EXPIRY DATE" name="expiryDate" value={t.expiryDate} onChange={e => handleTradeChange(idx, e)} placeholder="YYYY-MM-DD" />}
+                  {isFilled(t.entryBasis) && <FormSelect label="ENTRY BASIS" name="entryBasis" value={t.entryBasis} onChange={e => handleTradeChange(idx, e)} options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]} />}
+                  {isFilled(t.riskRewardRatio) && <FormSelect label="RISK : REWARD" name="riskRewardRatio" value={t.riskRewardRatio} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }]} />}
+                  {isFilled(t.setup) && <FormInput label="SETUP / PATTERN" name="setup" value={t.setup} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Breakout above 26200" />}
+                  {isFilled(t.mistakeTag) && <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={t.mistakeTag} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />}
+                  {isFilled(t.lesson) && <FormInput label="LESSON (one line)" name="lesson" value={t.lesson} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Never add to a losing position" />}
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={labelStyle}>NOTES</label>
                   <textarea name="notes" placeholder="Why you took this trade..." value={t.notes || ""} onChange={e => handleTradeChange(idx, e)} rows={2} style={{ ...inputBase, resize: "vertical", fontFamily: "'Plus Jakarta Sans',sans-serif" }} onFocus={onFocusGreen} onBlur={onBlurReset} />
+                </div>
+                {/* Setup checklist — only when a strategy is selected */}
+                <div style={{ marginBottom: 14 }}>
+                  {t.strategy ? (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>SETUP CHECKLIST</div>
+                          <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>Tick the rules you followed for this trade.</div>
+                        </div>
+                        <button type="button" onClick={() => clearSetupRulesMulti(idx)} style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", padding: "6px 10px", borderRadius: 999, border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#64748B", cursor: "pointer" }}>CLEAR TICKS</button>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {(!t.setupRules || t.setupRules.length === 0) ? (
+                          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>No rules for this setup. Add your own rules below.</div>
+                        ) : (
+                          (t.setupRules || []).map(rule => (
+                            <div key={rule.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 10, background: rule.followed ? "rgba(13,158,110,0.04)" : "transparent", border: "1px solid #E2E8F0" }}>
+                              <button type="button" onClick={() => toggleSetupRuleMulti(idx, rule.id)} style={{ width: 18, height: 18, borderRadius: 5, border: rule.followed ? "1.5px solid #0D9E6E" : "1.5px solid #CBD5E1", background: rule.followed ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                                {rule.followed && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4"><polyline points="20 6 9 17 4 12" /></svg>}
+                              </button>
+                              <input type="text" value={rule.label || ""} onChange={e => updateSetupRuleLabelMulti(idx, rule.id, e.target.value)} placeholder="Add setup rule..." style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 12, fontFamily: "'Plus Jakarta Sans',sans-serif", color: "#0F1923" }} />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <button type="button" onClick={() => addSetupRuleMulti(idx)} style={{ marginTop: 8, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", color: "#0D9E6E", background: "transparent", border: "none", cursor: "pointer" }}>+ ADD RULE</button>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Select a setup above to load its checklist, or add your own rules.</div>
+                  )}
                 </div>
                 {/* Save button per trade */}
                 <button onClick={() => saveIndianTrade(idx)} disabled={savedTrades[idx]}
@@ -995,11 +1114,11 @@ function UploadTradeContent() {
                   </div>
                   <FormSelect label="CE / PE" name="optionType" value={trade?.optionType} onChange={handleChange} options={[{ value: "CE", label: "CE" }, { value: "PE", label: "PE" }]} />
                   <FormSelect label="BUY / SELL" name="action" value={trade?.action} onChange={handleChange} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
-                  <FormInput label="QTY (lots)" name="quantity" value={trade?.quantity} onChange={handleChange} placeholder="e.g. 3" />
-                  <FormInput label="PROFIT / LOSS (₹)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="e.g. 1500 or -500" />
-                  <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="e.g. 85.50" />
-                  <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="e.g. 120" />
-                  <FormSelect label="TRADE TYPE" name="tradeType" value={trade?.tradeType} onChange={handleChange} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />
+                  {isFilled(trade?.quantity) && <FormInput label="QTY (lots)" name="quantity" value={trade?.quantity} onChange={handleChange} placeholder="e.g. 3" />}
+                  {isFilled(trade?.profit) && <FormInput label="PROFIT / LOSS (₹)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="e.g. 1500 or -500" />}
+                  {isFilled(trade?.entryPrice) && <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="e.g. 85.50" />}
+                  {isFilled(trade?.exitPrice) && <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="e.g. 120" />}
+                  {isFilled(trade?.tradeType) && <FormSelect label="TRADE TYPE" name="tradeType" value={trade?.tradeType} onChange={handleChange} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />}
                   <FormSelect
                     label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
                     name="strategy"
@@ -1018,59 +1137,67 @@ function UploadTradeContent() {
                   {trade?.strategy === "Custom" && (
                     <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={trade?.strategyCustom} onChange={handleChange} placeholder="e.g. My own setup" />
                   )}
-                  <FormInput label="EXPIRY DATE" name="expiryDate" value={trade?.expiryDate} onChange={handleChange} placeholder="YYYY-MM-DD" />
-                  <FormSelect
-                    label="RISK : REWARD"
-                    name="riskRewardRatio"
-                    value={trade?.riskRewardRatio}
-                    onChange={(e) => { setShowCustomRR(e.target.value === "custom"); handleChange(e); }}
-                    options={[
-                      { value: "", label: "Select..." },
-                      { value: "1:1", label: "1:1" },
-                      { value: "1:1.5", label: "1:1.5" },
-                      { value: "1:2", label: "1:2" },
-                      { value: "1:3", label: "1:3" },
-                      { value: "1:4", label: "1:4" },
-                      { value: "1:5", label: "1:5" },
-                      { value: "custom", label: "Custom" }
-                    ]}
-                  />
-                  {showCustomRR && (
-                    <FormInput label="CUSTOM RR" name="riskRewardCustom" value={trade?.riskRewardCustom} onChange={handleChange} placeholder="e.g. 1:2.5" />
+                  {isFilled(trade?.expiryDate) && <FormInput label="EXPIRY DATE" name="expiryDate" value={trade?.expiryDate} onChange={handleChange} placeholder="YYYY-MM-DD" />}
+                  {(isFilled(trade?.riskRewardRatio) || showCustomRR) && (
+                    <>
+                      <FormSelect
+                        label="RISK : REWARD"
+                        name="riskRewardRatio"
+                        value={trade?.riskRewardRatio}
+                        onChange={(e) => { setShowCustomRR(e.target.value === "custom"); handleChange(e); }}
+                        options={[
+                          { value: "", label: "Select..." },
+                          { value: "1:1", label: "1:1" },
+                          { value: "1:1.5", label: "1:1.5" },
+                          { value: "1:2", label: "1:2" },
+                          { value: "1:3", label: "1:3" },
+                          { value: "1:4", label: "1:4" },
+                          { value: "1:5", label: "1:5" },
+                          { value: "custom", label: "Custom" }
+                        ]}
+                      />
+                      {showCustomRR && (
+                        <FormInput label="CUSTOM RR" name="riskRewardCustom" value={trade?.riskRewardCustom} onChange={handleChange} placeholder="e.g. 1:2.5" />
+                      )}
+                    </>
                   )}
-                  <FormSelect
-                    label="ENTRY BASIS"
-                    name="entryBasis"
-                    value={trade?.entryBasis}
-                    onChange={handleChange}
-                    options={[
-                      { value: "Plan", label: "Rule Based / Plan" },
-                      { value: "Emotion", label: "Emotional" },
-                      { value: "Impulsive", label: "Impulsive" },
-                      { value: "Custom", label: "Custom Basis" }
-                    ]}
-                  />
-                  {trade?.entryBasis === "Custom" && (
-                    <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
+                  {isFilled(trade?.entryBasis) && (
+                    <>
+                      <FormSelect
+                        label="ENTRY BASIS"
+                        name="entryBasis"
+                        value={trade?.entryBasis}
+                        onChange={handleChange}
+                        options={[
+                          { value: "Plan", label: "Rule Based / Plan" },
+                          { value: "Emotion", label: "Emotional" },
+                          { value: "Impulsive", label: "Impulsive" },
+                          { value: "Custom", label: "Custom Basis" }
+                        ]}
+                      />
+                      {trade?.entryBasis === "Custom" && (
+                        <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
+                      )}
+                    </>
                   )}
-                  <FormInput label="SETUP / PATTERN" name="setup" value={trade?.setup} onChange={handleChange} placeholder="e.g. Breakout above 26200" />
-                  <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={trade?.mistakeTag} onChange={handleChange} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />
-                  <FormInput label="LESSON (one line)" name="lesson" value={trade?.lesson} onChange={handleChange} placeholder="e.g. Never add to a losing position" />
+                  {isFilled(trade?.setup) && <FormInput label="SETUP / PATTERN" name="setup" value={trade?.setup} onChange={handleChange} placeholder="e.g. Breakout above 26200" />}
+                  {isFilled(trade?.mistakeTag) && <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={trade?.mistakeTag} onChange={handleChange} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />}
+                  {isFilled(trade?.lesson) && <FormInput label="LESSON (one line)" name="lesson" value={trade?.lesson} onChange={handleChange} placeholder="e.g. Never add to a losing position" />}
                 </>
               ) : (
                 <>
                   <FormInput label="TRADING PAIR" name="pair" value={trade?.pair} onChange={handleChange} placeholder="e.g. USDCAD" />
                   <FormSelect label="ACTION" name="action" value={trade?.action} onChange={handleChange} options={[{ value: "buy", label: "Buy (Long)" }, { value: "sell", label: "Sell (Short)" }]} />
-                  <FormInput label="LOT SIZE" name="lotSize" value={trade?.lotSize} onChange={handleChange} placeholder="0.01" />
-                  <FormInput label="ENTRY PRICE" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="1.2345" />
-                  <FormInput label="EXIT PRICE" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="1.2365" />
-                  <FormInput label="PROFIT" name="profit" value={trade?.profit} onChange={handleChange} placeholder="+20.00" />
-                  <FormInput label="STOP LOSS" name="stopLoss" value={trade?.stopLoss} onChange={handleChange} placeholder="1.2300" />
-                  <FormInput label="TAKE PROFIT" name="takeProfit" value={trade?.takeProfit} onChange={handleChange} placeholder="1.2400" />
-                  <FormInput label="COMMISSION" name="commission" value={trade?.commission} onChange={handleChange} placeholder="2.50" />
-                  <FormInput label="SWAP" name="swap" value={trade?.swap} onChange={handleChange} placeholder="0.00" />
-                  <FormInput label="BALANCE" name="balance" value={trade?.balance} onChange={handleChange} placeholder="1000.00" />
-                  <FormSelect label="SESSION" name="session" value={trade?.session} onChange={handleChange} options={[{ value: "Asian", label: "Asian" }, { value: "London", label: "London" }, { value: "New York", label: "New York" }]} />
+                  {isFilled(trade?.lotSize) && <FormInput label="LOT SIZE" name="lotSize" value={trade?.lotSize} onChange={handleChange} placeholder="0.01" />}
+                  {isFilled(trade?.entryPrice) && <FormInput label="ENTRY PRICE" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="1.2345" />}
+                  {isFilled(trade?.exitPrice) && <FormInput label="EXIT PRICE" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="1.2365" />}
+                  {isFilled(trade?.profit) && <FormInput label="PROFIT" name="profit" value={trade?.profit} onChange={handleChange} placeholder="+20.00" />}
+                  {isFilled(trade?.stopLoss) && <FormInput label="STOP LOSS" name="stopLoss" value={trade?.stopLoss} onChange={handleChange} placeholder="1.2300" />}
+                  {isFilled(trade?.takeProfit) && <FormInput label="TAKE PROFIT" name="takeProfit" value={trade?.takeProfit} onChange={handleChange} placeholder="1.2400" />}
+                  {isFilled(trade?.commission) && <FormInput label="COMMISSION" name="commission" value={trade?.commission} onChange={handleChange} placeholder="2.50" />}
+                  {isFilled(trade?.swap) && <FormInput label="SWAP" name="swap" value={trade?.swap} onChange={handleChange} placeholder="0.00" />}
+                  {isFilled(trade?.balance) && <FormInput label="BALANCE" name="balance" value={trade?.balance} onChange={handleChange} placeholder="1000.00" />}
+                  {isFilled(trade?.session) && <FormSelect label="SESSION" name="session" value={trade?.session} onChange={handleChange} options={[{ value: "Asian", label: "Asian" }, { value: "London", label: "London" }, { value: "New York", label: "New York" }]} />}
                   <FormSelect
                     label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
                     name="strategy"
@@ -1086,138 +1213,151 @@ function UploadTradeContent() {
                       ]
                     }
                   />
-                  {trade?.strategy === "Custom" && (
-                    <FormInput label="CUSTOM STRATEGY" name="strategyCustom" value={trade?.strategyCustom} onChange={handleChange} placeholder="e.g. My own setup" />
+                  {(isFilled(trade?.riskRewardRatio) || showCustomRR) && (
+                    <>
+                      <FormSelect
+                        label="RISK : REWARD"
+                        name="riskRewardRatio"
+                        value={trade?.riskRewardRatio}
+                        onChange={(e) => { setShowCustomRR(e.target.value === "custom"); handleChange(e); }}
+                        options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]}
+                      />
+                      {showCustomRR && (
+                        <FormInput label="CUSTOM RR" name="riskRewardCustom" value={trade?.riskRewardCustom} onChange={handleChange} placeholder="e.g. 1:2.5" />
+                      )}
+                    </>
                   )}
-                  <FormSelect
-                    label="RISK : REWARD"
-                    name="riskRewardRatio"
-                    value={trade?.riskRewardRatio}
-                    onChange={(e) => { setShowCustomRR(e.target.value === "custom"); handleChange(e); }}
-                    options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]}
-                  />
-                  {showCustomRR && (
-                    <FormInput label="CUSTOM RR" name="riskRewardCustom" value={trade?.riskRewardCustom} onChange={handleChange} placeholder="e.g. 1:2.5" />
-                  )}
-                  <FormSelect
-                    label="ENTRY BASIS"
-                    name="entryBasis"
-                    value={trade?.entryBasis}
-                    onChange={handleChange}
-                    options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]}
-                  />
-                  {trade?.entryBasis === "Custom" && (
-                    <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
+                  {(isFilled(trade?.entryBasis) || trade?.entryBasis === "Custom") && (
+                    <>
+                      <FormSelect
+                        label="ENTRY BASIS"
+                        name="entryBasis"
+                        value={trade?.entryBasis}
+                        onChange={handleChange}
+                        options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]}
+                      />
+                      {trade?.entryBasis === "Custom" && (
+                        <FormInput label="CUSTOM BASIS" name="entryBasisCustom" value={trade?.entryBasisCustom} onChange={handleChange} placeholder="Describe basis..." />
+                      )}
+                    </>
                   )}
                 </>
               )}
             </div>
 
-            {/* Setup checklist */}
+            {/* Setup checklist — only when a strategy is selected */}
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-                    SETUP CHECKLIST
-                  </div>
-                  <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
-                    Tick the rules you actually followed on this trade.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearSetupRules}
-                  style={{
-                    fontSize: 10,
-                    fontFamily: "'JetBrains Mono',monospace",
-                    letterSpacing: "0.08em",
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    border: "1px solid #E2E8F0",
-                    background: "#F8FAFC",
-                    color: "#64748B",
-                    cursor: "pointer",
-                  }}
-                >
-                  CLEAR TICKS
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {setupRules.length === 0 ? (
-                  <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
-                    Select a setup above to load its checklist, or add your own rules.
-                  </div>
-                ) : (
-                  setupRules.map(rule => (
-                    <div
-                      key={rule.id}
+              {trade?.strategy ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                        SETUP CHECKLIST
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
+                        Tick the rules you actually followed on this trade.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearSetupRules}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
+                        fontSize: 10,
+                        fontFamily: "'JetBrains Mono',monospace",
+                        letterSpacing: "0.08em",
                         padding: "6px 10px",
-                        borderRadius: 10,
-                        background: rule.followed ? "rgba(13,158,110,0.04)" : "transparent",
+                        borderRadius: 999,
                         border: "1px solid #E2E8F0",
+                        background: "#F8FAFC",
+                        color: "#64748B",
+                        cursor: "pointer",
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => toggleSetupRule(rule.id)}
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 5,
-                          border: rule.followed ? "1.5px solid #0D9E6E" : "1.5px solid #CBD5E1",
-                          background: rule.followed ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {rule.followed && (
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </button>
-                      <input
-                        type="text"
-                        value={rule.label}
-                        onChange={e => updateSetupRuleLabel(rule.id, e.target.value)}
-                        placeholder="Add setup rule..."
-                        style={{
-                          flex: 1,
-                          border: "none",
-                          outline: "none",
-                          background: "transparent",
-                          fontSize: 12,
-                          fontFamily: "'Plus Jakarta Sans',sans-serif",
-                          color: "#0F1923",
-                        }}
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={addSetupRule}
-                style={{
-                  marginTop: 8,
-                  fontSize: 11,
-                  fontFamily: "'JetBrains Mono',monospace",
-                  letterSpacing: "0.08em",
-                  color: "#0D9E6E",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                + ADD RULE
-              </button>
+                      CLEAR TICKS
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {setupRules.length === 0 ? (
+                      <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                        No rules for this setup. Add your own rules below.
+                      </div>
+                    ) : (
+                      setupRules.map(rule => (
+                        <div
+                          key={rule.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 10px",
+                            borderRadius: 10,
+                            background: rule.followed ? "rgba(13,158,110,0.04)" : "transparent",
+                            border: "1px solid #E2E8F0",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleSetupRule(rule.id)}
+                            style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: 5,
+                              border: rule.followed ? "1.5px solid #0D9E6E" : "1.5px solid #CBD5E1",
+                              background: rule.followed ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {rule.followed && (
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </button>
+                          <input
+                            type="text"
+                            value={rule.label}
+                            onChange={e => updateSetupRuleLabel(rule.id, e.target.value)}
+                            placeholder="Add setup rule..."
+                            style={{
+                              flex: 1,
+                              border: "none",
+                              outline: "none",
+                              background: "transparent",
+                              fontSize: 12,
+                              fontFamily: "'Plus Jakarta Sans',sans-serif",
+                              color: "#0F1923",
+                            }}
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addSetupRule}
+                    style={{
+                      marginTop: 8,
+                      fontSize: 11,
+                      fontFamily: "'JetBrains Mono',monospace",
+                      letterSpacing: "0.08em",
+                      color: "#0D9E6E",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    + ADD RULE
+                  </button>
+                </>
+              ) : (
+                <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                  Select a setup above to load its checklist, or add your own rules.
+                </div>
+              )}
             </div>
 
             {/* Notes */}
