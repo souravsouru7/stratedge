@@ -1,4 +1,5 @@
 const Trade = require("../models/Trade");
+const { clearUserCache } = require("../utils/cacheUtils");
 
 exports.createTrade = async (req, res) => {
   try {
@@ -21,6 +22,8 @@ exports.createTrade = async (req, res) => {
       type: type.toUpperCase(),
       user: req.user._id
     });
+
+    await clearUserCache(req.user._id);
 
     res.status(201).json(trade);
   } catch (error) {
@@ -70,6 +73,8 @@ exports.updateTrade = async (req, res) => {
       return res.status(404).json({ message: "Trade not found or unauthorized" });
     }
 
+    await clearUserCache(req.user._id);
+
     res.json(trade);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -82,6 +87,8 @@ exports.deleteTrade = async (req, res) => {
     if (!trade) {
       return res.status(404).json({ message: "Trade not found or unauthorized" });
     }
+
+    await clearUserCache(req.user._id);
 
     res.json({ message: "Trade deleted" });
   } catch (error) {

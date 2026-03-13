@@ -237,6 +237,21 @@ function SectionCard({ accentColor = "#0D9E6E", title, subtitle, children, delay
 // Start with no static rules; rules will come from selected setup
 const DEFAULT_SETUP_RULES = [];
 
+/* ── QUALITY HELPER ── */
+function getSetupQuality(rules) {
+  if (!rules || rules.length === 0) return null;
+  const activeRules = rules.filter(r => r.label && r.label.trim().length > 0);
+  if (activeRules.length === 0) return null;
+  const followed = activeRules.filter(r => r.followed).length;
+  const score = (followed / activeRules.length) * 100;
+
+  if (score >= 100) return { label: "A+", color: "#0D9E6E", bg: "#ECFDF5" };
+  if (score >= 80) return { label: "A", color: "#10B981", bg: "#F0FDF4" };
+  if (score >= 60) return { label: "B", color: "#B8860B", bg: "#FFFBEB" };
+  if (score >= 40) return { label: "C", color: "#F59E0B", bg: "#FFF7ED" };
+  return { label: "D", color: "#D63B3B", bg: "#FEF2F2" };
+}
+
 /* ─────────────────────────────────────────
    MAIN COMPONENT
  ───────────────────────────────────────── */
@@ -1017,7 +1032,24 @@ function UploadTradeContent() {
                     <>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
                         <div>
-                          <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>SETUP CHECKLIST</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>SETUP CHECKLIST</div>
+                            {getSetupQuality(t.setupRules) && (
+                              <div style={{ 
+                                padding: "2px 8px", 
+                                borderRadius: 6, 
+                                fontSize: 10, 
+                                fontWeight: 800, 
+                                fontFamily: "'JetBrains Mono',monospace",
+                                color: getSetupQuality(t.setupRules).color,
+                                background: getSetupQuality(t.setupRules).bg,
+                                border: `1px solid ${getSetupQuality(t.setupRules).color}33`,
+                                animation: "fadeUp 0.3s ease both"
+                              }}>
+                                QUALITY: {getSetupQuality(t.setupRules).label}
+                              </div>
+                            )}
+                          </div>
                           <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>Tick the rules you followed for this trade.</div>
                         </div>
                         <button type="button" onClick={() => clearSetupRulesMulti(idx)} style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", padding: "6px 10px", borderRadius: 999, border: "1px solid #E2E8F0", background: "#F8FAFC", color: "#64748B", cursor: "pointer" }}>CLEAR TICKS</button>
@@ -1251,8 +1283,25 @@ function UploadTradeContent() {
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 10 }}>
                     <div>
-                      <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-                        SETUP CHECKLIST
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                          SETUP CHECKLIST
+                        </div>
+                        {getSetupQuality(setupRules) && (
+                          <div style={{ 
+                            padding: "2px 8px", 
+                            borderRadius: 6, 
+                            fontSize: 10, 
+                            fontWeight: 800, 
+                            fontFamily: "'JetBrains Mono',monospace",
+                            color: getSetupQuality(setupRules).color,
+                            background: getSetupQuality(setupRules).bg,
+                            border: `1px solid ${getSetupQuality(setupRules).color}33`,
+                            animation: "fadeUp 0.3s ease both"
+                          }}>
+                            QUALITY: {getSetupQuality(setupRules).label}
+                          </div>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
                         Tick the rules you actually followed on this trade.

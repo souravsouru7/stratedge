@@ -16,20 +16,21 @@ const {
 } = require("../controllers/indianAnalyticsController");
 
 const { protect } = require("../middleware/authMiddleware");
+const cacheMiddleware = require("../middleware/cacheMiddleware");
 
 // Indian Market only — uses IndianTrade model
 router.use(protect);
 
-router.get("/summary", getSummary);
-router.get("/weekly", getWeeklyStats);
-router.get("/risk-reward", getRiskRewardAnalysis);
-router.get("/distribution", getTradeDistribution);
-router.get("/performance", getPerformanceMetrics);
-router.get("/time-analysis", getTimeAnalysis);
-router.get("/quality", getTradeQuality);
-router.get("/drawdown", getDrawdownAnalysis);
-router.get("/ai-insights", getAIInsights);
-router.get("/advanced", getAdvancedAnalytics);
-router.get("/pnl-breakdown", getPnLBreakdown);
+router.get("/summary", cacheMiddleware(30), getSummary);
+router.get("/weekly", cacheMiddleware(30), getWeeklyStats);
+router.get("/risk-reward", cacheMiddleware(30), getRiskRewardAnalysis);
+router.get("/distribution", cacheMiddleware(30), getTradeDistribution);
+router.get("/performance", cacheMiddleware(30), getPerformanceMetrics);
+router.get("/time-analysis", cacheMiddleware(30), getTimeAnalysis);
+router.get("/quality", cacheMiddleware(30), getTradeQuality);
+router.get("/drawdown", cacheMiddleware(30), getDrawdownAnalysis);
+router.get("/ai-insights", cacheMiddleware(30), getAIInsights);
+router.get("/advanced", cacheMiddleware(30), getAdvancedAnalytics);
+router.get("/pnl-breakdown", cacheMiddleware(30), getPnLBreakdown);
 
 module.exports = router;

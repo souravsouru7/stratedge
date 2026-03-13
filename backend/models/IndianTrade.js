@@ -80,7 +80,21 @@ const indianTradeSchema = new mongoose.Schema(
     // Journal: setup/pattern, mistake tag, one-line lesson
     setup: { type: String, default: "" },
     mistakeTag: { type: String, default: "" },
-    lesson: { type: String, default: "" }
+    lesson: { type: String, default: "" },
+
+    // Per-trade setup checklist: rules and how many were followed
+    setupRules: [
+      {
+        label: { type: String, trim: true },
+        followed: { type: Boolean, default: false }
+      }
+    ],
+
+    setupScore: {
+      // 0–100 percentage of rules followed for this trade
+      type: Number,
+      default: null
+    }
   },
   { timestamps: true }
 );

@@ -41,6 +41,12 @@ exports.getSummary = async (req, res) => {
     const totalCosts = totalCommission + totalSwap;
     const netProfit = totalProfit - totalCosts;
 
+    // Setup Quality Stats
+    const tradesWithScore = trades.filter(t => t.setupScore !== null && t.setupScore !== undefined);
+    const avgSetupScore = tradesWithScore.length
+      ? tradesWithScore.reduce((acc, t) => acc + t.setupScore, 0) / tradesWithScore.length
+      : 0;
+
     res.json({
       totalTrades,
       totalProfit: totalProfit.toFixed(2),
@@ -51,7 +57,8 @@ exports.getSummary = async (req, res) => {
       avgLoss: avgLoss.toFixed(2),
       totalCosts: totalCosts.toFixed(2),
       winningTrades: winningTrades.length,
-      losingTrades: losingTrades.length
+      losingTrades: losingTrades.length,
+      avgSetupScore: avgSetupScore.toFixed(1)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

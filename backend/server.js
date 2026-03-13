@@ -8,8 +8,11 @@ const { globalRateLimiter, authRateLimiter } = require("./middleware/rateLimit")
 const { sanitizeInput } = require("./middleware/sanitizeInput");
 const { errorHandler } = require("./middleware/errorHandler");
 
+const { connectRedis } = require("./config/redis");
+
 dotenv.config();
 connectDB();
+connectRedis();
 
 const app = express();
 
