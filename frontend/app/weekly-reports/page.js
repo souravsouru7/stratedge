@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import MarketSwitcher from "@/components/MarketSwitcher";
 import { generateWeeklyFeedbackNow, listWeeklyReports } from "@/services/reportsApi";
 import { useMarket } from "@/context/MarketContext";
 
-export default function WeeklyReportsPage() {
+function WeeklyReportsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const marketParam = searchParams.get("market");
   const { currentMarket, getCurrencySymbol, getMarketLabel } = useMarket();
   const [reports, setReports] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -310,6 +313,14 @@ export default function WeeklyReportsPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function WeeklyReportsPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner message="LOADING..." fullPage />}>
+      <WeeklyReportsContent />
+    </Suspense>
   );
 }
 
