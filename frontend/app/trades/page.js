@@ -431,7 +431,7 @@ export default function TradesPage() {
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+          <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
               STRATEDGE
@@ -450,6 +450,7 @@ export default function TradesPage() {
               { href: "/trades", label: "Journal" },
               { href: "/add-trade", label: "Log Trade" },
               { href: "/analytics", label: "Analytics" },
+              { href: "/weekly-reports?market=Forex", label: "Weekly AI" },
             ].map(n => (
               <Link key={n.href} href={n.href} style={{
                 fontSize: 12, color: "#4A5568", fontWeight: 600,

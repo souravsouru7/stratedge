@@ -20,6 +20,14 @@ const getAuthHeaders = () => {
 // Helper to handle fetch responses and prevent JSON syntax errors on 404/500
 const handleResponse = async (res) => {
   if (!res.ok) {
+    // Check for unauthorized access
+    if (res.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+      // Return a promise that never resolves to prevent further execution in the component
+      return new Promise(() => {});
+    }
+
     const errorText = await res.text();
     let errorMessage = `Request failed with status ${res.status}`;
     try {

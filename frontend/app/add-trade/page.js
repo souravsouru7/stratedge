@@ -261,19 +261,85 @@ function AddTradePageContent() {
 
   return (
     <div className="p-10 max-w-4xl mx-auto" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <header className="mb-10 flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-            Log New <span style={{ color: isIndianMarket ? '#1B5E20' : '#0D9E6E' }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
-          </h1>
-          <p className="text-gray-500 mt-1 uppercase text-xs tracking-widest font-bold">
-            {isIndianMarket ? "NSE / BSE / F&O MARKET ENTRY" : "GLOBAL CURRENCY MARKET ENTRY"}
-          </p>
+      <header style={{
+        position: "sticky", top: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
+        background: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(20px)",
+        borderBottom: "1px solid #E2E8F0",
+        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
+        marginBottom: 40
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Link href={isIndianMarket ? "/indian-market/dashboard" : "/dashboard"} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+            <div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
+                STRATEDGE
+              </div>
+              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: isIndianMarket ? "#1B5E20" : "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+                {isIndianMarket ? "OPTIONS JOURNAL · NSE" : "FOREX AI JOURNAL"}
+              </div>
+            </div>
+          </Link>
         </div>
-        <div className="flex items-center gap-4">
+
+        <nav style={{ display: "flex", gap: 4 }}>
+          {(isIndianMarket ? [
+            { href: "/indian-market/trades", label: "Journal" },
+            { href: "/indian-market/add-trade", label: "Log Option" },
+            { href: "/indian-market/analytics", label: "Analytics" },
+            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
+          ] : [
+            { href: "/trades", label: "Journal" },
+            { href: "/add-trade", label: "Log Trade" },
+            { href: "/analytics", label: "Analytics" },
+            { href: "/weekly-reports?market=Forex", label: "Weekly AI" },
+          ]).map(n => (
+            <Link key={n.href} href={n.href} style={{
+              fontSize: 12, color: "#4A5568", fontWeight: 600,
+              textDecoration: "none", padding: "5px 10px",
+              borderRadius: 6, transition: "all 0.15s",
+              fontFamily: "'Plus Jakarta Sans',sans-serif",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#F0EEE9"; e.currentTarget.style.color = "#0F1923"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#4A5568"; }}
+            >
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <InstallPWA />
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
+              borderRadius: 6, padding: "6px 12px",
+              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
+              color: "#D63B3B", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            LOGOUT
+          </button>
         </div>
       </header>
+
+      <div className="mb-10 text-center">
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+          Log New <span style={{ color: isIndianMarket ? '#1B5E20' : '#0D9E6E' }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
+        </h1>
+        <p className="text-gray-500 mt-1 uppercase text-xs tracking-widest font-bold">
+          {isIndianMarket ? "NSE / BSE / F&O MARKET ENTRY" : "GLOBAL CURRENCY MARKET ENTRY"}
+        </p>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

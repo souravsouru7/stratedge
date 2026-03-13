@@ -8,6 +8,19 @@ const getBaseUrl = (marketType) => {
   return BASE_URL;
 };
 
+const handleResponse = async (res) => {
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+      return new Promise(() => {});
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Request failed with status ${res.status}`);
+  }
+  return res.json();
+};
+
 export const createTrade = async (tradeData, marketType = 'Forex') => {
   const token = localStorage.getItem("token");
 
@@ -25,14 +38,7 @@ export const createTrade = async (tradeData, marketType = 'Forex') => {
     body: JSON.stringify(tradeData)
   });
 
-  // Parse response - throw error if not OK
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Failed to create trade");
-  }
-
-  return data;
+  return handleResponse(res);
 };
 
 
@@ -44,7 +50,7 @@ export const getTrades = async (marketType = 'Forex') => {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.json();
+  return handleResponse(res);
 };
 
 export const getTrade = async (id, marketType = 'Forex') => {
@@ -53,7 +59,7 @@ export const getTrade = async (id, marketType = 'Forex') => {
   const res = await fetch(`${baseUrl}/trades/${id}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.json();
+  return handleResponse(res);
 };
 
 export const deleteTrade = async (id, marketType = 'Forex') => {
@@ -63,7 +69,7 @@ export const deleteTrade = async (id, marketType = 'Forex') => {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.json();
+  return handleResponse(res);
 };
 
 export const updateTrade = async (id, tradeData, marketType = 'Forex') => {
@@ -77,5 +83,5 @@ export const updateTrade = async (id, tradeData, marketType = 'Forex') => {
     },
     body: JSON.stringify(tradeData)
   });
-  return res.json();
+  return handleResponse(res);
 };

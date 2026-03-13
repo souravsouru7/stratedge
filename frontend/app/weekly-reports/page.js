@@ -68,40 +68,91 @@ export default function WeeklyReportsPage() {
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <header style={{
+        position: "sticky", top: 0, zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 18px", background: "rgba(255,255,255,0.92)",
-        backdropFilter: "blur(20px)", borderBottom: "1px solid #E2E8F0",
+        padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
+        background: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(20px)",
+        borderBottom: "1px solid #E2E8F0",
+        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            Weekly <span style={{ color: "#0D9E6E" }}>Reports</span>
-          </div>
-          <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", marginTop: 2 }}>
-            {getMarketLabel().toUpperCase()} • LAST 7 DAYS (UPLOAD TIME)
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link href="/dashboard" style={{ textDecoration: "none", color: "#4A5568", fontSize: 12, fontWeight: 700 }}>
-            ← Dashboard
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Link href={marketParam === "Indian_Market" ? "/indian-market/dashboard" : "/dashboard"} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+            <div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
+                STRATEDGE
+              </div>
+              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+                {marketParam === "Indian_Market" ? "OPTIONS JOURNAL · NSE" : "FOREX AI JOURNAL"}
+              </div>
+            </div>
           </Link>
+        </div>
+
+        <nav style={{ display: "flex", gap: 4 }}>
+          {(marketParam === "Indian_Market" ? [
+            { href: "/indian-market/trades", label: "Journal" },
+            { href: "/indian-market/add-trade", label: "Log Option" },
+            { href: "/indian-market/analytics", label: "Analytics" },
+            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
+          ] : [
+            { href: "/trades", label: "Journal" },
+            { href: "/add-trade", label: "Log Trade" },
+            { href: "/analytics", label: "Analytics" },
+            { href: "/weekly-reports?market=Forex", label: "Weekly AI" },
+          ]).map(n => (
+            <Link key={n.href} href={n.href} style={{
+              fontSize: 12, color: "#4A5568", fontWeight: 600,
+              textDecoration: "none", padding: "5px 10px",
+              borderRadius: 6, transition: "all 0.15s",
+              fontFamily: "'Plus Jakarta Sans',sans-serif",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#F0EEE9"; e.currentTarget.style.color = "#0F1923"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#4A5568"; }}
+            >
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <MarketSwitcher />
           <button
             onClick={onGenerateNow}
             disabled={busy}
             style={{
               background: "linear-gradient(135deg,#0D9E6E,#22C78E)",
               border: "none",
-              borderRadius: 10,
-              padding: "10px 14px",
+              borderRadius: 8,
+              padding: "8px 16px",
               color: "#0F1923",
               fontFamily: "'JetBrains Mono',monospace",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 800,
               letterSpacing: "0.08em",
               cursor: busy ? "not-allowed" : "pointer",
               opacity: busy ? 0.7 : 1,
+              boxShadow: "0 2px 8px rgba(13,158,110,0.2)",
             }}
           >
-            {busy ? "GENERATING..." : "GENERATE AI FEEDBACK (7D)"}
+            {busy ? "GENERATING..." : "GENERATE AI FEEDBACK"}
+          </button>
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
+              borderRadius: 6, padding: "6px 12px",
+              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
+              color: "#D63B3B", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            LOGOUT
           </button>
         </div>
       </header>

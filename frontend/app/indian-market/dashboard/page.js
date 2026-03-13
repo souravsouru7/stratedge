@@ -374,8 +374,8 @@ export default function IndianMarketDashboard() {
                 boxShadow: "0 8px 24px rgba(15,23,42,0.45)",
             }}>
                 {/* Logo */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 40, height: 40, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "rgba(15,23,42,0.4)", padding: 6 }}>
+                <Link href="/indian-market/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "rgba(15,23,42,0.4)", padding: 6 }}>
                         <img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                     </div>
                     <div>
@@ -386,7 +386,7 @@ export default function IndianMarketDashboard() {
                             OPTIONS JOURNAL · NSE / BSE
                         </div>
                     </div>
-                </div>
+                </Link>
 
                 {/* Right side */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>

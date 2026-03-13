@@ -10,6 +10,11 @@ const getAuthHeaders = () => {
 
 const handleResponse = async (res) => {
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+      return new Promise(() => {});
+    }
     const errorText = await res.text();
     let errorMessage = `Request failed with status ${res.status}`;
     try {

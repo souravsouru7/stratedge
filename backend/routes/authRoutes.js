@@ -5,7 +5,10 @@ const {
   registerUser,
   loginUser,
   googleLogin,
-  getMe
+  getMe,
+  forgotPassword,
+  verifyOTP,
+  resetPassword
 } = require("../controllers/authController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -13,6 +16,9 @@ const { protect } = require("../middleware/authMiddleware");
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/google", googleLogin);
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-otp", verifyOTP);
+router.post("/reset-password", resetPassword);
 
 // Basic profile for logged-in user
 router.get("/me", protect, getMe);

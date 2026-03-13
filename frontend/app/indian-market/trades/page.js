@@ -129,40 +129,55 @@ export default function IndianTradesPage() {
                 display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between"
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    {/* Global back button */}
-                    <button
-                        type="button"
-                        onClick={() => router.back()}
-                        style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "999px",
-                            border: `1px solid ${theme.border}`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginRight: 8,
-                            cursor: "pointer",
-                            background: "#FFFFFF",
-                            padding: 0
-                        }}
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="2.2">
-                            <polyline points="15 18 9 12 15 6" />
-                        </svg>
-                    </button>
                     <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+                        <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
                         <div>
                             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
                                 STRATEDGE
                             </div>
                             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                                OPTIONS JOURNAL
+                                OPTIONS JOURNAL · NSE
                             </div>
                         </div>
                     </Link>
                 </div>
+
+                <nav style={{ display: "flex", gap: 6 }}>
+                    {[
+                        { href: "/indian-market/trades", label: "Journal" },
+                        { href: "/indian-market/add-trade", label: "Log Option" },
+                        { href: "/indian-market/analytics", label: "Analytics" },
+                        { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
+                    ].map(n => (
+                        <Link
+                            key={n.href}
+                            href={n.href}
+                            style={{
+                                fontSize: 11,
+                                color: theme.primary,
+                                fontWeight: 600,
+                                textDecoration: "none",
+                                padding: "6px 12px",
+                                borderRadius: 999,
+                                transition: "all 0.15s",
+                                fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                background: "rgba(13,158,110,0.05)",
+                                border: "1px solid rgba(13,158,110,0.2)"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.background = "rgba(13,158,110,0.15)";
+                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.5)";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.background = "rgba(13,158,110,0.05)";
+                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.2)";
+                            }}
+                        >
+                            {n.label}
+                        </Link>
+                    ))}
+                </nav>
+
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <InstallPWA />
                     <MarketSwitcher />

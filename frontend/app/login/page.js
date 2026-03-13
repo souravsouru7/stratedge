@@ -441,13 +441,14 @@ export default function LoginPage() {
 
               {/* Forgot password */}
               <div style={{ textAlign:"right", marginTop:-8, marginBottom:20 }}>
-                <span style={{
+                <Link href="/forgot-password" style={{
                   fontSize:11, color:"#D63B3B", cursor:"pointer", fontWeight:600,
                   fontFamily:"'Plus Jakarta Sans',sans-serif",
                   borderBottom:"1px solid rgba(214,59,59,0.3)", paddingBottom:1,
+                  textDecoration: "none"
                 }}>
                   Forgot password?
-                </span>
+                </Link>
               </div>
 
               {/* Divider */}

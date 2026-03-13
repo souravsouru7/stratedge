@@ -1,5 +1,18 @@
 import { API_URL } from "@/config/api";
 
+const handleResponse = async (res) => {
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+      return new Promise(() => {});
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Request failed with status ${res.status}`);
+  }
+  return res.json();
+};
+
 export const fetchSetups = async (marketType = "Forex") => {
   const token = localStorage.getItem("token");
   const params = new URLSearchParams({ marketType });
@@ -9,13 +22,7 @@ export const fetchSetups = async (marketType = "Forex") => {
     },
   });
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Failed to load setups");
-  }
-
-  return data;
+  return handleResponse(res);
 };
 
 export const saveSetups = async (strategies, marketType = "Forex") => {
@@ -30,12 +37,6 @@ export const saveSetups = async (strategies, marketType = "Forex") => {
     body: JSON.stringify({ strategies }),
   });
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Failed to save setups");
-  }
-
-  return data;
+  return handleResponse(res);
 };
 

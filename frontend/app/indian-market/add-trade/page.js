@@ -204,51 +204,83 @@ export default function IndianOptionsAddTradePage() {
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.primary }}>
       <header style={{
+        position: "sticky", top: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
         background: theme.card,
+        backdropFilter: "blur(20px)",
         borderBottom: `1px solid ${theme.border}`,
-        minHeight: 60,
-        padding: "10px 24px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 10
+        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Global back button */}
-          <button
-            type="button"
-            onClick={() => router.back()}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              border: `1px solid ${theme.border}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 8,
-              cursor: "pointer",
-              background: "#FFFFFF",
-              padding: 0
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="2.2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
           <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="/logo.png" alt="Stratedge" style={{ width: 38, height: 38, objectFit: "contain" }} />
+            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary }}>STRATEDGE</div>
-              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>OPTIONS JOURNAL</div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
+                STRATEDGE
+              </div>
+              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+                OPTIONS JOURNAL · NSE
+              </div>
             </div>
           </Link>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/indian-market/trades" style={{ fontSize: 12, color: theme.primary, fontWeight: 600, textDecoration: "none" }}>← JOURNAL</Link>
+
+        <nav style={{ display: "flex", gap: 6 }}>
+          {[
+            { href: "/indian-market/trades", label: "Journal" },
+            { href: "/indian-market/add-trade", label: "Log Option" },
+            { href: "/indian-market/analytics", label: "Analytics" },
+            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
+          ].map(n => (
+            <Link
+              key={n.href}
+              href={n.href}
+              style={{
+                fontSize: 11,
+                color: theme.primary,
+                fontWeight: 600,
+                textDecoration: "none",
+                padding: "6px 12px",
+                borderRadius: 999,
+                transition: "all 0.15s",
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
+                background: "rgba(13,158,110,0.05)",
+                border: "1px solid rgba(13,158,110,0.2)"
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(13,158,110,0.15)";
+                e.currentTarget.style.borderColor = "rgba(13,158,110,0.5)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "rgba(13,158,110,0.05)";
+                e.currentTarget.style.borderColor = "rgba(13,158,110,0.2)";
+              }}
+            >
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <MarketSwitcher />
           <InstallPWA />
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
+              borderRadius: 6, padding: "6px 12px",
+              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
+              color: "#D63B3B", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            LOGOUT
+          </button>
         </div>
       </header>
 
