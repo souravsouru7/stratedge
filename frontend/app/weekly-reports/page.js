@@ -41,7 +41,20 @@ function WeeklyReportsContent() {
     return label || "Weekly Report";
   }, [selected]);
 
-  const ai = selected?.aiFeedback;
+  // aiFeedback may arrive as either a parsed object OR a JSON string.
+  // Normalise it so the rest of the page can safely access .summary etc.
+  const ai = useMemo(() => {
+    const raw = selected?.aiFeedback;
+    if (!raw) return null;
+    if (typeof raw === "object") return raw;
+    // It's a string – try to parse it
+    try {
+      return JSON.parse(raw);
+    } catch {
+      // Unparseable – wrap the raw text into a minimal feedback shape
+      return { week: "", summary: raw, mistakes: [], improvements: [], nextWeekChecklist: [] };
+    }
+  }, [selected]);
   const snap = selected?.snapshot;
   const currency = getCurrencySymbol();
 

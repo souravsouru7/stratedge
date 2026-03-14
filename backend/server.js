@@ -51,6 +51,7 @@ app.use(globalRateLimiter);
 app.use("/api/auth", authRateLimiter, require("./routes/authRoutes"));
 app.use("/api/trades", require("./routes/tradeRoutes"));
 app.use("/api/setups", require("./routes/setupRoutes"));
+app.use("/api/checklists", require("./routes/checklistRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use("/api/reports", require("./routes/weeklyReportRoutes"));

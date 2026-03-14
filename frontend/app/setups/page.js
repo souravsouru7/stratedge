@@ -35,7 +35,6 @@ export default function SetupStrategiesPage() {
               ? s.rules.map((r, rIdx) => ({
                   id: rIdx + 1,
                   label: r.label || "",
-                  followed: false,
                 }))
               : [],
           }));
@@ -83,22 +82,8 @@ export default function SetupStrategiesPage() {
           ...s,
           rules: [
             ...s.rules,
-            { id: nextRuleId, label: "", followed: false },
+            { id: nextRuleId, label: "" },
           ],
-        };
-      })
-    );
-  };
-
-  const toggleRule = (strategyId, ruleId) => {
-    setStrategies(prev =>
-      prev.map(s => {
-        if (s.id !== strategyId) return s;
-        return {
-          ...s,
-          rules: s.rules.map(r =>
-            r.id === ruleId ? { ...r, followed: !r.followed } : r
-          ),
         };
       })
     );
@@ -118,18 +103,6 @@ export default function SetupStrategiesPage() {
     );
   };
 
-  const clearTicksForStrategy = (strategyId) => {
-    setStrategies(prev =>
-      prev.map(s => {
-        if (s.id !== strategyId) return s;
-        return {
-          ...s,
-          rules: s.rules.map(r => ({ ...r, followed: false })),
-        };
-      })
-    );
-  };
-
   const deleteStrategy = (strategyId) => {
     setStrategies(prev => prev.filter(s => s.id !== strategyId));
   };
@@ -144,6 +117,23 @@ export default function SetupStrategiesPage() {
         };
       })
     );
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError("");
+      const payload = strategies.map(s => ({
+        name: s.name,
+        rules: (s.rules || []).map(r => ({ label: r.label })),
+      }));
+      await saveSetups(payload, currentMarket);
+      setSavedAt(new Date());
+    } catch (e) {
+      setError(e.message || "Failed to save setups");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!mounted) return null;
@@ -190,7 +180,7 @@ export default function SetupStrategiesPage() {
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "0.03em" }}>Setup / Strategies</div>
             <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", marginTop: 2 }}>
-              DEFINE STRATEGIES · ADD RULE CHECKLISTS
+              DEFINE STRATEGIES · MANAGE RULES
             </div>
           </div>
         </div>
@@ -200,22 +190,7 @@ export default function SetupStrategiesPage() {
           </div>
           <button
             type="button"
-            onClick={async () => {
-              try {
-                setSaving(true);
-                setError("");
-                const payload = strategies.map(s => ({
-                  name: s.name,
-                  rules: (s.rules || []).map(r => ({ label: r.label })),
-                }));
-                await saveSetups(payload, currentMarket);
-                setSavedAt(new Date());
-              } catch (e) {
-                setError(e.message || "Failed to save setups");
-              } finally {
-                setSaving(false);
-              }
-            }}
+            onClick={handleSave}
             disabled={saving}
             style={{
               fontSize: 11,
@@ -276,7 +251,7 @@ export default function SetupStrategiesPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, gap: 10 }}>
             <div>
               <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-                STRATEGY CHECKLISTS
+                YOUR STRATEGIES
               </div>
               <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
                 Create each strategy once, then add the exact rules you want to follow for that setup.
@@ -302,188 +277,166 @@ export default function SetupStrategiesPage() {
             </button>
           </div>
 
+          {strategies.length === 0 && (
+            <div style={{
+              padding: "32px 0",
+              textAlign: "center",
+              color: "#94A3B8",
+              fontSize: 12,
+              fontFamily: "'JetBrains Mono',monospace",
+            }}>
+              No strategies yet — click <span style={{ color: "#0D9E6E", fontWeight: 700 }}>+ ADD STRATEGY</span> to get started.
+            </div>
+          )}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {strategies.map(strategy => {
-              const activeRules = strategy.rules.filter(r => r.label && r.label.trim().length > 0);
-              const followedCount = activeRules.filter(r => r.followed).length;
-              const score = activeRules.length > 0
-                ? Math.round((followedCount / activeRules.length) * 100)
-                : null;
-
-              return (
-                <div
-                  key={strategy.id}
-                  style={{
-                    borderRadius: 12,
-                    border: "1px solid #E2E8F0",
-                    padding: "10px 12px 10px",
-                    background: "linear-gradient(135deg,rgba(248,250,252,0.9),#FFFFFF)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                      <label style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                        STRATEGY NAME
-                      </label>
-                      <input
-                        type="text"
-                        value={strategy.name}
-                        onChange={e => updateStrategyName(strategy.id, e.target.value)}
-                        placeholder="e.g. London Breakout, NY Reversal..."
-                        style={{
-                          borderRadius: 8,
-                          border: "1px solid #E2E8F0",
-                          padding: "7px 10px",
-                          fontSize: 12,
-                          fontFamily: "'Plus Jakarta Sans',sans-serif",
-                          outline: "none",
-                          width: "100%",
-                        }}
-                      />
-                    </div>
-                    <div style={{ textAlign: "right", minWidth: 90 }}>
-                      <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#0D9E6E", fontWeight: 700 }}>
-                        {score !== null ? `${score}% FOLLOWED` : "NO TICKS"}
-                      </div>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                        {activeRules.length} rule{activeRules.length === 1 ? "" : "s"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => clearTicksForStrategy(strategy.id)}
+            {strategies.map(strategy => (
+              <div
+                key={strategy.id}
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid #E2E8F0",
+                  padding: "10px 12px 10px",
+                  background: "linear-gradient(135deg,rgba(248,250,252,0.9),#FFFFFF)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
+                      STRATEGY NAME
+                    </label>
+                    <input
+                      type="text"
+                      value={strategy.name}
+                      onChange={e => updateStrategyName(strategy.id, e.target.value)}
+                      placeholder="e.g. London Breakout, NY Reversal..."
                       style={{
-                        fontSize: 9,
-                        fontFamily: "'JetBrains Mono',monospace",
-                        letterSpacing: "0.08em",
-                        padding: "5px 9px",
-                        borderRadius: 999,
+                        borderRadius: 8,
                         border: "1px solid #E2E8F0",
-                        background: "#F8FAFC",
-                        color: "#64748B",
-                        cursor: "pointer",
+                        padding: "7px 10px",
+                        fontSize: 12,
+                        fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        outline: "none",
+                        width: "100%",
                       }}
-                    >
-                      CLEAR TICKS
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteStrategy(strategy.id)}
-                      style={{
-                        fontSize: 9,
-                        fontFamily: "'JetBrains Mono',monospace",
-                        letterSpacing: "0.08em",
-                        padding: "5px 9px",
-                        borderRadius: 999,
-                        border: "1px solid #FCA5A5",
-                        background: "#FEF2F2",
-                        color: "#B91C1C",
-                        cursor: "pointer",
-                      }}
-                    >
-                      DELETE SETUP
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => addRuleToStrategy(strategy.id)}
-                      style={{
-                        fontSize: 9,
-                        fontFamily: "'JetBrains Mono',monospace",
-                        letterSpacing: "0.08em",
-                        padding: "5px 9px",
-                        borderRadius: 999,
-                        border: "1px solid #0D9E6E33",
-                        background: "rgba(13,158,110,0.04)",
-                        color: "#0D9E6E",
-                        cursor: "pointer",
-                      }}
-                    >
-                      + ADD RULE
-                    </button>
+                    />
                   </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {strategy.rules.map(rule => (
-                      <div
-                        key={rule.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "5px 8px",
-                          borderRadius: 9,
-                          background: rule.followed ? "rgba(13,158,110,0.04)" : "transparent",
-                          border: "1px solid #E2E8F0",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleRule(strategy.id, rule.id)}
-                          style={{
-                            width: 18,
-                            height: 18,
-                            borderRadius: 5,
-                            border: rule.followed ? "1.5px solid #0D9E6E" : "1.5px solid #CBD5E1",
-                            background: rule.followed ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {rule.followed && (
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                        </button>
-                        <input
-                          type="text"
-                          value={rule.label}
-                          onChange={e => updateRuleLabel(strategy.id, rule.id, e.target.value)}
-                          placeholder="Add rule for this strategy..."
-                          style={{
-                            flex: 1,
-                            border: "none",
-                            outline: "none",
-                            background: "transparent",
-                            fontSize: 12,
-                            fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            color: "#0F1923",
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => deleteRule(strategy.id, rule.id)}
-                          style={{
-                            fontSize: 9,
-                            fontFamily: "'JetBrains Mono',monospace",
-                            padding: "3px 6px",
-                            borderRadius: 999,
-                            border: "1px solid #FCA5A5",
-                            background: "#FEF2F2",
-                            color: "#B91C1C",
-                            cursor: "pointer",
-                            flexShrink: 0,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    {strategy.rules.length === 0 && (
-                      <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
-                        No rules yet — add your first rule for this strategy.
-                      </div>
-                    )}
+                  <div style={{ textAlign: "right", minWidth: 70 }}>
+                    <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
+                      {strategy.rules.filter(r => r.label && r.label.trim().length > 0).length} rule{strategy.rules.filter(r => r.label && r.label.trim().length > 0).length === 1 ? "" : "s"}
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => addRuleToStrategy(strategy.id)}
+                    style={{
+                      fontSize: 9,
+                      fontFamily: "'JetBrains Mono',monospace",
+                      letterSpacing: "0.08em",
+                      padding: "5px 9px",
+                      borderRadius: 999,
+                      border: "1px solid #0D9E6E33",
+                      background: "rgba(13,158,110,0.04)",
+                      color: "#0D9E6E",
+                      cursor: "pointer",
+                    }}
+                  >
+                    + ADD RULE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteStrategy(strategy.id)}
+                    style={{
+                      fontSize: 9,
+                      fontFamily: "'JetBrains Mono',monospace",
+                      letterSpacing: "0.08em",
+                      padding: "5px 9px",
+                      borderRadius: 999,
+                      border: "1px solid #FCA5A5",
+                      background: "#FEF2F2",
+                      color: "#B91C1C",
+                      cursor: "pointer",
+                    }}
+                  >
+                    DELETE SETUP
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {strategy.rules.map(rule => (
+                    <div
+                      key={rule.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "5px 8px",
+                        borderRadius: 9,
+                        border: "1px solid #E2E8F0",
+                      }}
+                    >
+                      {/* Rule number badge */}
+                      <div style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 6,
+                        background: "#F1F5F9",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 9,
+                        fontFamily: "'JetBrains Mono',monospace",
+                        fontWeight: 700,
+                        color: "#64748B",
+                        flexShrink: 0,
+                      }}>
+                        {strategy.rules.indexOf(rule) + 1}
+                      </div>
+                      <input
+                        type="text"
+                        value={rule.label}
+                        onChange={e => updateRuleLabel(strategy.id, rule.id, e.target.value)}
+                        placeholder="Add rule for this strategy..."
+                        style={{
+                          flex: 1,
+                          border: "none",
+                          outline: "none",
+                          background: "transparent",
+                          fontSize: 12,
+                          fontFamily: "'Plus Jakarta Sans',sans-serif",
+                          color: "#0F1923",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => deleteRule(strategy.id, rule.id)}
+                        style={{
+                          fontSize: 9,
+                          fontFamily: "'JetBrains Mono',monospace",
+                          padding: "3px 6px",
+                          borderRadius: 999,
+                          border: "1px solid #FCA5A5",
+                          background: "#FEF2F2",
+                          color: "#B91C1C",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {strategy.rules.length === 0 && (
+                    <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
+                      No rules yet — add your first rule for this strategy.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         )}

@@ -190,7 +190,7 @@ export default function IndianOptionsAddTradePage() {
       const result = await createTrade(tradeData, MARKETS.INDIAN_MARKET);
       if (result?._id) {
         alert("Trade saved!");
-        router.push("/indian-market/trades");
+        router.push("/indian-market/dashboard");
       } else {
         throw new Error(result?.message || "Failed to save");
       }
@@ -202,7 +202,7 @@ export default function IndianOptionsAddTradePage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.primary }}>
+    <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.secondary }}>
       <header style={{
         position: "sticky", top: 0, zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -213,13 +213,13 @@ export default function IndianOptionsAddTradePage() {
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
+          <Link href="/indian-market/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
             <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
+              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.secondary, lineHeight: 1 }}>
                 STRATEDGE
               </div>
-              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#1B5E20", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                 OPTIONS JOURNAL · NSE
               </div>
             </div>
@@ -263,7 +263,7 @@ export default function IndianOptionsAddTradePage() {
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <MarketSwitcher />
+          <MarketSwitcher currentMarket={MARKETS.INDIAN_MARKET} />
           <InstallPWA />
           <button
             onClick={() => {
@@ -275,7 +275,7 @@ export default function IndianOptionsAddTradePage() {
               background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
               borderRadius: 6, padding: "6px 12px",
               cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
-              color: "#D63B3B", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
+              color: theme.bear, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
               transition: "all 0.2s",
             }}
           >
@@ -284,11 +284,16 @@ export default function IndianOptionsAddTradePage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 480, margin: "0 auto", padding: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4, color: theme.primary }}>Log option trade</h1>
-        <p style={{ fontSize: 12, color: theme.muted, marginBottom: 24 }}>NSE / BSE — only what you need</p>
+      <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 24px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, color: theme.secondary }}>
+          Log New <span style={{ color: '#1B5E20' }}>Options Trade</span>
+        </h1>
+        <p style={{ fontSize: 12, color: theme.muted, marginBottom: 32, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>
+          NSE / BSE F&O MARKET ENTRY
+        </p>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Underlying</label>

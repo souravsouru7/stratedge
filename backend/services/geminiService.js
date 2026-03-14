@@ -53,7 +53,7 @@ ${JSON.stringify(snapshot)}
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 1600,
+        maxOutputTokens: 4096,
       },
     });
 
