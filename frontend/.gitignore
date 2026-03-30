@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# capacitor (mobile only - not for web/vercel)
+/android/
+/ios/
+capacitor.config.ts
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

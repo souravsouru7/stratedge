@@ -1,0 +1,5 @@
+android/
+ios/
+capacitor.config.ts
+node_modules/@capacitor/android
+node_modules/@codetrix-studio/capacitor-google-auth
