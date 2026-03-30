@@ -5,7 +5,6 @@ import { googleLogin, loginUser } from "@/services/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GoogleLogin } from "@react-oauth/google";
-import { Capacitor } from "@capacitor/core";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -497,7 +496,8 @@ export default function LoginPage() {
               {/* Google */}
               <div style={{ marginBottom: 16 }}>
                 {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
-                  Capacitor.isNativePlatform() ? (
+                  // Check if running in Capacitor (mobile app)
+                  (typeof window !== 'undefined' && !!window.Capacitor) ? (
                     // Native Android: use the Capacitor Google Auth plugin
                     <button
                       type="button"

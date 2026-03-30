@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { googleLogin, registerUser } from "@/services/api";
 import { useRouter } from "next/navigation";
 import { GoogleLogin } from "@react-oauth/google";
-import { Capacitor } from "@capacitor/core";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -530,7 +529,8 @@ export default function RegisterPage() {
               {/* Google */}
               <div style={{ marginBottom: 14 }}>
                 {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
-                  Capacitor.isNativePlatform() ? (
+                  // Check if running in Capacitor (mobile app)
+                  (typeof window !== 'undefined' && !!window.Capacitor) ? (
                     <button
                       type="button"
                       onClick={handleNativeGoogleSignIn}
