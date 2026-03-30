@@ -65,6 +65,13 @@ function AddTradePageContent() {
     sttTaxes: "",
     entryBasis: "Plan",
     entryBasisCustom: "",
+    // Psychology fields
+    mood: null,
+    confidence: "",
+    emotionalTags: [],
+    mistakeTag: "",
+    lesson: "",
+    wouldRetake: "",
   });
 
   const [showCustomRR, setShowCustomRR] = useState(false);
@@ -249,6 +256,13 @@ function AddTradePageContent() {
       sttTaxes: isIndianMarket && trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined,
       entryBasis: trade.entryBasis || "Plan",
       entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : undefined,
+      // Psychology fields
+      mood: trade.mood || undefined,
+      confidence: trade.confidence || undefined,
+      emotionalTags: trade.emotionalTags && trade.emotionalTags.length > 0 ? trade.emotionalTags : undefined,
+      mistakeTag: trade.mistakeTag || undefined,
+      lesson: trade.lesson || undefined,
+      wouldRetake: trade.wouldRetake || undefined,
     };
 
     const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
@@ -284,10 +298,10 @@ function AddTradePageContent() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link href={isIndianMarket ? "/indian-market/dashboard" : "/dashboard"} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
             <div>
               <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.secondary, lineHeight: 1 }}>
-                STRATEDGE
+                LOGNERA
               </div>
               <div style={{ fontSize: 9, letterSpacing: "0.18em", color: isIndianMarket ? "#1B5E20" : theme.primary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                 {isIndianMarket ? "OPTIONS JOURNAL · NSE" : "FOREX AI JOURNAL"}
@@ -598,7 +612,104 @@ function AddTradePageContent() {
                 <input name="entryBasisCustom" placeholder="Describe basis..." style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.entryBasisCustom} />
               </div>
             )}
-            
+
+            {/* ── Psychology / Emotional Tracking ── */}
+            <div style={{ background: theme.card, borderRadius: 16, padding: 20, border: `1px solid ${theme.border}` }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: theme.secondary, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <span>🧠</span> Trade Psychology
+                <span style={{ fontSize: 9, color: theme.muted, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em" }}>OPTIONAL</span>
+              </div>
+
+              {/* Mood Rating */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 8 }}>How are you feeling?</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[{ emoji: "😰", val: 1, label: "Stressed" }, { emoji: "😟", val: 2, label: "Anxious" }, { emoji: "😐", val: 3, label: "Neutral" }, { emoji: "😊", val: 4, label: "Good" }, { emoji: "🔥", val: 5, label: "Peak" }].map(m => (
+                    <button key={m.val} type="button" onClick={() => setTrade(prev => ({ ...prev, mood: prev.mood === m.val ? null : m.val }))}
+                      style={{
+                        flex: 1, padding: "10px 4px", borderRadius: 12, cursor: "pointer", textAlign: "center", transition: "all 0.2s",
+                        border: trade.mood === m.val ? `2px solid ${theme.primary}` : `1px solid ${theme.border}`,
+                        background: trade.mood === m.val ? "rgba(13,158,110,0.08)" : theme.card,
+                        transform: trade.mood === m.val ? "scale(1.08)" : "scale(1)",
+                      }}>
+                      <div style={{ fontSize: 22 }}>{m.emoji}</div>
+                      <div style={{ fontSize: 9, color: trade.mood === m.val ? theme.primary : theme.muted, fontWeight: 700, marginTop: 2 }}>{m.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Confidence Level */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Confidence Level</label>
+                <select name="confidence" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.confidence}>
+                  <option value="">Select confidence...</option>
+                  <option value="Low">Low — Unsure about this setup</option>
+                  <option value="Medium">Medium — Decent setup</option>
+                  <option value="High">High — Strong conviction</option>
+                  <option value="Overconfident">Overconfident — Can't lose 🚩</option>
+                </select>
+              </div>
+
+              {/* Emotional Tags */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 8 }}>Emotional Tags <span style={{ fontWeight: 500 }}>(select all that apply)</span></label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"].map(tag => {
+                    const isSelected = trade.emotionalTags.includes(tag);
+                    return (
+                      <button key={tag} type="button" onClick={() => {
+                        setTrade(prev => ({
+                          ...prev,
+                          emotionalTags: prev.emotionalTags.includes(tag)
+                            ? prev.emotionalTags.filter(t => t !== tag)
+                            : [...prev.emotionalTags, tag]
+                        }));
+                      }}
+                        style={{
+                          padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",
+                          border: isSelected ? `1.5px solid ${theme.primary}` : `1px solid ${theme.border}`,
+                          background: isSelected ? "rgba(13,158,110,0.1)" : theme.card,
+                          color: isSelected ? theme.primary : theme.muted,
+                        }}>
+                        {tag === "FOMO" ? "😨 FOMO" : tag === "Revenge" ? "😡 Revenge" : tag === "Fear" ? "😰 Fear" : tag === "Greed" ? "🤑 Greed" : tag === "Calm" ? "🧘 Calm" : tag === "Bored" ? "😴 Bored" : tag === "Focused" ? "🎯 Focused" : "😤 Frustrated"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mistake Tag */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Mistake Tag</label>
+                <input name="mistakeTag" placeholder="e.g. moved SL, entered too early, oversized..." style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.mistakeTag} />
+              </div>
+
+              {/* Lesson Learned */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Lesson Learned</label>
+                <input name="lesson" placeholder="What did I learn from this trade?" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.lesson} />
+              </div>
+
+              {/* Would Retake */}
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 8 }}>Would you take this trade again?</label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {[{ val: "Yes", icon: "✅", label: "Yes" }, { val: "No", icon: "❌", label: "No" }].map(opt => (
+                    <button key={opt.val} type="button" onClick={() => setTrade(prev => ({ ...prev, wouldRetake: prev.wouldRetake === opt.val ? "" : opt.val }))}
+                      style={{
+                        flex: 1, padding: "12px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.2s",
+                        border: trade.wouldRetake === opt.val ? `2px solid ${opt.val === "Yes" ? theme.primary : theme.bear}` : `1px solid ${theme.border}`,
+                        background: trade.wouldRetake === opt.val ? (opt.val === "Yes" ? "rgba(13,158,110,0.08)" : "rgba(214,59,59,0.08)") : theme.card,
+                        color: trade.wouldRetake === opt.val ? (opt.val === "Yes" ? theme.primary : theme.bear) : theme.muted,
+                      }}>
+                      {opt.icon} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Screenshot & Notes Section */}
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Visual Evidence</label>

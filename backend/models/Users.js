@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema(
     googleId: {
       type: String
     },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user"
+    },
     avatar: {
       type: String
     },
@@ -32,6 +37,30 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordOTPExpires: {
       type: Date
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ["inactive", "active", "expired"],
+      default: "inactive"
+    },
+    subscriptionPlan: {
+      type: String,
+      enum: ["free", "monthly", "yearly"],
+      default: "free"
+    },
+    subscriptionExpiry: {
+      type: Date
+    },
+    totalPaid: {
+      type: Number,
+      default: 0
+    },
+    lastLogin: {
+      type: Date
+    },
+    freeUploadUsed: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

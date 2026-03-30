@@ -48,7 +48,11 @@ export default function IndianOptionsAddTradePage() {
     mistakeTag: "",
     lesson: "",
     brokerage: "",
-    sttTaxes: ""
+    sttTaxes: "",
+    mood: null,
+    confidence: "",
+    emotionalTags: [],
+    wouldRetake: ""
   });
   const [loading, setLoading] = useState(false);
   const [strategies, setStrategies] = useState([]);
@@ -176,7 +180,11 @@ export default function IndianOptionsAddTradePage() {
       mistakeTag: trade.mistakeTag || undefined,
       lesson: trade.lesson || undefined,
       brokerage: trade.brokerage ? parseFloat(trade.brokerage) : undefined,
-      sttTaxes: trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined
+      sttTaxes: trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined,
+      mood: trade.mood ?? undefined,
+      confidence: trade.confidence || undefined,
+      emotionalTags: Array.isArray(trade.emotionalTags) ? trade.emotionalTags : undefined,
+      wouldRetake: trade.wouldRetake || undefined
     };
 
     const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
@@ -214,10 +222,10 @@ export default function IndianOptionsAddTradePage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link href="/indian-market/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
             <div>
               <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.secondary, lineHeight: 1 }}>
-                STRATEDGE
+                LOGNERA
               </div>
               <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#1B5E20", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                 OPTIONS JOURNAL · NSE
@@ -556,6 +564,129 @@ export default function IndianOptionsAddTradePage() {
               <div>
                 <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>STT / Taxes (₹)</label>
                 <input name="sttTaxes" type="number" step="0.01" placeholder="0" value={trade.sttTaxes} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+              </div>
+            </div>
+
+            {/* Psychology Section */}
+            <div style={{ background: "#FFFFFF", borderRadius: 12, padding: 20, border: "1px solid #E2E8F0" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0F1923", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                <span>🧠</span> TRADE PSYCHOLOGY
+                <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", background: "#F8FAFC", padding: "2px 6px", borderRadius: 4 }}>OPTIONAL</span>
+              </div>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>HOW ARE YOU FEELING?</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[
+                    { emoji: "😰", val: 1, label: "Stressed" },
+                    { emoji: "😟", val: 2, label: "Anxious" },
+                    { emoji: "😐", val: 3, label: "Neutral" },
+                    { emoji: "😊", val: 4, label: "Good" },
+                    { emoji: "🔥", val: 5, label: "Peak" }
+                  ].map(m => (
+                    <button
+                      key={m.val}
+                      type="button"
+                      onClick={() => setTrade(prev => ({ ...prev, mood: prev.mood === m.val ? null : m.val }))}
+                      style={{
+                        flex: 1,
+                        padding: "10px 4px",
+                        borderRadius: 10,
+                        cursor: "pointer",
+                        textAlign: "center",
+                        transition: "all 0.2s",
+                        border: trade.mood === m.val ? "1.5px solid #0D9E6E" : "1px solid #E2E8F0",
+                        background: trade.mood === m.val ? "rgba(13,158,110,0.06)" : "#F8FAFC",
+                        transform: trade.mood === m.val ? "scale(1.04)" : "scale(1)"
+                      }}
+                    >
+                      <div style={{ fontSize: 20 }}>{m.emoji}</div>
+                      <div style={{ fontSize: 10, color: trade.mood === m.val ? "#0D9E6E" : "#64748B", fontWeight: 700, marginTop: 4, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{m.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 6, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>CONFIDENCE LEVEL</label>
+                <select
+                  name="confidence"
+                  value={trade.confidence}
+                  onChange={handleChange}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}
+                >
+                  <option value="">Select confidence...</option>
+                  <option value="Low">Low — Unsure about this setup</option>
+                  <option value="Medium">Medium — Decent setup</option>
+                  <option value="High">High — Strong conviction</option>
+                  <option value="Overconfident">Overconfident — Can't lose 🚩</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>EMOTIONAL TAGS</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"].map(tag => {
+                    const selected = (trade.emotionalTags || []).includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setTrade(prev => ({
+                          ...prev,
+                          emotionalTags: selected
+                            ? (prev.emotionalTags || []).filter(x => x !== tag)
+                            : [...(prev.emotionalTags || []), tag]
+                        }))}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                          fontFamily: "'Plus Jakarta Sans',sans-serif",
+                          border: selected ? "1px solid #0D9E6E" : "1px solid #E2E8F0",
+                          background: selected ? "rgba(13,158,110,0.08)" : "#FFFFFF",
+                          color: selected ? "#0D9E6E" : "#64748B"
+                        }}
+                      >
+                        {tag === "FOMO" ? "😨" : tag === "Revenge" ? "😡" : tag === "Fear" ? "😰" : tag === "Greed" ? "🤑" : tag === "Calm" ? "🧘" : tag === "Bored" ? "😴" : tag === "Focused" ? "🎯" : "😤"} {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>WOULD YOU TAKE THIS TRADE AGAIN?</label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {[
+                    { val: "Yes", icon: "✅", label: "Yes" },
+                    { val: "No", icon: "❌", label: "No" }
+                  ].map(option => (
+                    <button
+                      key={option.val}
+                      type="button"
+                      onClick={() => setTrade(prev => ({ ...prev, wouldRetake: prev.wouldRetake === option.val ? "" : option.val }))}
+                      style={{
+                        flex: 1,
+                        padding: "10px",
+                        borderRadius: 10,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        transition: "all 0.2s",
+                        fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        border: trade.wouldRetake === option.val ? `1.5px solid ${option.val === "Yes" ? "#0D9E6E" : "#D63B3B"}` : "1px solid #E2E8F0",
+                        background: trade.wouldRetake === option.val ? (option.val === "Yes" ? "rgba(13,158,110,0.06)" : "rgba(214,59,59,0.06)") : "#F8FAFC",
+                        color: trade.wouldRetake === option.val ? (option.val === "Yes" ? "#0D9E6E" : "#D63B3B") : "#64748B"
+                      }}
+                    >
+                      {option.icon} {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

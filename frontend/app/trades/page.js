@@ -225,7 +225,7 @@ function TradeRow({ trade, onDelete, idx }) {
       {/* Actions */}
       <td style={{ padding: "14px 16px" }}>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <Link href={`/trades/${trade._id}`} style={{
+          <Link href={`/trades/view?id=${trade._id}`} style={{
             fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace",
             color: "#0D9E6E", border: "1px solid rgba(13,158,110,0.3)",
             background: "rgba(13,158,110,0.05)", borderRadius: 4,
@@ -293,7 +293,7 @@ function TradeCard({ trade, onDelete, idx }) {
         <span>BASIS: <span style={{ color: trade.entryBasis === "Plan" ? "#4A5568" : trade.entryBasis === "Emotion" ? "#D63B3B" : "#B8860B", fontWeight: 700 }}>{trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}</span></span>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <Link href={`/trades/${trade._id}`} style={{
+        <Link href={`/trades/view?id=${trade._id}`} style={{
           flex: 1, textAlign: "center", fontSize: 9, letterSpacing: "0.1em",
           fontFamily: "'JetBrains Mono',monospace", color: "#0D9E6E",
           border: "1px solid rgba(13,158,110,0.3)", background: "rgba(13,158,110,0.05)",
@@ -311,27 +311,120 @@ function TradeCard({ trade, onDelete, idx }) {
 }
 
 /* ─────────────────────────────────────────
-   EMPTY STATE
+   EMPTY STATE — Enhanced for better onboarding
 ───────────────────────────────────────── */
 function EmptyState() {
   return (
-    <div style={{ textAlign: "center", padding: "60px 20px" }}>
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ margin: "0 auto 16px" }}>
-        <rect x="8" y="16" width="10" height="18" fill="rgba(13,158,110,0.2)" rx="1" />
-        <line x1="13" y1="8" x2="13" y2="16" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
-        <line x1="13" y1="34" x2="13" y2="42" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
-        <rect x="22" y="12" width="10" height="12" fill="rgba(214,59,59,0.2)" rx="1" />
-        <line x1="27" y1="4" x2="27" y2="12" stroke="rgba(214,59,59,0.3)" strokeWidth="2" />
-        <line x1="27" y1="24" x2="27" y2="34" stroke="rgba(214,59,59,0.3)" strokeWidth="2" />
-        <rect x="36" y="14" width="10" height="16" fill="rgba(13,158,110,0.2)" rx="1" />
-        <line x1="41" y1="6" x2="41" y2="14" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
-        <line x1="41" y1="30" x2="41" y2="42" stroke="rgba(13,158,110,0.3)" strokeWidth="2" />
-      </svg>
-      <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 16, fontWeight: 800, color: "#0F1923", marginBottom: 6 }}>
-        NO TRADES LOGGED YET
+    <div style={{ 
+      textAlign: "center", 
+      padding: "80px 20px",
+      background: "linear-gradient(135deg, rgba(13,158,110,0.03) 0%, rgba(240,238,233,0.5) 100%)",
+      borderRadius: 14,
+      margin: "20px",
+      border: "1px dashed rgba(13,158,110,0.2)",
+    }}>
+      {/* Icon illustration */}
+      <div style={{ marginBottom: 24, position: "relative" }}>
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ margin: "0 auto" }}>
+          {/* Background circle */}
+          <circle cx="40" cy="40" r="36" fill="rgba(13,158,110,0.08)" stroke="rgba(13,158,110,0.15)" strokeWidth="2" />
+          
+          {/* Chart bars */}
+          <rect x="24" y="38" width="8" height="18" fill="rgba(13,158,110,0.6)" rx="2" />
+          <rect x="36" y="32" width="8" height="24" fill="rgba(13,158,110,0.8)" rx="2" />
+          <rect x="48" y="42" width="8" height="14" fill="rgba(214,59,59,0.5)" rx="2" />
+          
+          {/* Upward trend arrow */}
+          <path d="M20 52 L32 42 L42 50 L60 28" stroke="rgba(13,158,110,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points="52 28 60 28 60 36" fill="none" stroke="rgba(13,158,110,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </div>
-      <div style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace" }}>
-        START BUILDING YOUR JOURNAL — LOG YOUR FIRST TRADE
+      
+      {/* Main message */}
+      <div style={{ 
+        fontFamily: "'Plus Jakarta Sans',sans-serif", 
+        fontSize: 20, 
+        fontWeight: 800, 
+        color: "#0F1923", 
+        marginBottom: 10,
+        letterSpacing: "-0.02em",
+      }}>
+        Upload your first trade to get started
+      </div>
+      
+      {/* Subtext */}
+      <div style={{ 
+        fontSize: 11, 
+        color: "#64748B", 
+        lineHeight: 1.6, 
+        maxWidth: 420, 
+        margin: "0 auto 24px",
+        fontFamily: "'Plus Jakarta Sans',sans-serif",
+      }}>
+        Track your trades, analyze performance, and improve discipline with detailed analytics and insights.
+      </div>
+      
+      {/* CTA Button */}
+      <Link href="/upload-trade" style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        background: "linear-gradient(135deg, #0D9E6E 0%, #22C78E 100%)",
+        color: "#FFFFFF",
+        padding: "14px 28px",
+        borderRadius: 12,
+        textDecoration: "none",
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: "0.08em",
+        boxShadow: "0 4px 14px rgba(13,158,110,0.3)",
+        transition: "transform 0.2s, box-shadow 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 6px 20px rgba(13,158,110,0.4)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 4px 14px rgba(13,158,110,0.3)";
+      }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        UPLOAD TRADE
+      </Link>
+      
+      {/* Quick tips */}
+      <div style={{ 
+        marginTop: 28, 
+        paddingTop: 20, 
+        borderTop: "1px solid rgba(13,158,110,0.15)",
+        display: "grid", 
+        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", 
+        gap: 16,
+        maxWidth: 520,
+        margin: "28px auto 0",
+      }}>
+        {[
+          { icon: "📊", text: "Track Performance" },
+          { icon: "🎯", text: "Analyze Patterns" },
+          { icon: "📈", text: "Improve Strategy" },
+        ].map((tip, idx) => (
+          <div key={idx} style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+          }}>
+            <span style={{ fontSize: 20 }}>{tip.icon}</span>
+            <span style={{ fontSize: 9, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 600 }}>
+              {tip.text}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -431,10 +524,10 @@ export default function TradesPage() {
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <Link href="/dashboard" style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+          <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
-              STRATEDGE
+              LOGNERA
             </div>
             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
               FOREX AI JOURNAL
@@ -697,7 +790,7 @@ export default function TradesPage() {
                 SHOWING {filtered.length} OF {trades.length} TRADES
               </span>
               <span style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace" }}>
-                STRATEDGE AI JOURNAL
+                LOGNERA AI JOURNAL
               </span>
             </div>
           )}

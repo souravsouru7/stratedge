@@ -42,6 +42,126 @@ function TickerTape() {
     );
 }
 
+/* ─────────────────────────────────────────
+   EMPTY STATE — Enhanced for better onboarding
+───────────────────────────────────────── */
+function EmptyState() {
+  return (
+    <div style={{ 
+      textAlign: "center", 
+      padding: "80px 20px",
+      background: "linear-gradient(135deg, rgba(13,158,110,0.03) 0%, rgba(240,238,233,0.5) 100%)",
+      borderRadius: 14,
+      margin: "20px",
+      border: "1px dashed rgba(13,158,110,0.2)",
+    }}>
+      {/* Icon illustration */}
+      <div style={{ marginBottom: 24, position: "relative" }}>
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ margin: "0 auto" }}>
+          {/* Background circle */}
+          <circle cx="40" cy="40" r="36" fill="rgba(13,158,110,0.08)" stroke="rgba(13,158,110,0.15)" strokeWidth="2" />
+          
+          {/* Chart bars */}
+          <rect x="24" y="38" width="8" height="18" fill="rgba(13,158,110,0.6)" rx="2" />
+          <rect x="36" y="32" width="8" height="24" fill="rgba(13,158,110,0.8)" rx="2" />
+          <rect x="48" y="42" width="8" height="14" fill="rgba(214,59,59,0.5)" rx="2" />
+          
+          {/* Upward trend arrow */}
+          <path d="M20 52 L32 42 L42 50 L60 28" stroke="rgba(13,158,110,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points="52 28 60 28 60 36" fill="none" stroke="rgba(13,158,110,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      
+      {/* Main message */}
+      <div style={{ 
+        fontFamily: "'Plus Jakarta Sans',sans-serif", 
+        fontSize: 20, 
+        fontWeight: 800, 
+        color: theme.secondary, 
+        marginBottom: 10,
+        letterSpacing: "-0.02em",
+      }}>
+        Upload your first trade to get started
+      </div>
+      
+      {/* Subtext */}
+      <div style={{ 
+        fontSize: 11, 
+        color: "#64748B", 
+        lineHeight: 1.6, 
+        maxWidth: 420, 
+        margin: "0 auto 24px",
+        fontFamily: "'Plus Jakarta Sans',sans-serif",
+      }}>
+        Track your trades, analyze performance, and improve discipline with detailed analytics and insights.
+      </div>
+      
+      {/* CTA Button */}
+      <Link href="/indian-market/add-trade" style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        background: "linear-gradient(135deg, #0D9E6E 0%, #22C78E 100%)",
+        color: "#FFFFFF",
+        padding: "14px 28px",
+        borderRadius: 12,
+        textDecoration: "none",
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: "0.08em",
+        boxShadow: "0 4px 14px rgba(13,158,110,0.3)",
+        transition: "transform 0.2s, box-shadow 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 6px 20px rgba(13,158,110,0.4)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 4px 14px rgba(13,158,110,0.3)";
+      }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        UPLOAD TRADE
+      </Link>
+      
+      {/* Quick tips */}
+      <div style={{ 
+        marginTop: 28, 
+        paddingTop: 20, 
+        borderTop: "1px solid rgba(13,158,110,0.15)",
+        display: "grid", 
+        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", 
+        gap: 16,
+        maxWidth: 520,
+        margin: "28px auto 0",
+      }}>
+        {[
+          { icon: "📊", text: "Track Performance" },
+          { icon: "🎯", text: "Analyze Patterns" },
+          { icon: "📈", text: "Improve Strategy" },
+        ].map((tip, idx) => (
+          <div key={idx} style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+          }}>
+            <span style={{ fontSize: 20 }}>{tip.icon}</span>
+            <span style={{ fontSize: 9, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 600 }}>
+              {tip.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TradeRow({ trade, onDelete, idx }) {
     const profitNum = parseFloat(trade.profit) || 0;
     const bull = profitNum >= 0;
@@ -84,7 +204,7 @@ function TradeRow({ trade, onDelete, idx }) {
             </td>
             <td style={{ padding: "14px 16px", textAlign: "right" }}>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <Link href={`/indian-market/trades/${trade._id}`} style={{ fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", color: theme.bull, border: `1px solid ${theme.bull}55`, background: `${theme.bull}11`, borderRadius: 4, padding: "5px 12px", textDecoration: "none" }}>VIEW</Link>
+                    <Link href={`/indian-market/trades/view?id=${trade._id}`} style={{ fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", color: theme.bull, border: `1px solid ${theme.bull}55`, background: `${theme.bull}11`, borderRadius: 4, padding: "5px 12px", textDecoration: "none" }}>VIEW</Link>
                     <button onClick={() => onDelete(trade)} style={{ fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", color: theme.bear, border: `1px solid ${theme.bear}55`, background: `${theme.bear}11`, borderRadius: 4, padding: "5px 12px", cursor: "pointer" }}>DELETE</button>
                 </div>
             </td>
@@ -130,10 +250,10 @@ export default function IndianTradesPage() {
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+                        <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
                         <div>
                             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
-                                STRATEDGE
+                                LOGNERA
                             </div>
                             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                                 OPTIONS JOURNAL · NSE
@@ -197,7 +317,7 @@ export default function IndianTradesPage() {
                     {loading ? (
                         <div style={{ padding: 40, textAlign: "center" }}>Loading trades...</div>
                     ) : trades.length === 0 ? (
-                        <div style={{ padding: 40, textAlign: "center" }}>No options trades yet. <Link href="/indian-market/add-trade" style={{ color: theme.primary, fontWeight: 600 }}>Log your first trade</Link></div>
+                        <EmptyState />
                     ) : (
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead>

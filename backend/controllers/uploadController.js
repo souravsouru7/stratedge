@@ -1,34 +1,44 @@
-const cloudinary = require("../config/cloudinary");
-const { extractText } = require("../services/ocrService");
-const { extractTextWithVision, isVisionAvailable } = require("../services/visionOcrService");
-const { parseTrade, parseIndianTrade, parseTradesFromOCR } = require("../services/parsingService");
-const { extractIndianTradeWithAI } = require("../services/aiExtractionService");
-
-/**
- * Get OCR text - uses Google Vision for Indian market (high accuracy),
- * Tesseract for others
- */
-async function getExtractedText(file, marketType, imageUrl) {
-  const isIndian = marketType === "Indian_Market";
-
-  if (isIndian && isVisionAvailable()) {
-    const visionResult = await extractTextWithVision(file.buffer);
-    if (visionResult && visionResult.text) {
-      console.log("[Upload] Using Google Vision OCR | confidence:", visionResult.confidence?.toFixed(2) ?? "N/A");
-      return visionResult.text;
-    }
-    console.warn("[Upload] Vision OCR failed/empty, falling back to Tesseract");
-  }
-
-  return extractText(imageUrl);
-}
+const { uploadBufferToCloudinary } = require("../config/cloudinary");
+const Trade = require("../models/Trade");
+const User = require("../models/Users");
+const { ocrQueue } = require("../queues/ocrQueue");
 
 exports.uploadImage = async (req, res) => {
+  console.time("uploadAPI");
   try {
+    const user = req.user; // From authMiddleware
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized, user missing" });
+    }
+
+    // 1. Subscription Check
+    const now = new Date();
+    const isSubscribed = user.subscriptionStatus === "active" && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > now;
+    
+    if (!isSubscribed) {
+      if (user.freeUploadUsed) {
+        return res.status(403).json({ 
+          message: "Subscription required", 
+          code: "PAYMENT_REQUIRED",
+          details: "You have used your free upload. Please subscribe for ₹150 for 3 months to continue."
+        });
+      }
+      // If they haven't used their free upload, we allow this one and mark it as used later on success
+      console.log(`[Upload] User ${user.email} using free upload trial.`);
+    }
+
     const file = req.file;
 
     if (!file) {
       return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    if (!["image/jpeg", "image/png", "image/jpg"].includes(file.mimetype)) {
+      return res.status(400).json({ message: "Only JPG and PNG images are allowed" });
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: "File size must be 5MB or less" });
     }
 
     const marketType = String(req.body.marketType || req.query.marketType || "Forex").trim();
@@ -40,56 +50,50 @@ exports.uploadImage = async (req, res) => {
     console.log("File received:", file.originalname, file.mimetype, file.size, "| market:", marketType);
     if (brokerOverride) console.log("[Upload] broker override:", brokerOverride);
 
-    const b64 = Buffer.from(file.buffer).toString("base64");
-    const dataURI = `data:${file.mimetype};base64,${b64}`;
-
-    const result = await cloudinary.uploader.upload(dataURI, {
-      folder: "trades"
+    const result = await uploadBufferToCloudinary(file.buffer, {
+      folder: "trades",
+      resource_type: "image",
+      secure: true,
     });
 
     const imageUrl = result.secure_url;
 
-    let extractedText = await getExtractedText(file, marketType, imageUrl);
+    const trade = await Trade.create({
+      user: user._id,
+      screenshot: imageUrl,
+      imageUrl,
+      marketType,
+      broker: brokerOverride || "",
+      status: "pending",
+      error: null,
+    });
 
-    console.log("[Upload] marketType:", marketType, "| OCR length:", extractedText?.length ?? 0, "| OCR preview:", (extractedText || "").slice(0, 120) + "...");
-
-    let parsedTrade;
-    let parsedTrades = null;
-    if (marketType === "Indian_Market") {
-      parsedTrade = parseIndianTrade(extractedText, { broker: brokerOverride });
-      parsedTrades = parseTradesFromOCR(extractedText, { broker: brokerOverride });
-      const badPair =
-        !parsedTrade.pair ||
-        String(parsedTrade.pair).trim().length < 6 ||
-        !/\b\d{4,5}\b/.test(String(parsedTrade.pair)) ||
-        !/\b(CE|PE|CALL|PUT|FUT)\b/i.test(String(parsedTrade.pair));
-      const needsFallback = badPair || parsedTrade.profit == null;
-      if (needsFallback && extractedText.trim().length >= 10) {
-        const aiResult = await extractIndianTradeWithAI(extractedText);
-        if (aiResult) {
-          if (!parsedTrade.pair && aiResult.pair) parsedTrade.pair = aiResult.pair;
-          if (parsedTrade.profit == null && aiResult.profit != null) parsedTrade.profit = aiResult.profit;
-          if (!parsedTrade.quantity && aiResult.quantity != null) parsedTrade.quantity = aiResult.quantity;
-          if (!parsedTrade.strikePrice && aiResult.strikePrice != null) parsedTrade.strikePrice = aiResult.strikePrice;
-          if (aiResult.optionType) parsedTrade.optionType = aiResult.optionType;
-        }
+    await ocrQueue.add(
+      "processTrade",
+      {
+        tradeId: trade._id.toString(),
+        imagePath: imageUrl,
+      },
+      {
+        jobId: trade._id.toString(),
       }
-    } else {
-      parsedTrade = parseTrade(extractedText);
+    );
+
+    // If this was a free upload, mark it as used
+    if (!isSubscribed) {
+      await User.findByIdAndUpdate(user._id, { freeUploadUsed: true });
     }
 
-    console.log("[Upload] parsedTrade:", JSON.stringify(parsedTrade));
-    if (parsedTrades) console.log("[Upload] parsedTrades:", JSON.stringify(parsedTrades));
-
-    res.json({
-      url: imageUrl,
-      extractedText,
-      parsedTrade,
-      ...(parsedTrades && parsedTrades.length > 0 && { parsedTrades })
+    res.status(202).json({
+      success: true,
+      jobId: trade._id,
+      status: "pending",
     });
 
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ message: error.message });
+  } finally {
+    console.timeEnd("uploadAPI");
   }
 };

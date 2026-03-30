@@ -62,6 +62,14 @@ export const getTrade = async (id, marketType = 'Forex') => {
   return handleResponse(res);
 };
 
+export const getTradeStatus = async (id) => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${BASE_URL}/trade/status/${id}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return handleResponse(res);
+};
+
 export const deleteTrade = async (id, marketType = 'Forex') => {
   const token = localStorage.getItem("token");
   const baseUrl = getBaseUrl(marketType);

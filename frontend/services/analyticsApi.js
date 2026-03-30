@@ -74,7 +74,7 @@ export const getPerformanceMetrics = async (marketType = 'Forex') => {
   return handleResponse(res);
 };
 
-export const getTimeAnalysis = async (marketType = 'Forex', range = 'thisWeek') => {
+export const getTimeAnalysis = async (marketType = 'Forex', range = 'all') => {
   const baseUrl = getBaseUrl(marketType);
   const res = await fetch(`${baseUrl}/analytics/time-analysis?marketType=${marketType}&range=${encodeURIComponent(range)}`, getAuthHeaders());
   return handleResponse(res);
@@ -108,5 +108,11 @@ export const getAdvancedAnalytics = async (marketType = 'Forex') => {
 export const getPnLBreakdown = async (marketType = 'Forex') => {
   const baseUrl = getBaseUrl(marketType);
   const res = await fetch(`${baseUrl}/analytics/pnl-breakdown?marketType=${marketType}`, getAuthHeaders());
+  return handleResponse(res);
+};
+
+export const getPsychologyAnalytics = async (marketType = 'Forex') => {
+  const baseUrl = getBaseUrl(marketType);
+  const res = await fetch(`${baseUrl}/analytics/psychology?marketType=${marketType}`, getAuthHeaders());
   return handleResponse(res);
 };

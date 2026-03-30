@@ -5,6 +5,7 @@ import { googleLogin, loginUser } from "@/services/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GoogleLogin } from "@react-oauth/google";
+import { Capacitor } from "@capacitor/core";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -167,10 +168,10 @@ export default function LoginPage() {
         setTimeout(() => setShake(false), 600);
         alert(data.message);
       }
-    } catch {
+    } catch (err) {
       setShake(true);
       setTimeout(() => setShake(false), 600);
-      alert("Login failed. Please try again.");
+      alert("Manual Login Error: " + (err.message || JSON.stringify(err)));
     } finally {
       setLoading(false);
     }
@@ -198,6 +199,45 @@ export default function LoginPage() {
       alert("Google login failed. Please try again.");
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleNativeGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
+      await GoogleAuth.initialize({
+        clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        scopes: ["profile", "email"],
+        grantOfflineAccess: true,
+      });
+      const googleUser = await GoogleAuth.signIn();
+      const idToken = googleUser?.authentication?.idToken;
+      if (!idToken) throw new Error("No ID token received");
+      const data = await googleLogin(idToken);
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        router.push("/dashboard");
+      } else {
+        setShake(true);
+        setTimeout(() => setShake(false), 600);
+        alert(data.message || "Google login failed.");
+      }
+    } catch (err) {
+      setShake(true);
+      setTimeout(() => setShake(false), 600);
+      alert("Native Google Error: " + (err.message || JSON.stringify(err)));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const testConnection = async () => {
+    try {
+      const res = await fetch(process.env.NEXT_PUBLIC_API_URL || "no-url");
+      alert("Connection test to " + process.env.NEXT_PUBLIC_API_URL + " : " + (res.ok ? "SUCCESS" : "FAILED (" + res.status + ")"));
+    } catch (err) {
+      alert("Connection test ERROR: " + err.message);
     }
   };
 
@@ -245,9 +285,9 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+          <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
-            <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:15, fontWeight:800, letterSpacing:"0.04em", color:"#0F1923", lineHeight:1 }}>STRATEDGE</div>
+            <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:15, fontWeight:800, letterSpacing:"0.04em", color:"#0F1923", lineHeight:1 }}>LOGNERA</div>
             <div style={{ fontSize:9, letterSpacing:"0.18em", color:"#0D9E6E", marginTop:1, fontFamily:"'JetBrains Mono',monospace", fontWeight:600 }}>AI JOURNAL</div>
           </div>
         </div>
@@ -457,24 +497,60 @@ export default function LoginPage() {
               {/* Google */}
               <div style={{ marginBottom: 16 }}>
                 {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
-                  <div
-                    style={{
-                      opacity: googleLoading ? 0.7 : 1,
-                      pointerEvents: googleLoading ? "none" : "auto",
-                      display: "flex",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={() => alert("Google login failed. Please try again.")}
-                      useOneTap={false}
-                      theme="outline"
-                      size="large"
-                      shape="rectangular"
-                      width="380"
-                    />
-                  </div>
+                  Capacitor.isNativePlatform() ? (
+                    // Native Android: use the Capacitor Google Auth plugin
+                    <button
+                      type="button"
+                      onClick={handleNativeGoogleSignIn}
+                      disabled={googleLoading}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        padding: "11px 16px",
+                        border: "1.5px solid #E2E8F0",
+                        borderRadius: 8,
+                        background: "#fff",
+                        cursor: googleLoading ? "not-allowed" : "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#0F1923",
+                        fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        opacity: googleLoading ? 0.7 : 1,
+                        boxShadow: "0 1px 6px rgba(15,25,35,0.08)",
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.7 0 6.7 5.5 2.7 13.5l7.8 6C12.4 13.2 17.8 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.5 2.8-2.2 5.2-4.7 6.8l7.4 5.7c4.3-4 6.8-9.9 6.8-16.5z"/>
+                        <path fill="#FBBC05" d="M10.5 28.5c-.5-1.5-.8-3-.8-4.5s.3-3 .8-4.5l-7.8-6C1 16.5 0 20.1 0 24s1 7.5 2.7 10.7l7.8-6.2z"/>
+                        <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.4-5.7c-2.1 1.4-4.7 2.2-7.8 2.2-6.2 0-11.5-3.7-13.5-9l-7.8 6C6.7 42.5 14.7 48 24 48z"/>
+                      </svg>
+                      {googleLoading ? "Signing in..." : "Continue with Google"}
+                    </button>
+                  ) : (
+                    // Web browser: use standard web Google Login component
+                    <div
+                      style={{
+                        opacity: googleLoading ? 0.7 : 1,
+                        pointerEvents: googleLoading ? "none" : "auto",
+                        display: "flex",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => alert("Google login failed. Please try again.")}
+                        useOneTap={false}
+                        theme="outline"
+                        size="large"
+                        shape="rectangular"
+                        width="380"
+                      />
+                    </div>
+                  )
                 ) : (
                   <div style={{
                     fontSize: 11,
@@ -543,9 +619,15 @@ export default function LoginPage() {
                 )}
               </button>
 
+              <div style={{ textAlign:"center", marginTop:10 }}>
+                <button type="button" onClick={testConnection} style={{ fontSize:10, color:"#94A3B8", background:"none", border:"none", cursor:"pointer", textDecoration:"underline" }}>
+                  Test Backend Connection
+                </button>
+              </div>
+
               {/* Register link */}
               <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:"#94A3B8", fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
-                New to Stratedge?{" "}
+                New to LOGNERA?{" "}
                 <span
                   style={{ color:"#0D9E6E", cursor:"pointer", fontWeight:700, borderBottom:"1px solid rgba(13,158,110,0.3)", paddingBottom:1 }}
                   onClick={() => router.push("/register")}

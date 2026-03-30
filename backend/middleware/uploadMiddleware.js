@@ -12,13 +12,15 @@ const upload = multer({
     const allowedMimeTypes = [
       "image/jpeg",
       "image/png",
-      "image/webp",
-      "image/gif",
-      "application/pdf"
+      "image/jpg"
     ];
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      return cb(new Error("Unsupported file type"));
+      const error = new Error("Only image files are allowed");
+      error.statusCode = 400;
+      error.code = "INVALID_FILE_TYPE";
+      console.warn(`[Security] Invalid file upload rejected | mimetype=${file.mimetype}`);
+      return cb(error);
     }
 
     cb(null, true);

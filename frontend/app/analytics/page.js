@@ -14,7 +14,8 @@ import {
   getTimeAnalysis,
   getTradeQuality,
   getDrawdownAnalysis,
-  getAIInsights
+  getAIInsights,
+  getPsychologyAnalytics
 } from "@/services/analyticsApi";
 
 /* ─────────────────────────────────────────
@@ -55,6 +56,11 @@ function StatCard({ label, value, sub, color = colors.primary, icon, delay = 0 }
   const cleanValue = typeof value === "string" ? value.replace(/[$,%]/g, "") : value;
   const isInfinite = cleanValue === "∞";
   const valueColor = color;
+  
+  // Fix negative currency formatting: "$-41.28" -> "-$41.28"
+  const formattedValue = typeof value === "string" && value.startsWith("$-") 
+    ? "-$" + value.substring(2) 
+    : value;
 
   return (
     <div style={{
@@ -69,7 +75,7 @@ function StatCard({ label, value, sub, color = colors.primary, icon, delay = 0 }
         {icon && <div style={{ width: 28, height: 28, borderRadius: 6, background: `${valueColor}12`, display: "flex", alignItems: "center", justifyContent: "center", color: valueColor }}>{icon}</div>}
       </div>
       <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: valueColor, lineHeight: 1.2, marginBottom: 6 }}>
-        {value}
+        {formattedValue}
       </div>
       {sub && (
         <div style={{ fontSize: 10, color: label.toLowerCase().includes("profit factor") && isInfinite ? colors.bull : colors.muted, letterSpacing: "0.06em", fontWeight: isInfinite ? 600 : 400 }}>
@@ -109,7 +115,7 @@ function ProgressBar({ value, max = 100, color = colors.bull, label, showPercent
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
         <span style={{ fontSize: 11, color: colors.secondary, fontFamily: "'JetBrains Mono',monospace" }}>{label}</span>
-        {showPercent && <span style={{ fontSize: 11, color, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>{percent.toFixed(1)}%</span>}
+        {showPercent && !label?.includes("%") && <span style={{ fontSize: 11, color, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>{percent.toFixed(1)}%</span>}
       </div>
       <div style={{ height: 8, background: "#F0EEE9", borderRadius: 4, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${percent}%`, background: `linear-gradient(90deg, ${color}, ${color}88)`, borderRadius: 4, transition: "width 0.8s ease" }} />
@@ -122,13 +128,18 @@ function ProgressBar({ value, max = 100, color = colors.bull, label, showPercent
    LIST ITEM
 ───────────────────────────────────────── */
 function ListItem({ label, value, color = colors.primary, sub }) {
+  // Fix negative currency formatting: "$-41.28" -> "-$41.28"
+  const formattedValue = typeof value === "string" && value.startsWith("$-") 
+    ? "-$" + value.substring(2) 
+    : value;
+
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${colors.border}` }}>
       <div>
         <div style={{ fontSize: 12, color: colors.secondary, fontWeight: 500 }}>{label}</div>
         {sub && <div style={{ fontSize: 10, color: colors.muted }}>{sub}</div>}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color }}>{value}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color }}>{formattedValue}</div>
     </div>
   );
 }
@@ -154,6 +165,131 @@ function HeatMapCell({ value, maxValue, label, subLabel }) {
       </div>
       <div style={{ fontSize: 9, color: textColor, opacity: 0.9, marginTop: 2 }}>{label}</div>
       {subLabel && <div style={{ fontSize: 8, color: textColor, opacity: 0.7 }}>{subLabel}</div>}
+    </div>
+  );
+}
+
+function shiftMonth(date, amount) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function formatCalendarMonth(date) {
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function getCalendarModel(byDate = {}, activeMonth = new Date()) {
+  const firstDay = new Date(activeMonth.getFullYear(), activeMonth.getMonth(), 1);
+  const lastDay = new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 0);
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = lastDay.getDate();
+  const cells = [];
+  const monthEntries = [];
+
+  for (let i = 0; i < startOffset; i += 1) {
+    cells.push({ type: "empty", key: `empty-start-${i}` });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const key = `${activeMonth.getFullYear()}-${String(activeMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const entry = byDate?.[key] || null;
+    if (entry) monthEntries.push(entry);
+    cells.push({
+      type: "day",
+      key,
+      day,
+      entry,
+    });
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push({ type: "empty", key: `empty-end-${cells.length}` });
+  }
+
+  const maxAbsProfit = monthEntries.length > 0
+    ? Math.max(...monthEntries.map((entry) => Math.abs(Number(entry.profit) || 0)), 1)
+    : 1;
+  const totalProfit = monthEntries.reduce((sum, entry) => sum + (Number(entry.profit) || 0), 0);
+  const totalTrades = monthEntries.reduce((sum, entry) => sum + (Number(entry.total) || 0), 0);
+
+  return {
+    cells,
+    maxAbsProfit,
+    totalProfit,
+    totalTrades,
+  };
+}
+
+function CalendarPnL({ byDate, activeMonth, onPrevMonth, onNextMonth, currency = "$" }) {
+  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const { cells, maxAbsProfit, totalProfit, totalTrades } = getCalendarModel(byDate, activeMonth);
+  const summaryPositive = totalProfit >= 0;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: colors.primary }}>{formatCalendarMonth(activeMonth)}</div>
+          <div style={{ fontSize: 10, color: colors.muted, fontFamily: "'JetBrains Mono',monospace", marginTop: 4 }}>
+            {summaryPositive ? "+" : "-"}{currency}{Math.abs(totalProfit).toFixed(2)} · {totalTrades} trades
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button type="button" onClick={onPrevMonth} style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${colors.border}`, background: colors.card, color: colors.primary, cursor: "pointer", fontSize: 16 }}>
+            ‹
+          </button>
+          <button type="button" onClick={onNextMonth} style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${colors.border}`, background: colors.card, color: colors.primary, cursor: "pointer", fontSize: 16 }}>
+            ›
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+        {weekDays.map((day) => (
+          <div key={day} style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: colors.muted, textAlign: "center", fontFamily: "'JetBrains Mono',monospace", paddingBottom: 4 }}>
+            {day}
+          </div>
+        ))}
+        {cells.map((cell) => {
+          if (cell.type === "empty") {
+            return <div key={cell.key} style={{ minHeight: 86, borderRadius: 12, background: "rgba(148,163,184,0.06)" }} />;
+          }
+
+          const profit = Number(cell.entry?.profit || 0);
+          const trades = Number(cell.entry?.total || 0);
+          const intensity = cell.entry ? Math.max(0.12, Math.abs(profit) / maxAbsProfit) : 0;
+          const background = !cell.entry
+            ? "#FFFFFF"
+            : profit >= 0
+              ? `rgba(13, 158, 110, ${Math.min(0.82, intensity * 0.9)})`
+              : `rgba(214, 59, 59, ${Math.min(0.82, intensity * 0.9)})`;
+          const border = !cell.entry
+            ? `1px solid ${colors.border}`
+            : `1px solid ${profit >= 0 ? "rgba(13, 158, 110, 0.25)" : "rgba(214, 59, 59, 0.25)"}`;
+          const textColor = cell.entry && intensity > 0.45 ? "#FFFFFF" : colors.primary;
+          const mutedColor = cell.entry && intensity > 0.45 ? "rgba(255,255,255,0.8)" : colors.muted;
+
+          return (
+            <div key={cell.key} style={{ minHeight: 86, borderRadius: 12, background, border, padding: "10px 8px", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: cell.entry ? "0 8px 18px rgba(15,25,35,0.05)" : "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: textColor }}>{cell.day}</span>
+                {trades > 0 && (
+                  <span style={{ fontSize: 9, color: mutedColor, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {trades}T
+                  </span>
+                )}
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: textColor, fontFamily: "'JetBrains Mono',monospace" }}>
+                  {cell.entry ? `${profit >= 0 ? "+" : "-"}${currency}${Math.abs(profit).toFixed(0)}` : "—"}
+                </div>
+                <div style={{ fontSize: 9, color: mutedColor, marginTop: 3 }}>
+                  {cell.entry ? `${cell.entry.winRate}% WR` : "No trades"}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -226,6 +362,7 @@ function InsightTag({ text, type = "info" }) {
 export default function AnalyticsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [data, setData] = useState({
     summary: null,
     riskReward: null,
@@ -234,7 +371,8 @@ export default function AnalyticsPage() {
     timeAnalysis: null,
     quality: null,
     drawdown: null,
-    aiInsights: null
+    aiInsights: null,
+    psychology: null
   });
 
   useEffect(() => {
@@ -243,9 +381,19 @@ export default function AnalyticsPage() {
     fetchAllData();
   }, [router]);
 
+  useEffect(() => {
+    const dateKeys = Object.keys(data.timeAnalysis?.byDate || {});
+    if (dateKeys.length === 0) return;
+    const latestKey = [...dateKeys].sort().slice(-1)[0];
+    const [year, month] = latestKey.split("-").map(Number);
+    if (year && month) {
+      setCalendarMonth(new Date(year, month - 1, 1));
+    }
+  }, [data.timeAnalysis]);
+
   const fetchAllData = async () => {
     try {
-      const [summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights] = await Promise.all([
+      const [summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights, psychology] = await Promise.all([
         getSummary(),
         getRiskRewardAnalysis(),
         getTradeDistribution(),
@@ -253,10 +401,11 @@ export default function AnalyticsPage() {
         getTimeAnalysis(),
         getTradeQuality(),
         getDrawdownAnalysis(),
-        getAIInsights()
+        getAIInsights(),
+        getPsychologyAnalytics().catch(() => null)
       ]);
 
-      setData({ summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights });
+      setData({ summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights, psychology });
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
     } finally {
@@ -270,11 +419,7 @@ export default function AnalyticsPage() {
     </div>
   );
 
-  const { summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights } = data;
-
-  // Calculate max values for heatmaps
-  const dayMaxProfit = timeAnalysis?.byDay ? Math.max(...Object.values(timeAnalysis.byDay).map(d => Math.abs(parseFloat(d.profit) || 0)), 100) : 100;
-  const sessionMaxProfit = timeAnalysis?.bySession ? Math.max(...Object.values(timeAnalysis.bySession).map(s => Math.abs(parseFloat(s.profit) || 0)), 100) : 100;
+  const { summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights, psychology } = data;
 
   return (
     <div style={{ minHeight: "100vh", background: colors.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: colors.primary, paddingBottom: 40 }}>
@@ -291,10 +436,10 @@ export default function AnalyticsPage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link href="/dashboard" style={{ textDecoration: "none", color: colors.primary, display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
             <div>
               <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: colors.primary, lineHeight: 1 }}>
-                STRATEDGE
+                LOGNERA
               </div>
               <div style={{ fontSize: 9, letterSpacing: "0.18em", color: colors.bull, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                 FOREX AI JOURNAL
@@ -460,7 +605,7 @@ export default function AnalyticsPage() {
                 <span style={{ fontSize: 10, color: colors.bull, fontWeight: 700, letterSpacing: "0.1em" }}>🏆 BEST SESSION</span>
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: colors.bull, marginBottom: 8 }}>
-                {timeAnalysis?.bestSession?.name || "0"}
+                {timeAnalysis?.bestSession?.name || "Need more data"}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
@@ -491,7 +636,7 @@ export default function AnalyticsPage() {
                 <span style={{ fontSize: 10, color: colors.bear, fontWeight: 700, letterSpacing: "0.1em" }}>📉 WORST SESSION</span>
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: colors.bear, marginBottom: 8 }}>
-                {timeAnalysis?.worstSession?.name || "0"}
+                {timeAnalysis?.worstSession?.name || "Need more data"}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
@@ -522,7 +667,7 @@ export default function AnalyticsPage() {
                 <span style={{ fontSize: 10, color: colors.gold, fontWeight: 700, letterSpacing: "0.1em" }}>📈 HIGHEST WIN RATE</span>
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: colors.primary, marginBottom: 8 }}>
-                {timeAnalysis?.bestSessionWR?.name || "0"}
+                {timeAnalysis?.bestSessionWR?.name || "Need more data"}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
@@ -545,22 +690,16 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Day of Week Heatmap */}
+        {/* Calendar Heatmap */}
         <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-          <SectionCard title="Day of Week Performance" subtitle="PROFIT BY DAY (CLICK FOR DETAILS)" delay={0.5} accentColor={colors.bull}>
-            {timeAnalysis?.byDay && (
-              <div style={{ display: "flex", gap: 4 }}>
-                {Object.entries(timeAnalysis.byDay).map(([day, data]) => (
-                  <HeatMapCell
-                    key={day}
-                    value={parseFloat(data.profit) || 0}
-                    maxValue={dayMaxProfit}
-                    label={day.substring(0, 3)}
-                    subLabel={`${data.winRate}%`}
-                  />
-                ))}
-              </div>
-            )}
+          <SectionCard title="Calendar Performance" subtitle="MONTHLY P&L CALENDAR" delay={0.5} accentColor={colors.bull}>
+            <CalendarPnL
+              byDate={timeAnalysis?.byDate || {}}
+              activeMonth={calendarMonth}
+              onPrevMonth={() => setCalendarMonth((prev) => shiftMonth(prev, -1))}
+              onNextMonth={() => setCalendarMonth((prev) => shiftMonth(prev, 1))}
+              currency="$"
+            />
           </SectionCard>
 
           {/* Best/Worst Times */}
@@ -569,27 +708,27 @@ export default function AnalyticsPage() {
               <div>
                 <ListItem
                   label="🏆 Best Day (Profit)"
-                  value={timeAnalysis.bestDay?.name && timeAnalysis.bestDay?.name !== "0" ? `$${timeAnalysis.bestDay?.profit || 0}` : "0"}
+                  value={timeAnalysis.bestDay ? `$${timeAnalysis.bestDay.profit || 0}` : "—"}
                   color={colors.bull}
-                  sub={timeAnalysis.bestDay?.name && timeAnalysis.bestDay?.name !== "0" ? timeAnalysis.bestDay?.name : "Need more data"}
+                  sub={timeAnalysis.bestDay ? timeAnalysis.bestDay.name : "Need more data"}
                 />
                 <ListItem
                   label="📉 Worst Day (Profit)"
-                  value={timeAnalysis.worstDay?.name && timeAnalysis.worstDay?.name !== "0" ? `$${timeAnalysis.worstDay?.profit || 0}` : "0"}
+                  value={timeAnalysis.worstDay && timeAnalysis.worstDay.name !== timeAnalysis.bestDay?.name ? `$${timeAnalysis.worstDay.profit || 0}` : "—"}
                   color={colors.bear}
-                  sub={timeAnalysis.worstDay?.name && timeAnalysis.worstDay?.name !== "0" ? timeAnalysis.worstDay?.name : "Need more data"}
+                  sub={timeAnalysis.worstDay && timeAnalysis.worstDay.name !== timeAnalysis.bestDay?.name ? timeAnalysis.worstDay.name : "Need more data"}
                 />
                 <ListItem
                   label="🕐 Best Hour (Profit)"
-                  value={timeAnalysis.bestHour?.hour !== undefined && timeAnalysis.bestHour?.hour !== 0 ? `$${timeAnalysis.bestHour?.profit || 0}` : "0"}
+                  value={timeAnalysis.bestHour ? `$${timeAnalysis.bestHour.profit || 0}` : "—"}
                   color={colors.bull}
-                  sub={timeAnalysis.bestHour?.hour !== undefined && timeAnalysis.bestHour?.hour !== 0 ? `${timeAnalysis.bestHour?.hour}:00` : "Need more data"}
+                  sub={timeAnalysis.bestHour ? `${String(timeAnalysis.bestHour.hour).padStart(2, '0')}:00` : "Need more data"}
                 />
                 <ListItem
                   label="⚠️ Worst Hour (Profit)"
-                  value={timeAnalysis.worstHour?.hour !== undefined && timeAnalysis.worstHour?.hour !== 0 ? `$${timeAnalysis.worstHour?.profit || 0}` : "0"}
+                  value={timeAnalysis.worstHour && timeAnalysis.worstHour.hour !== timeAnalysis.bestHour?.hour ? `$${timeAnalysis.worstHour.profit || 0}` : "—"}
                   color={colors.bear}
-                  sub={timeAnalysis.worstHour?.hour !== undefined && timeAnalysis.worstHour?.hour !== 0 ? `${timeAnalysis.worstHour?.hour}:00` : "Need more data"}
+                  sub={timeAnalysis.worstHour && timeAnalysis.worstHour.hour !== timeAnalysis.bestHour?.hour ? `${String(timeAnalysis.worstHour.hour).padStart(2, '0')}:00` : "Need more data"}
                 />
               </div>
             )}
@@ -700,17 +839,21 @@ export default function AnalyticsPage() {
                 {Object.entries(distribution.byPair)
                   .sort((a, b) => parseFloat(b[1].profit) - parseFloat(a[1].profit))
                   .slice(0, 6)
-                  .map(([pair, data]) => (
-                    <div key={pair} style={{ marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600 }}>{pair}</span>
-                        <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(data.profit) >= 0 ? colors.bull : colors.bear }}>
-                          {parseFloat(data.profit) >= 0 ? "+" : ""}${parseFloat(data.profit).toFixed(2)}
-                        </span>
+                  .map(([pair, data]) => {
+                    const pVal = parseFloat(data.profit);
+                    const pFormatted = pVal >= 0 ? `+$${pVal.toFixed(2)}` : `-$${Math.abs(pVal).toFixed(2)}`;
+                    return (
+                      <div key={pair} style={{ marginBottom: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600 }}>{pair}</span>
+                          <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: pVal >= 0 ? colors.bull : colors.bear }}>
+                            {pFormatted}
+                          </span>
+                        </div>
+                        <ProgressBar value={parseFloat(data.winRate)} max={100} color={parseFloat(data.winRate) >= 50 ? colors.bull : colors.bear} label={`${data.wins}W / ${data.losses}L • ${data.winRate}%`} />
                       </div>
-                      <ProgressBar value={parseFloat(data.winRate)} max={100} color={parseFloat(data.winRate) >= 50 ? colors.bull : colors.bear} label={`${data.wins}W / ${data.losses}L • ${data.winRate}%`} />
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             ) : (
               <div style={{ color: colors.muted, textAlign: "center", padding: 20 }}>No pair data available</div>
@@ -721,19 +864,24 @@ export default function AnalyticsPage() {
           <SectionCard title="BUY vs SELL Performance" subtitle="TRADE TYPE ANALYSIS" delay={0.55} accentColor={colors.gold}>
             {distribution?.byType && (
               <div>
-                {Object.entries(distribution.byType).map(([type, data]) => (
-                  <div key={type} style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: type === "BUY" ? colors.bull : colors.bear }}>{type}</span>
-                      <span style={{ fontSize: 11, color: colors.muted }}>{data.total} trades</span>
+                {Object.entries(distribution.byType).map(([type, data]) => {
+                  const pVal = parseFloat(data.profit);
+                  const pFormatted = pVal >= 0 ? `$${pVal.toFixed(2)}` : `-$${Math.abs(pVal).toFixed(2)}`;
+                  
+                  return (
+                    <div key={type} style={{ marginBottom: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: type === "BUY" ? colors.bull : colors.bear }}>{type}</span>
+                        <span style={{ fontSize: 11, color: colors.muted }}>{data.total} trades</span>
+                      </div>
+                      <ProgressBar value={parseFloat(data.winRate)} max={100} color={parseFloat(data.winRate) >= 50 ? colors.bull : colors.bear} label={`${data.winRate}% win rate`} />
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: colors.muted, marginTop: 4 }}>
+                        <span>Profit: <span style={{ color: pVal >= 0 ? colors.bull : colors.bear }}>{pFormatted}</span></span>
+                        <span>{data.wins}W / {data.losses}L</span>
+                      </div>
                     </div>
-                    <ProgressBar value={parseFloat(data.winRate)} max={100} color={parseFloat(data.winRate) >= 50 ? colors.bull : colors.bear} label={`${data.winRate}% win rate`} />
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: colors.muted, marginTop: 4 }}>
-                      <span>Profit: <span style={{ color: parseFloat(data.profit) >= 0 ? colors.bull : colors.bear }}>${parseFloat(data.profit).toFixed(2)}</span></span>
-                      <span>{data.wins}W / {data.losses}L</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </SectionCard>
@@ -818,6 +966,177 @@ export default function AnalyticsPage() {
               </div>
             )}
           </SectionCard>
+        </div>
+        {/* 🧠 Psychology Analytics Section */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7C3AED", letterSpacing: "0.1em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#7C3AED", animation: "pulse 2s infinite" }} />
+            🧠 PSYCHOLOGY ANALYTICS
+          </div>
+
+          {psychology && psychology.totalTrackedTrades > 0 ? (
+            <>
+              {/* Psychology Score + Stats */}
+              <div style={{ display: "flex", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
+                <StatCard
+                  label="PSYCHOLOGY SCORE"
+                  value={`${psychology.psychologyScore}/100`}
+                  sub="Composite discipline rating"
+                  color={psychology.psychologyScore >= 70 ? colors.bull : psychology.psychologyScore >= 40 ? colors.gold : colors.bear}
+                  delay={0}
+                  icon={<span style={{ fontSize: 16 }}>🧠</span>}
+                />
+                <StatCard
+                  label="TRACKED TRADES"
+                  value={psychology.totalTrackedTrades}
+                  sub="With psychology data"
+                  color={colors.primary}
+                  delay={0.05}
+                />
+                {psychology.scoreBreakdown && (
+                  <>
+                    <StatCard
+                      label="PLAN ADHERENCE"
+                      value={`${psychology.scoreBreakdown.planAdherencePct}%`}
+                      sub="Trades from plan"
+                      color={parseFloat(psychology.scoreBreakdown.planAdherencePct) >= 70 ? colors.bull : colors.bear}
+                      delay={0.1}
+                    />
+                    <StatCard
+                      label="CALM TRADING"
+                      value={`${psychology.scoreBreakdown.calmTradingPct}%`}
+                      sub="Calm or Focused"
+                      color={parseFloat(psychology.scoreBreakdown.calmTradingPct) >= 50 ? colors.bull : colors.gold}
+                      delay={0.15}
+                    />
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+                {/* Mood vs Performance */}
+                <SectionCard title="Mood vs Performance" subtitle="WIN RATE BY EMOTIONAL STATE" delay={0.2} accentColor="#7C3AED">
+                  {psychology.moodAnalysis && psychology.moodAnalysis.length > 0 ? (
+                    <div>
+                      {psychology.moodAnalysis.map(m => (
+                        <div key={m.level} style={{ marginBottom: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{m.label}</span>
+                            <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(m.avgProfit) >= 0 ? colors.bull : colors.bear }}>
+                              ${parseFloat(m.avgProfit).toFixed(2)} avg
+                            </span>
+                          </div>
+                          <ProgressBar value={parseFloat(m.winRate)} max={100} color={parseFloat(m.winRate) >= 50 ? colors.bull : colors.bear} label={`${m.trades} trades • ${m.winRate}% WR`} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: colors.muted, textAlign: "center", padding: 20, fontSize: 12 }}>Start tagging your mood when logging trades</div>
+                  )}
+                </SectionCard>
+
+                {/* Confidence Calibration */}
+                <SectionCard title="Confidence Calibration" subtitle="ARE YOU CALIBRATED?" delay={0.25} accentColor={colors.gold}>
+                  {psychology.confidenceAnalysis && psychology.confidenceAnalysis.length > 0 ? (
+                    <div>
+                      {psychology.confidenceAnalysis.map(c => (
+                        <div key={c.level} style={{ marginBottom: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: c.level === "Overconfident" ? colors.bear : colors.primary }}>
+                              {c.level === "Overconfident" ? "🚩 " : ""}{c.level}
+                            </span>
+                            <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(c.avgProfit) >= 0 ? colors.bull : colors.bear }}>
+                              ${parseFloat(c.avgProfit).toFixed(2)} avg
+                            </span>
+                          </div>
+                          <ProgressBar value={parseFloat(c.winRate)} max={100} color={c.level === "Overconfident" && parseFloat(c.winRate) < 50 ? colors.bear : parseFloat(c.winRate) >= 50 ? colors.bull : colors.bear} label={`${c.trades} trades • ${c.winRate}% WR`} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: colors.muted, textAlign: "center", padding: 20, fontSize: 12 }}>Start tagging your confidence level</div>
+                  )}
+                </SectionCard>
+              </div>
+
+              <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+                {/* Emotional Tag Impact */}
+                <SectionCard title="Emotional Tag Impact" subtitle="HOW EMOTIONS AFFECT YOUR P&L" delay={0.3} accentColor="#7C3AED">
+                  {psychology.emotionalTagImpact && psychology.emotionalTagImpact.length > 0 ? (
+                    <div>
+                      {psychology.emotionalTagImpact.map(t => (
+                        <ListItem
+                          key={t.tag}
+                          label={`${t.emoji} ${t.tag}`}
+                          value={`${t.winRate}%`}
+                          color={parseFloat(t.avgProfit) >= 0 ? colors.bull : colors.bear}
+                          sub={`${t.trades} trades • Avg: $${t.avgProfit}`}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: colors.muted, textAlign: "center", padding: 20, fontSize: 12 }}>Tag your emotions when logging trades to see their impact</div>
+                  )}
+                </SectionCard>
+
+                {/* Would Retake Analysis */}
+                <SectionCard title="Would Retake Analysis" subtitle="HINDSIGHT ACCURACY" delay={0.35} accentColor={colors.primary}>
+                  {(psychology.wouldRetakeAnalysis?.yes || psychology.wouldRetakeAnalysis?.no) ? (
+                    <div>
+                      {psychology.wouldRetakeAnalysis.yes && (
+                        <div style={{ padding: 14, borderRadius: 10, border: `2px solid ${colors.bull}`, background: "rgba(13,158,110,0.05)", marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.bull, marginBottom: 8 }}>✅ Would Retake</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: colors.muted }}>Trades</span>
+                            <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>{psychology.wouldRetakeAnalysis.yes.trades}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: colors.muted }}>Win Rate</span>
+                            <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(psychology.wouldRetakeAnalysis.yes.winRate) >= 50 ? colors.bull : colors.bear }}>{psychology.wouldRetakeAnalysis.yes.winRate}%</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                            <span style={{ color: colors.muted }}>Avg P&L</span>
+                            <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(psychology.wouldRetakeAnalysis.yes.avgProfit) >= 0 ? colors.bull : colors.bear }}>${psychology.wouldRetakeAnalysis.yes.avgProfit}</span>
+                          </div>
+                        </div>
+                      )}
+                      {psychology.wouldRetakeAnalysis.no && (
+                        <div style={{ padding: 14, borderRadius: 10, border: `2px solid ${colors.bear}`, background: "rgba(214,59,59,0.05)" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.bear, marginBottom: 8 }}>❌ Would NOT Retake</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: colors.muted }}>Trades</span>
+                            <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>{psychology.wouldRetakeAnalysis.no.trades}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: colors.muted }}>Win Rate</span>
+                            <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(psychology.wouldRetakeAnalysis.no.winRate) >= 50 ? colors.bull : colors.bear }}>{psychology.wouldRetakeAnalysis.no.winRate}%</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                            <span style={{ color: colors.muted }}>Avg P&L</span>
+                            <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: parseFloat(psychology.wouldRetakeAnalysis.no.avgProfit) >= 0 ? colors.bull : colors.bear }}>${psychology.wouldRetakeAnalysis.no.avgProfit}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ color: colors.muted, textAlign: "center", padding: 20, fontSize: 12 }}>Use the "Would Retake" toggle when logging trades</div>
+                  )}
+                </SectionCard>
+              </div>
+            </>
+          ) : (
+            <div style={{
+              padding: "24px", borderRadius: 14, border: `1px dashed #7C3AED44`,
+              background: "rgba(124,58,237,0.03)", textAlign: "center",
+              animation: "fadeUp 0.5s ease both"
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🧠</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: colors.primary, marginBottom: 4 }}>Psychology Tracker</div>
+              <div style={{ fontSize: 12, color: colors.muted, maxWidth: 400, margin: "0 auto" }}>
+                Start tagging your mood, confidence, and emotions when logging trades to unlock psychology insights and your discipline score.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Back to Dashboard */}

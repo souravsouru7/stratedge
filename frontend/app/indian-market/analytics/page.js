@@ -316,7 +316,7 @@ export default function IndianAnalyticsPage() {
                 justifyContent: "center"
               }}
             >
-              <img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
             <div>
               <div
@@ -329,7 +329,7 @@ export default function IndianAnalyticsPage() {
                   lineHeight: 1
                 }}
               >
-                STRATEDGE
+                LOGNERA
               </div>
               <div
                 style={{

@@ -94,6 +94,32 @@ const indianTradeSchema = new mongoose.Schema(
       // 0–100 percentage of rules followed for this trade
       type: Number,
       default: null
+    },
+
+    // ── Psychology / Emotional Tracking ──
+    mood: {
+      // 1–5 scale (1 = stressed, 5 = peak focus)
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null
+    },
+
+    confidence: {
+      type: String,
+      enum: ["Low", "Medium", "High", "Overconfident", ""],
+      default: ""
+    },
+
+    emotionalTags: {
+      type: [String],
+      default: []
+    },
+
+    wouldRetake: {
+      type: String,
+      enum: ["Yes", "No", ""],
+      default: ""
     }
   },
   { timestamps: true }

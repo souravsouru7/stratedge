@@ -99,3 +99,45 @@ export const resetPassword = async (email, otp, password) => {
 
   return handleResponse(res, false);
 };
+
+export const submitFeedback = async (data) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const isFormData = data instanceof FormData;
+  
+  const res = await fetch(`${BASE_URL}/feedback`, {
+    method: "POST",
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: isFormData ? data : JSON.stringify(data)
+  });
+
+  return handleResponse(res, true);
+};
+
+// Payment APIs
+export const createPaymentOrder = async () => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(`${BASE_URL}/payments/order`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    }
+  });
+  return handleResponse(res, true);
+};
+
+export const verifyPayment = async (data) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(`${BASE_URL}/payments/verify`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res, true);
+};

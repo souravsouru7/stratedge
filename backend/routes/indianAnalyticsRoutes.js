@@ -12,7 +12,8 @@ const {
   getDrawdownAnalysis,
   getAIInsights,
   getAdvancedAnalytics,
-  getPnLBreakdown
+  getPnLBreakdown,
+  getPsychologyAnalytics
 } = require("../controllers/indianAnalyticsController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -32,5 +33,6 @@ router.get("/drawdown", cacheMiddleware(30), getDrawdownAnalysis);
 router.get("/ai-insights", cacheMiddleware(30), getAIInsights);
 router.get("/advanced", cacheMiddleware(30), getAdvancedAnalytics);
 router.get("/pnl-breakdown", cacheMiddleware(30), getPnLBreakdown);
+router.get("/psychology", cacheMiddleware(30), getPsychologyAnalytics);
 
 module.exports = router;

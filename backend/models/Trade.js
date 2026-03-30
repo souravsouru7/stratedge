@@ -10,14 +10,14 @@ const tradeSchema = new mongoose.Schema(
 
     pair: {
       type: String,
-      required: true
     },
 
     type: {
       type: String,
       enum: ["BUY", "SELL"],
-      required: true
     },
+
+    quantity: Number,
 
     lotSize: Number,
 
@@ -59,6 +59,89 @@ const tradeSchema = new mongoose.Schema(
       default: ""
     },
 
+    imageUrl: {
+      type: String,
+      default: ""
+    },
+
+    marketType: {
+      type: String,
+      default: "Forex"
+    },
+
+    broker: {
+      type: String,
+      default: ""
+    },
+
+    segment: {
+      type: String,
+      default: ""
+    },
+
+    instrumentType: {
+      type: String,
+      default: ""
+    },
+
+    strikePrice: Number,
+
+    expiryDate: {
+      type: String,
+      default: ""
+    },
+
+    extractedText: {
+      type: String,
+      default: ""
+    },
+
+    rawOCRText: {
+      type: String,
+      default: ""
+    },
+
+    aiRawResponse: {
+      type: String,
+      default: ""
+    },
+
+    parsedData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
+
+    extractionConfidence: {
+      type: Number,
+      default: 0
+    },
+
+    isValid: {
+      type: Boolean,
+      default: true
+    },
+
+    needsReview: {
+      type: Boolean,
+      default: false
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "processing", "completed", "failed"],
+      default: "pending"
+    },
+
+    error: {
+      type: String,
+      default: null
+    },
+
+    processedAt: {
+      type: Date,
+      default: null
+    },
+
     // Per-trade setup checklist: rules and how many were followed
     setupRules: [
       {
@@ -71,10 +154,62 @@ const tradeSchema = new mongoose.Schema(
       // 0–100 percentage of rules followed for this trade
       type: Number,
       default: null
+    },
+
+    // ── Psychology / Emotional Tracking ──
+    entryBasis: {
+      type: String,
+      enum: ["Plan", "Emotion", "Impulsive", "Custom", ""],
+      default: ""
+    },
+
+    entryBasisCustom: {
+      type: String,
+      default: ""
+    },
+
+    mood: {
+      // 1–5 scale (1 = stressed, 5 = peak focus)
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null
+    },
+
+    confidence: {
+      type: String,
+      enum: ["Low", "Medium", "High", "Overconfident", ""],
+      default: ""
+    },
+
+    emotionalTags: {
+      type: [String],
+      default: []
+    },
+
+    mistakeTag: {
+      type: String,
+      default: ""
+    },
+
+    lesson: {
+      type: String,
+      default: ""
+    },
+
+    wouldRetake: {
+      type: String,
+      enum: ["Yes", "No", ""],
+      default: ""
     }
 
   },
   { timestamps: true }
 );
+
+tradeSchema.index({ user: 1 });
+tradeSchema.index({ createdAt: -1 });
+tradeSchema.index({ strategy: 1 });
+tradeSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Trade", tradeSchema);

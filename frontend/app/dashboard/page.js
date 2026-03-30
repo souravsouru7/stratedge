@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getSummary } from "@/services/analyticsApi";
 import Link from "next/link";
@@ -461,6 +461,70 @@ function CreateTradeButton() {
   );
 }
 
+function WelcomeGuide({ onClose }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 2000,
+      background: "rgba(15,25,35,0.85)", backdropFilter: "blur(8px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+    }}>
+      <div style={{
+        background: "#FFFFFF", width: "100%", maxWidth: 550, borderRadius: 24,
+        padding: 40, border: "1px solid #E2E8F0", position: "relative",
+        boxShadow: "0 20px 50px rgba(0,0,0,0.3)", animation: "fadeUpNormal 0.6s ease"
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, color: "#0F1923", marginBottom: 8 }}>Welcome to StratEdge AI</h2>
+          <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>Your premium trading companion for performance analysis.</p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 24, marginBottom: 40 }}>
+          <div style={{ display: "flex", gap: 16 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#F0FDF4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📊</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0F1923" }}>Forex & Global Markets</div>
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Extract trades from MT4/MT5 screenshots using AI or log them manually for deep performance metrics.</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#FFF7ED", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🇮🇳</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0F1923" }}>Indian Market Ready</div>
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Seamlessly analyze NSE/BSE trades from Zerodha, Groww & more with our specialized AI extraction.</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🤖</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0F1923" }}>AI-Driven Insights</div>
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Get weekly reports, optimal trading window suggestions, and risk analysis to improve your edge.</div>
+            </div>
+          </div>
+        </div>
+
+        <button 
+          onClick={onClose}
+          style={{
+            width: "100%", padding: "18px", background: "linear-gradient(135deg, #0F1923 0%, #1a2d3d 100%)",
+            color: "#22C78E", border: "1px solid rgba(34,199,142,0.3)", borderRadius: 14,
+            fontSize: 14, fontWeight: 800, cursor: "pointer", letterSpacing: "0.08em",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)", transition: "all 0.2s"
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
+        >
+          START JOURNALING →
+        </button>
+
+        <style>{`
+          @keyframes fadeUpNormal { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────────────────────
    MAIN DASHBOARD
 ───────────────────────────────────────── */
@@ -469,22 +533,39 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
+  const [showWelcome, setShowWelcome] = useState(false);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     const data = await getSummary();
     setStats(data);
-  };
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) { router.push("/login"); return; }
-    setMounted(true);
-    fetchStats();
+    if (!token) { 
+      router.push("/login"); 
+      return; 
+    }
+    // Use requestAnimationFrame to avoid synchronous setState in effect
+    requestAnimationFrame(() => {
+      setMounted(true);
+      fetchStats();
+      
+      const hasSeen = localStorage.getItem("hasSeenWelcomeGuide");
+      if (!hasSeen) {
+        setShowWelcome(true);
+      }
+    });
     const tick = () => setTime(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }));
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, [router]);
+  }, []);
+
+  const closeWelcome = () => {
+    localStorage.setItem("hasSeenWelcomeGuide", "true");
+    setShowWelcome(false);
+  };
 
   const profitBull = stats ? parseFloat(stats.netProfit ?? stats.totalProfit) >= 0 : true;
   const winBull = stats ? parseFloat(stats.winRate) >= 50 : true;
@@ -511,6 +592,9 @@ export default function Dashboard() {
       {/* Candlestick BG */}
       <CandlestickBackground />
 
+      {/* Welcome Guide */}
+      {showWelcome && <WelcomeGuide onClose={closeWelcome} />}
+
       {/* Subtle overlay to unify bg */}
       <div style={{
         position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none",
@@ -529,10 +613,10 @@ export default function Dashboard() {
       }}>
         {/* Logo */}
         <Link href="/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+          <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
           <div>
             <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
-              STRATEDGE
+              LOGNERA
             </div>
             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
               FOREX AI JOURNAL
@@ -797,6 +881,12 @@ export default function Dashboard() {
                   icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 4h18M5 4v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4" />
                     <path d="M8 8h8M8 12h5M8 16h3" />
+                  </svg>}
+                />
+                <NavCard href="/support" label="Support & Help" sub="Contact admin / report bug" accentColor="#D63B3B" delay={0.52}
+                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>}
                 />
               </div>

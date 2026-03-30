@@ -24,4 +24,6 @@ jobs:
             cd ~/stratedge/backend
             git pull origin main
             npm install --production
-            pm2 restart "My App Name" || pm2 start server.js --name "My App Name"
+            
+            # Restart both server and OCR worker using PM2 ecosystem config
+            pm2 reload ecosystem.config.js --update-env || pm2 start ecosystem.config.js

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import "./mobile-optimizations.css";
 import Providers from "./providers";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -14,21 +15,21 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stratedge - AI Journal",
+  title: "LOGNERA - AI Journal",
   description: "Professional Trading Journal with AI Analytics",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/load.png", type: "image/png" },
+      { url: "/formobileand tabicon.png", type: "image/png" },
     ],
-    shortcut: "/load.png",
-    apple: "/load.png",
+    shortcut: "/formobileand tabicon.png",
+    apple: "/formobileand tabicon.png",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Stratedge",
-    startupImage: "/load.png",
+    title: "LOGNERA",
+    startupImage: "/formobileand tabicon.png",
   },
   formatDetection: {
     telephone: false,

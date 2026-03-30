@@ -1,16 +1,16 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { createTrade } from "@/services/tradeApi";
+import { createTrade, getTradeStatus, updateTrade } from "@/services/tradeApi";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import InstallPWA from "@/components/InstallPWA";
-import { API_URL } from "@/config/api";
 import { fetchSetups } from "@/services/setupApi";
+import { uploadTradeImage } from "@/services/uploadApi";
 
-/* ─────────────────────────────────────────
+/* -----------------------------------------
    LIGHT THEME DESIGN TOKENS
    Base bg:      #F0EEE9  (warm parchment)
    Card:         #FFFFFF
@@ -20,9 +20,9 @@ import { fetchSetups } from "@/services/setupApi";
    Text:         #0F1923 / #4A5568 / #94A3B8
    Border:       #E2E8F0
    Fonts:        Plus Jakarta Sans + JetBrains Mono
- ───────────────────────────────────────── */
+ ----------------------------------------- */
 
-/* ── CANDLESTICK BACKGROUND ── */
+/* -- CANDLESTICK BACKGROUND -- */
 function CandlestickBackground() {
   useEffect(() => {
     const canvas = document.getElementById("upload-bg-canvas");
@@ -72,7 +72,7 @@ function CandlestickBackground() {
   return <canvas id="upload-bg-canvas" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", opacity: 1, zIndex: 0, pointerEvents: "none" }} />;
 }
 
-/* ── TICKER TAPE — dark strip for contrast ── */
+/* -- TICKER TAPE — dark strip for contrast -- */
 const tickers = [
   { sym: "BTC", val: "+2.34%", bull: true }, { sym: "ETH", val: "-1.12%", bull: false },
   { sym: "AAPL", val: "+0.87%", bull: true }, { sym: "TSLA", val: "+4.20%", bull: true },
@@ -88,7 +88,7 @@ function TickerTape() {
         {items.map((t, i) => (
           <span key={i} style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>
             <span style={{ color: "#94A3B8", marginRight: 6 }}>{t.sym}</span>
-            <span style={{ color: t.bull ? "#22C78E" : "#F87171" }}>{t.bull ? "▲" : "▼"} {t.val}</span>
+            <span style={{ color: t.bull ? "#22C78E" : "#F87171" }}>{t.bull ? "?" : "?"} {t.val}</span>
           </span>
         ))}
       </div>
@@ -96,7 +96,7 @@ function TickerTape() {
   );
 }
 
-/* ── FILE UPLOAD ZONE ── */
+/* -- FILE UPLOAD ZONE -- */
 function FileUploadZone({ onFileSelect, selectedFile, onClear }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -167,13 +167,13 @@ function FileUploadZone({ onFileSelect, selectedFile, onClear }) {
   );
 }
 
-/* ── SHARED LABEL STYLE ── */
+/* -- SHARED LABEL STYLE -- */
 const labelStyle = {
   display: "block", fontSize: 10, fontWeight: 600, color: "#4A5568",
   letterSpacing: "0.1em", marginBottom: 7, fontFamily: "'JetBrains Mono',monospace",
 };
 
-/* ── SHARED INPUT BASE STYLE ── */
+/* -- SHARED INPUT BASE STYLE -- */
 const inputBase = {
   width: "100%", padding: "11px 14px", fontSize: 13,
   fontFamily: "'JetBrains Mono',monospace", color: "#0F1923",
@@ -220,7 +220,7 @@ function FormSelect({ label, name, value, onChange, options }) {
   );
 }
 
-/* ── SECTION CARD ── */
+/* -- SECTION CARD -- */
 function SectionCard({ accentColor = "#0D9E6E", title, subtitle, children, delay = 0, style = {} }) {
   return (
     <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", overflow: "hidden", boxShadow: "0 2px 12px rgba(15,25,35,0.06)", animation: `fadeUp 0.5s ease ${delay}s both`, marginBottom: 20, ...style }}>
@@ -237,7 +237,7 @@ function SectionCard({ accentColor = "#0D9E6E", title, subtitle, children, delay
 // Start with no static rules; rules will come from selected setup
 const DEFAULT_SETUP_RULES = [];
 
-/* ── QUALITY HELPER ── */
+/* -- QUALITY HELPER -- */
 function getSetupQuality(rules) {
   if (!rules || rules.length === 0) return null;
   const activeRules = rules.filter(r => r.label && r.label.trim().length > 0);
@@ -252,9 +252,9 @@ function getSetupQuality(rules) {
   return { label: "D", color: "#D63B3B", bg: "#FEF2F2" };
 }
 
-/* ─────────────────────────────────────────
+/* -----------------------------------------
    MAIN COMPONENT
- ───────────────────────────────────────── */
+ ----------------------------------------- */
 function UploadTradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -269,6 +269,8 @@ function UploadTradeContent() {
   const [extractedText, setExtractedText] = useState("");
   const [strategies, setStrategies] = useState([]);
   const [setupsLoading, setSetupsLoading] = useState(false);
+  const [jobId, setJobId] = useState("");
+  const [processingStatus, setProcessingStatus] = useState("");
 
   const marketType = pathname?.startsWith("/indian-market")
     ? MARKETS.INDIAN_MARKET
@@ -327,91 +329,38 @@ function UploadTradeContent() {
     };
   }, [marketType, mounted]);
 
-  const handleUpload = async () => {
-    if (!file) { setError("Please select an image file first"); return; }
-    setLoading(true); setError(null);
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("marketType", marketType); // Send marketType
-      if (marketType === MARKETS.INDIAN_MARKET) {
-        formData.append("broker", broker);
-      }
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/upload?marketType=${marketType}`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Upload failed"); }
-      const data = await res.json();
-      const p = data.parsedTrade || {};
-      setExtractedText(data.extractedText || "");
+  const applyProcessedTradeData = (payload) => {
+    const p = payload?.parsedData?.parsedTrade || payload?.parsedTrade || {};
+    const parsedTradesPayload = payload?.parsedData?.parsedTrades || payload?.parsedTrades || [];
+    const imageUrl = payload?.imageUrl || payload?.screenshot || "";
+    setExtractedText(payload?.extractedText || "");
 
-      const isInd = marketType === MARKETS.INDIAN_MARKET;
+    const isInd = marketType === MARKETS.INDIAN_MARKET;
 
-      if (isInd) {
-        // Use parsedTrades (multi-trade) if available
-        const multiTrades = data.parsedTrades || [];
-        if (multiTrades.length > 0) {
-          const tradeArr = multiTrades.map(t => {
-            const sym = (t.symbol || "").toUpperCase();
-            const strike = t.strike ? String(t.strike) : "";
-            const ot = (t.optionType || "CE").toUpperCase();
-            const pairBuilt = sym && strike ? `${sym} ${strike} ${ot}` : (sym || "");
-            return {
-              pair: pairBuilt,
-              action: "buy",
-              quantity: t.quantity != null ? String(t.quantity) : "",
-              profit: t.pnl != null ? String(t.pnl) : "",
-              entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
-              exitPrice: "",
-              optionType: ot,
-              screenshot: data.url,
-              segment: "F&O",
-              instrumentType: "OPTION",
-              strikePrice: strike,
-              tradeType: "INTRADAY",
-              strategy: "",
-              strategyCustom: "",
-              expiryDate: "",
-              riskRewardRatio: "",
-              riskRewardCustom: "",
-              entryBasis: "Plan",
-              entryBasisCustom: "",
-              notes: "",
-              setup: "",
-              mistakeTag: "",
-              lesson: "",
-              brokerage: "",
-              sttTaxes: "",
-              setupRules: [],
-            };
-          });
-          setTrades(tradeArr);
-          setSavedTrades(new Array(tradeArr.length).fill(false));
-          // Also set first trade as the single trade for backward compatibility
-          setTrade(tradeArr[0]);
-        } else {
-          // Fallback to single parsedTrade
-          const pairStr = (p.pair || "").trim().toUpperCase();
-          const optionTypeFromPair = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (p.optionType || "CE");
-          setTrade({
-            pair: p.pair || "",
-            action: (p.action || p.type || "BUY").toString().toUpperCase().slice(0, 4) === "SELL" ? "sell" : "buy",
-            quantity: p.quantity != null ? String(p.quantity) : "",
-            profit: p.profit != null && p.profit !== "" ? String(p.profit) : "",
-            entryPrice: p.entryPrice != null ? String(p.entryPrice) : "",
-            exitPrice: p.exitPrice != null ? String(p.exitPrice) : "",
-            optionType: optionTypeFromPair,
-            screenshot: data.url,
+    if (isInd) {
+      const multiTrades = parsedTradesPayload || [];
+      if (multiTrades.length > 0) {
+        const tradeArr = multiTrades.map(t => {
+          const sym = (t.symbol || "").toUpperCase();
+          const strike = t.strike ? String(t.strike) : "";
+          const ot = (t.optionType || "CE").toUpperCase();
+          const pairBuilt = sym && strike ? `${sym} ${strike} ${ot}` : (sym || "");
+          return {
+            pair: pairBuilt,
+            action: "buy",
+            quantity: t.quantity != null ? String(t.quantity) : "",
+            profit: t.pnl != null ? String(t.pnl) : "",
+            entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
+            exitPrice: "",
+            optionType: ot,
+            screenshot: imageUrl,
             segment: "F&O",
             instrumentType: "OPTION",
-            strikePrice: p.strikePrice != null ? String(p.strikePrice) : "",
+            strikePrice: strike,
             tradeType: "INTRADAY",
             strategy: "",
             strategyCustom: "",
-            expiryDate: p.expiryDate || "",
+            expiryDate: "",
             riskRewardRatio: "",
             riskRewardCustom: "",
             entryBasis: "Plan",
@@ -422,36 +371,164 @@ function UploadTradeContent() {
             lesson: "",
             brokerage: "",
             sttTaxes: "",
-          });
-          setTrades([]);
-        }
+            mood: null,
+            confidence: "",
+            emotionalTags: [],
+            wouldRetake: "",
+            setupRules: [],
+          };
+        });
+        setTrades(tradeArr);
+        setSavedTrades(new Array(tradeArr.length).fill(false));
+        setTrade(tradeArr[0]);
       } else {
+        const pairStr = (p.pair || "").trim().toUpperCase();
+        const optionTypeFromPair = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (p.optionType || "CE");
         setTrade({
           pair: p.pair || "",
-          action: p.action || p.type || "BUY",
-          lotSize: p.lotSize ? String(p.lotSize) : "",
-          entryPrice: p.entryPrice ? String(p.entryPrice) : "",
-          exitPrice: p.exitPrice ? String(p.exitPrice) : "",
-          stopLoss: p.stopLoss ? String(p.stopLoss) : "",
-          takeProfit: p.takeProfit ? String(p.takeProfit) : "",
-          profit: p.profit ? String(p.profit) : "",
-          commission: p.commission ? String(p.commission) : "",
-          swap: p.swap ? String(p.swap) : "",
-          balance: p.balance ? String(p.balance) : "",
+          action: (p.action || p.type || "BUY").toString().toUpperCase().slice(0, 4) === "SELL" ? "sell" : "buy",
+          quantity: p.quantity != null ? String(p.quantity) : "",
+          profit: p.profit != null && p.profit !== "" ? String(p.profit) : "",
+          entryPrice: p.entryPrice != null ? String(p.entryPrice) : "",
+          exitPrice: p.exitPrice != null ? String(p.exitPrice) : "",
+          optionType: optionTypeFromPair,
+          screenshot: imageUrl,
+          segment: "F&O",
+          instrumentType: "OPTION",
+          strikePrice: p.strikePrice != null ? String(p.strikePrice) : "",
+          tradeType: "INTRADAY",
+          strategy: "",
+          strategyCustom: "",
+          expiryDate: p.expiryDate || "",
+          riskRewardRatio: "",
+          riskRewardCustom: "",
+          entryBasis: "Plan",
+          entryBasisCustom: "",
+          notes: "",
+          setup: "",
+          mistakeTag: "",
+          lesson: "",
+          brokerage: "",
+          sttTaxes: "",
+          mood: null,
+          confidence: "",
+          emotionalTags: [],
+          wouldRetake: "",
+        });
+        setTrades([]);
+      }
+    } else {
+      const multiTrades = parsedTradesPayload || [];
+      if (multiTrades.length > 1) {
+        const tradeArr = multiTrades.map(t => ({
+          pair: t.pair || t.symbol || "",
+          action: (t.action || t.type || "buy").toString().toLowerCase(),
+          lotSize: t.lotSize != null ? String(t.lotSize) : "",
+          entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
+          exitPrice: t.exitPrice != null ? String(t.exitPrice) : "",
+          stopLoss: t.stopLoss != null ? String(t.stopLoss) : "",
+          takeProfit: t.takeProfit != null ? String(t.takeProfit) : "",
+          profit: t.profit != null ? String(t.profit) : (t.pnl != null ? String(t.pnl) : ""),
+          commission: t.commission != null ? String(t.commission) : "",
+          swap: t.swap != null ? String(t.swap) : "",
+          balance: t.balance != null ? String(t.balance) : "",
+          session: t.session || "",
+          strategy: "",
+          strategyCustom: "",
+          notes: "",
+          screenshot: imageUrl,
+          segment: t.segment || "Equity",
+          instrumentType: t.instrumentType || "EQUITY",
+          quantity: t.quantity != null ? String(t.quantity) : "",
+          strikePrice: t.strikePrice != null ? String(t.strikePrice) : "",
+          expiryDate: t.expiryDate || "",
+          brokerage: "",
+          sttTaxes: "",
+          entryBasis: "Plan",
+          entryBasisCustom: "",
+          mood: null,
+          confidence: "",
+          emotionalTags: [],
+          wouldRetake: "",
+          setupRules: [],
+        }));
+        setTrades(tradeArr);
+        setSavedTrades(new Array(tradeArr.length).fill(false));
+        setTrade(tradeArr[0]);
+      } else {
+        setTrades([]);
+        setSavedTrades([]);
+        setTrade({
+          pair: p.pair || "",
+          action: (p.action || p.type || "BUY").toString().toLowerCase(),
+          lotSize: p.lotSize != null ? String(p.lotSize) : "",
+          entryPrice: p.entryPrice != null ? String(p.entryPrice) : "",
+          exitPrice: p.exitPrice != null ? String(p.exitPrice) : "",
+          stopLoss: p.stopLoss != null ? String(p.stopLoss) : "",
+          takeProfit: p.takeProfit != null ? String(p.takeProfit) : "",
+          profit: p.profit != null ? String(p.profit) : "",
+          commission: p.commission != null ? String(p.commission) : "",
+          swap: p.swap != null ? String(p.swap) : "",
+          balance: p.balance != null ? String(p.balance) : "",
           session: p.session || "",
           strategy: "",
           notes: "",
-          screenshot: data.url,
+          screenshot: imageUrl,
           segment: p.segment || "Equity",
           instrumentType: p.instrumentType || "EQUITY",
-          quantity: p.quantity ? String(p.quantity) : "",
-          strikePrice: p.strikePrice ? String(p.strikePrice) : "",
+          quantity: p.quantity != null ? String(p.quantity) : "",
+          strikePrice: p.strikePrice != null ? String(p.strikePrice) : "",
           expiryDate: p.expiryDate || "",
           brokerage: "",
           sttTaxes: "",
           entryBasis: "Plan",
           entryBasisCustom: "",
+          mood: null,
+          confidence: "",
+          emotionalTags: [],
+          wouldRetake: "",
         });
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) { setError("Please select an image file first"); return; }
+    if (marketType === MARKETS.INDIAN_MARKET && (!broker || broker === "AUTO")) {
+      setError("Please select your broker for Indian market screenshots so extraction stays accurate.");
+      return;
+    }
+    setLoading(true); setError(null);
+    try {
+      const uploadResponse = await uploadTradeImage({
+        file,
+        marketType,
+        broker: marketType === MARKETS.INDIAN_MARKET ? broker : "",
+      });
+
+      setJobId(uploadResponse.jobId || "");
+      setProcessingStatus(uploadResponse.status || "pending");
+
+      let completed = false;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const statusResponse = await getTradeStatus(uploadResponse.jobId);
+        setProcessingStatus(statusResponse.status || "pending");
+
+        if (statusResponse.status === "completed" && statusResponse.data) {
+          applyProcessedTradeData(statusResponse.data);
+          completed = true;
+          break;
+        }
+
+        if (statusResponse.status === "failed") {
+          throw new Error(statusResponse.error || "Failed to process trade. Please try again.");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+      }
+
+      if (!completed) {
+        throw new Error("Processing is taking longer than expected. Please make sure the worker is running.");
       }
     } catch (err) {
       setError(err.message || "Failed to upload image. Please try again.");
@@ -537,33 +614,65 @@ function UploadTradeContent() {
       const followedCount = activeRules.filter(r => r.followed).length;
       const setupScore = activeRules.length > 0 ? Math.round((followedCount / activeRules.length) * 100) : null;
 
-      const tradeData = {
-        pair: t.pair,
-        type: (t.action || "BUY").toUpperCase(),
-        optionType: (t.optionType || "CE").toUpperCase(),
-        quantity: t.quantity ? parseFloat(t.quantity) : undefined,
-        profit: t.profit ? parseFloat(t.profit) : undefined,
-        strikePrice: t.strikePrice ? parseFloat(t.strikePrice) : undefined,
-        underlying: t.pair ? t.pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim() : undefined,
-        screenshot: t.screenshot,
-        entryPrice: t.entryPrice ? parseFloat(t.entryPrice) : undefined,
-        exitPrice: t.exitPrice ? parseFloat(t.exitPrice) : undefined,
-        tradeType: t.tradeType || undefined,
-        strategy: t.strategy === "Custom" ? (t.strategyCustom?.trim() || "Custom") : (t.strategy || undefined),
-        expiryDate: t.expiryDate || undefined,
-        riskRewardRatio: t.riskRewardRatio || undefined,
-        entryBasis: t.entryBasis || "Plan",
-        entryBasisCustom: t.entryBasis === "Custom" ? t.entryBasisCustom : undefined,
-        notes: t.notes || undefined,
-        setup: t.setup || undefined,
-        mistakeTag: t.mistakeTag || undefined,
-        lesson: t.lesson || undefined,
-        brokerage: t.brokerage ? parseFloat(t.brokerage) : undefined,
-        sttTaxes: t.sttTaxes ? parseFloat(t.sttTaxes) : undefined,
-        setupRules: activeRules.map(({ label, followed }) => ({ label: String(label).trim(), followed })),
-        setupScore,
-      };
-      const result = await createTrade(tradeData, marketType);
+      const tradeData = isInd
+        ? {
+            pair: t.pair,
+            type: (t.action || "BUY").toUpperCase(),
+            optionType: (t.optionType || "CE").toUpperCase(),
+            quantity: t.quantity ? parseFloat(t.quantity) : undefined,
+            profit: t.profit ? parseFloat(t.profit) : undefined,
+            strikePrice: t.strikePrice ? parseFloat(t.strikePrice) : undefined,
+            underlying: t.pair ? t.pair.replace(/\s+\d+\s*(CE|PE)$/i, "").trim() : undefined,
+            screenshot: t.screenshot,
+            entryPrice: t.entryPrice ? parseFloat(t.entryPrice) : undefined,
+            exitPrice: t.exitPrice ? parseFloat(t.exitPrice) : undefined,
+            tradeType: t.tradeType || undefined,
+            strategy: t.strategy === "Custom" ? (t.strategyCustom?.trim() || "Custom") : (t.strategy || undefined),
+            expiryDate: t.expiryDate || undefined,
+            riskRewardRatio: t.riskRewardRatio || undefined,
+            entryBasis: t.entryBasis || "Plan",
+            entryBasisCustom: t.entryBasis === "Custom" ? t.entryBasisCustom : undefined,
+            notes: t.notes || undefined,
+            setup: t.setup || undefined,
+            mistakeTag: t.mistakeTag || undefined,
+            lesson: t.lesson || undefined,
+            brokerage: t.brokerage ? parseFloat(t.brokerage) : undefined,
+            sttTaxes: t.sttTaxes ? parseFloat(t.sttTaxes) : undefined,
+            mood: t.mood ?? undefined,
+            confidence: t.confidence || undefined,
+            emotionalTags: Array.isArray(t.emotionalTags) ? t.emotionalTags : undefined,
+            wouldRetake: t.wouldRetake || undefined,
+            setupRules: activeRules.map(({ label, followed }) => ({ label: String(label).trim(), followed })),
+            setupScore,
+          }
+        : {
+            pair: t.pair,
+            type: (t.action || "BUY").toUpperCase(),
+            lotSize: t.lotSize ? parseFloat(t.lotSize) : undefined,
+            entryPrice: t.entryPrice ? parseFloat(t.entryPrice) : undefined,
+            exitPrice: t.exitPrice ? parseFloat(t.exitPrice) : undefined,
+            stopLoss: t.stopLoss ? parseFloat(t.stopLoss) : undefined,
+            takeProfit: t.takeProfit ? parseFloat(t.takeProfit) : undefined,
+            profit: t.profit ? parseFloat(t.profit) : undefined,
+            commission: t.commission ? parseFloat(t.commission) : undefined,
+            swap: t.swap ? parseFloat(t.swap) : undefined,
+            balance: t.balance ? parseFloat(t.balance) : undefined,
+            session: t.session || undefined,
+            strategy: t.strategy === "Custom" ? (t.strategyCustom?.trim() || "Custom") : (t.strategy || undefined),
+            entryBasis: t.entryBasis || "Plan",
+            entryBasisCustom: t.entryBasis === "Custom" ? t.entryBasisCustom : undefined,
+            notes: t.notes || undefined,
+            screenshot: t.screenshot || undefined,
+            mood: t.mood ?? undefined,
+            confidence: t.confidence || undefined,
+            emotionalTags: Array.isArray(t.emotionalTags) ? t.emotionalTags : undefined,
+            wouldRetake: t.wouldRetake || undefined,
+            setupRules: activeRules.map(({ label, followed }) => ({ label: String(label).trim(), followed })),
+            setupScore,
+          };
+      const result = jobId && index === 0
+        ? await updateTrade(jobId, tradeData, marketType)
+        : await createTrade(tradeData, marketType);
       if (result && result._id) {
         const updated = [...savedTrades];
         updated[index] = true;
@@ -608,6 +717,10 @@ function UploadTradeContent() {
         riskRewardCustom: trade.riskRewardCustom || undefined,
         entryBasis: trade.entryBasis || "Plan",
         entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : undefined,
+        mood: trade.mood ?? undefined,
+        confidence: trade.confidence || undefined,
+        emotionalTags: Array.isArray(trade.emotionalTags) ? trade.emotionalTags : undefined,
+        wouldRetake: trade.wouldRetake || undefined,
         setupRules: activeRules.map(({ label, followed }) => ({ label: label.trim(), followed })),
         setupScore,
       };
@@ -632,7 +745,9 @@ function UploadTradeContent() {
         tradeData.swap = trade.swap ? parseFloat(trade.swap) : undefined;
       }
 
-      const result = await createTrade(tradeData, marketType);
+      const result = !isInd && jobId
+        ? await updateTrade(jobId, tradeData, marketType)
+        : await createTrade(tradeData, marketType);
 
       if (result && result._id) {
         setSaved(true);
@@ -673,7 +788,7 @@ function UploadTradeContent() {
     setSetupRules(prev => prev.map(r => ({ ...r, followed: false })));
   };
 
-  /* ── step progress state ── */
+  /* -- step progress state -- */
   const steps = [
     { label: "Upload", done: !!file },
     { label: "Extract", done: !!trade },
@@ -694,7 +809,7 @@ function UploadTradeContent() {
       {/* Green glow bottom-right */}
       <div style={{ position: "fixed", bottom: -100, right: -60, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(13,158,110,0.06) 0%,transparent 70%)", zIndex: 1, pointerEvents: "none" }} />
 
-      {/* ── HEADER ── */}
+      {/* -- HEADER -- */}
       <header style={{ position: "relative", zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E2E8F0", boxShadow: "0 1px 12px rgba(15,25,35,0.06)" }}>
 
         {/* Left: back + logo */}
@@ -725,7 +840,7 @@ function UploadTradeContent() {
             <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/logo.png" alt="Stratedge" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
             <div>
               <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>STRATEDGE</div>
-              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>AI JOURNAL {isInd ? "🇮🇳" : "🌍"}</div>
+              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>AI JOURNAL {isInd ? "????" : "??"}</div>
             </div>
           </Link>
         </div>
@@ -786,7 +901,7 @@ function UploadTradeContent() {
 
       <TickerTape />
 
-      {/* ── MAIN ── */}
+      {/* -- MAIN -- */}
       <main style={{ position: "relative", zIndex: 5, padding: "28px 20px", maxWidth: 900, margin: "0 auto", opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(16px)", transition: "all 0.55s cubic-bezier(0.22,1,0.36,1)" }}>
 
         {/* Page title + step progress */}
@@ -819,7 +934,7 @@ function UploadTradeContent() {
           </div>
         </div>
 
-        {/* ── UPLOAD CARD ── */}
+        {/* -- UPLOAD CARD -- */}
         <SectionCard accentColor={isInd ? "#1B5E20" : "#B8860B"} title="Upload Screenshot" subtitle={isInd ? "DROP YOUR OPTIONS TRADE SCREENSHOT (BROKER APP)" : "DROP YOUR TRADE SCREENSHOT TO BEGIN AI EXTRACTION"} delay={0.05}>
 
           <FileUploadZone selectedFile={file} onFileSelect={f => { setFile(f); setError(null); }} onClear={() => { setFile(null); setError(null); }} />
@@ -828,12 +943,12 @@ function UploadTradeContent() {
           {isInd && (
             <div style={{ marginTop: 14 }}>
               <FormSelect
-                label="BROKER (OPTIONAL)"
+                label="BROKER (REQUIRED FOR ACCURATE EXTRACTION)"
                 name="broker"
                 value={broker}
                 onChange={(e) => setBroker(e.target.value)}
                 options={[
-                  { value: "AUTO", label: "Auto-detect" },
+                  { value: "AUTO", label: "Select broker..." },
                   { value: "Zerodha", label: "Zerodha (Kite)" },
                   { value: "Upstox", label: "Upstox" },
                   { value: "Angel One", label: "Angel One" },
@@ -847,12 +962,12 @@ function UploadTradeContent() {
                 ]}
               />
               <div style={{ marginTop: 6, fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
-                If extraction is wrong, pick your broker to apply the right screen template.
+                Broker-specific extraction is now enabled for Indian market screenshots. Pick the exact broker for the best result.
               </div>
             </div>
           )}
 
-          {/* ── INDIAN OPTIONS HINT (before file selected) ── */}
+          {/* -- INDIAN OPTIONS HINT (before file selected) -- */}
           {isInd && !file && (
             <div style={{ marginTop: 16, borderRadius: 10, border: "1px solid #E2E8F0", overflow: "hidden", background: "#F8FAFC" }}>
               <div style={{ padding: "10px 14px", background: "linear-gradient(90deg,rgba(27,94,32,0.08),rgba(27,94,32,0.02))", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 8 }}>
@@ -872,7 +987,7 @@ function UploadTradeContent() {
             </div>
           )}
 
-          {/* ── SAMPLE IMAGE HINT (Forex only, before file selected) ── */}
+          {/* -- SAMPLE IMAGE HINT (Forex only, before file selected) -- */}
           {!isInd && !file && (
             <div style={{ marginTop: 16, borderRadius: 10, border: "1px solid #E2E8F0", overflow: "hidden", background: "#F8FAFC" }}>
               <div style={{ padding: "10px 14px", background: "linear-gradient(90deg,rgba(184,134,11,0.07),rgba(184,134,11,0.02))", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 8 }}>
@@ -901,12 +1016,12 @@ function UploadTradeContent() {
                     Upload your <strong>MT5 trade history screenshot</strong>. Make sure pair, lot size, entry/exit prices &amp; profit are visible.
                   </p>
                   <p style={{ fontSize: 10, color: "#B8860B", fontFamily: "'JetBrains Mono',monospace", marginTop: 5, letterSpacing: "0.04em", cursor: "pointer" }} onClick={() => setShowSample(true)}>
-                    🔍 Click image to expand
+                    ?? Click image to expand
                   </p>
                 </div>
               </div>
 
-              {/* ── LIGHTBOX MODAL ── */}
+              {/* -- LIGHTBOX MODAL -- */}
               {showSample && (
                 <div
                   onClick={() => setShowSample(false)}
@@ -963,26 +1078,34 @@ function UploadTradeContent() {
           >
             {(!loading && file) && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.15) 50%,transparent 60%)", animation: "shimmer 2.5s linear infinite" }} />}
             {loading ? (
-              <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>EXTRACTING TRADE DATA...</>
+              <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>{processingStatus === "pending" ? "UPLOAD RECEIVED..." : processingStatus === "processing" ? "PROCESSING TRADE..." : "EXTRACTING TRADE DATA..."}</>
             ) : (
               <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>EXTRACT TRADE DATA</>
             )}
           </button>
         </SectionCard>
 
-        {/* ── LOADING CARD ── */}
+        {/* -- LOADING CARD -- */}
         {loading && (
           <SectionCard accentColor="#B8860B" title="" subtitle="" delay={0.1}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 14 }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#B8860B" strokeWidth="2.5" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-              <div style={{ fontSize: 12, color: "#94A3B8", letterSpacing: "0.12em", fontFamily: "'JetBrains Mono',monospace" }}>EXTRACTING TRADE DATA...</div>
-              <div style={{ fontSize: 11, color: "#CBD5E1", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>AI is reading your screenshot</div>
+              <div style={{ fontSize: 12, color: "#94A3B8", letterSpacing: "0.12em", fontFamily: "'JetBrains Mono',monospace" }}>
+                {processingStatus === "pending" ? "UPLOAD RECEIVED..." : processingStatus === "processing" ? "PROCESSING TRADE..." : "EXTRACTING TRADE DATA..."}
+              </div>
+              <div style={{ fontSize: 11, color: "#CBD5E1", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                {processingStatus === "pending"
+                  ? `Job queued${jobId ? ` · ${jobId}` : ""}`
+                  : processingStatus === "processing"
+                    ? "OCR and AI are reading your screenshot"
+                    : "AI is reading your screenshot"}
+              </div>
             </div>
           </SectionCard>
         )}
 
-        {/* ── MULTI-TRADE CARDS (Indian Market with multiple trades) ── */}
-        {isInd && trades.length > 1 && (
+        {/* -- MULTI-TRADE CARDS -- */}
+        {trades.length > 1 && (
           <>
             {/* Overall P&L (frontend-only, not stored) */}
             {(() => {
@@ -992,7 +1115,7 @@ function UploadTradeContent() {
               }, 0);
               const isProfit = totalPnl >= 0;
               const formatted = Number.isFinite(totalPnl)
-                ? (totalPnl >= 0 ? "₹" : "-₹") + Math.abs(totalPnl).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                ? `${totalPnl >= 0 ? "+" : "-"}${isInd ? "₹" : ""}${Math.abs(totalPnl).toLocaleString(isInd ? "en-IN" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : "—";
               return (
                 <SectionCard accentColor={isProfit ? "#0D9E6E" : "#D63B3B"} title="Overall P&L" subtitle={`${formatted} on ${trades.length} positions · Any broker · For reference only (not saved)`} delay={0.08}>
@@ -1027,18 +1150,38 @@ function UploadTradeContent() {
             </SectionCard>
 
             {trades.map((t, idx) => (
-              <SectionCard key={idx} accentColor={savedTrades[idx] ? "#0D9E6E" : "#B8860B"} title={`Trade ${idx + 1}: ${t.pair || "Unknown"}`} subtitle={savedTrades[idx] ? "✅ SAVED" : `P&L: ${t.profit || "—"}`} delay={0.1 + idx * 0.08}>
+              <SectionCard key={idx} accentColor={savedTrades[idx] ? "#0D9E6E" : "#B8860B"} title={`Trade ${idx + 1}: ${t.pair || "Unknown"}`} subtitle={savedTrades[idx] ? "? SAVED" : `P&L: ${t.profit || "—"}`} delay={0.1 + idx * 0.08}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <FormInput label="SYMBOL" name="pair" value={t.pair} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. NIFTY 26100 CE" />
-                  </div>
-                  <FormSelect label="CE / PE" name="optionType" value={t.optionType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "CE", label: "CE" }, { value: "PE", label: "PE" }]} />
-                  <FormSelect label="BUY / SELL" name="action" value={t.action} onChange={e => handleTradeChange(idx, e)} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
-                  {isFilled(t.quantity) && <FormInput label="QTY (lots)" name="quantity" value={t.quantity} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 3" />}
-                  {isFilled(t.profit) && <FormInput label="PROFIT / LOSS (₹)" name="profit" value={t.profit} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 1500 or -500" />}
-                  {isFilled(t.entryPrice) && <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={t.entryPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 85.50" />}
-                  {isFilled(t.exitPrice) && <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={t.exitPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 120" />}
-                  {isFilled(t.tradeType) && <FormSelect label="TRADE TYPE" name="tradeType" value={t.tradeType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />}
+                  {isInd ? (
+                    <>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <FormInput label="SYMBOL" name="pair" value={t.pair} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. NIFTY 26100 CE" />
+                      </div>
+                      <FormSelect label="CE / PE" name="optionType" value={t.optionType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "CE", label: "CE" }, { value: "PE", label: "PE" }]} />
+                      <FormSelect label="BUY / SELL" name="action" value={t.action} onChange={e => handleTradeChange(idx, e)} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
+                      {isFilled(t.quantity) && <FormInput label="QTY (lots)" name="quantity" value={t.quantity} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 3" />}
+                      {isFilled(t.profit) && <FormInput label="PROFIT / LOSS" name="profit" value={t.profit} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 1500 or -500" />}
+                      {isFilled(t.entryPrice) && <FormInput label="ENTRY PREMIUM" name="entryPrice" value={t.entryPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 85.50" />}
+                      {isFilled(t.exitPrice) && <FormInput label="EXIT PREMIUM" name="exitPrice" value={t.exitPrice} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. 120" />}
+                      {isFilled(t.tradeType) && <FormSelect label="TRADE TYPE" name="tradeType" value={t.tradeType} onChange={e => handleTradeChange(idx, e)} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />}
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <FormInput label="TRADING PAIR" name="pair" value={t.pair} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. EURUSD.X" />
+                      </div>
+                      <FormSelect label="ACTION" name="action" value={t.action} onChange={e => handleTradeChange(idx, e)} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
+                      {isFilled(t.lotSize) && <FormInput label="LOT SIZE" name="lotSize" value={t.lotSize} onChange={e => handleTradeChange(idx, e)} placeholder="0.01" />}
+                      {isFilled(t.entryPrice) && <FormInput label="ENTRY PRICE" name="entryPrice" value={t.entryPrice} onChange={e => handleTradeChange(idx, e)} placeholder="1.12345" />}
+                      {isFilled(t.exitPrice) && <FormInput label="EXIT PRICE" name="exitPrice" value={t.exitPrice} onChange={e => handleTradeChange(idx, e)} placeholder="1.12390" />}
+                      {isFilled(t.profit) && <FormInput label="PROFIT" name="profit" value={t.profit} onChange={e => handleTradeChange(idx, e)} placeholder="91.45" />}
+                      {isFilled(t.stopLoss) && <FormInput label="STOP LOSS" name="stopLoss" value={t.stopLoss} onChange={e => handleTradeChange(idx, e)} placeholder="1.12300" />}
+                      {isFilled(t.takeProfit) && <FormInput label="TAKE PROFIT" name="takeProfit" value={t.takeProfit} onChange={e => handleTradeChange(idx, e)} placeholder="1.12500" />}
+                      {isFilled(t.commission) && <FormInput label="COMMISSION" name="commission" value={t.commission} onChange={e => handleTradeChange(idx, e)} placeholder="-7.45" />}
+                      {isFilled(t.balance) && <FormInput label="BALANCE" name="balance" value={t.balance} onChange={e => handleTradeChange(idx, e)} placeholder="-117.90" />}
+                      {isFilled(t.session) && <FormSelect label="SESSION" name="session" value={t.session} onChange={e => handleTradeChange(idx, e)} options={[{ value: "Asian", label: "Asian" }, { value: "London", label: "London" }, { value: "New York", label: "New York" }]} />}
+                    </>
+                  )}
                   <FormSelect
                     label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
                     name="strategy"
@@ -1055,12 +1198,77 @@ function UploadTradeContent() {
                   )}
                   {isFilled(t.expiryDate) && <FormInput label="EXPIRY DATE" name="expiryDate" value={t.expiryDate} onChange={e => handleTradeChange(idx, e)} placeholder="YYYY-MM-DD" />}
                   {isFilled(t.entryBasis) && <FormSelect label="ENTRY BASIS" name="entryBasis" value={t.entryBasis} onChange={e => handleTradeChange(idx, e)} options={[{ value: "Plan", label: "Rule Based / Plan" }, { value: "Emotion", label: "Emotional" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom Basis" }]} />}
-                  {isFilled(t.riskRewardRatio) && <FormSelect label="RISK : REWARD" name="riskRewardRatio" value={t.riskRewardRatio} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }]} />}
-                  {isFilled(t.setup) && <FormInput label="SETUP / PATTERN" name="setup" value={t.setup} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Breakout above 26200" />}
-                  {isFilled(t.mistakeTag) && <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={t.mistakeTag} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />}
-                  {isFilled(t.lesson) && <FormInput label="LESSON (one line)" name="lesson" value={t.lesson} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Never add to a losing position" />}
+                  {isInd && isFilled(t.riskRewardRatio) && <FormSelect label="RISK : REWARD" name="riskRewardRatio" value={t.riskRewardRatio} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "Select..." }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }]} />}
+                  {isInd && isFilled(t.setup) && <FormInput label="SETUP / PATTERN" name="setup" value={t.setup} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Breakout above 26200" />}
+                  {isInd && isFilled(t.mistakeTag) && <FormSelect label="MISTAKE (if any)" name="mistakeTag" value={t.mistakeTag} onChange={e => handleTradeChange(idx, e)} options={[{ value: "", label: "None" }, { value: "Overtraded", label: "Overtraded" }, { value: "Held too long", label: "Held too long" }, { value: "Exited early", label: "Exited early" }, { value: "Wrong strike", label: "Wrong strike" }, { value: "Revenge trade", label: "Revenge trade" }, { value: "No stop", label: "No stop" }, { value: "Other", label: "Other" }]} />}
+                  {isInd && isFilled(t.lesson) && <FormInput label="LESSON (one line)" name="lesson" value={t.lesson} onChange={e => handleTradeChange(idx, e)} placeholder="e.g. Never add to a losing position" />}
                 </div>
                 <div style={{ marginBottom: 14 }}>
+                  <div style={{ background: "#FFFFFF", borderRadius: 12, padding: 20, border: "1px solid #E2E8F0", marginBottom: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#0F1923", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                      <span>🧠</span> TRADE PSYCHOLOGY
+                      <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", background: "#F8FAFC", padding: "2px 6px", borderRadius: 4 }}>OPTIONAL</span>
+                    </div>
+
+                    <div style={{ marginBottom: 18 }}>
+                      <label style={{ ...labelStyle, marginBottom: 8 }}>HOW ARE YOU FEELING?</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {[{ emoji: "😰", val: 1, label: "Stressed" }, { emoji: "😟", val: 2, label: "Anxious" }, { emoji: "😐", val: 3, label: "Neutral" }, { emoji: "😊", val: 4, label: "Good" }, { emoji: "🔥", val: 5, label: "Peak" }].map(m => (
+                          <button key={m.val} type="button" onClick={() => setTrades(prev => prev.map((tradeItem, tradeIndex) => tradeIndex === idx ? { ...tradeItem, mood: tradeItem.mood === m.val ? null : m.val } : tradeItem))}
+                            style={{
+                              flex: 1, padding: "10px 4px", borderRadius: 10, cursor: "pointer", textAlign: "center", transition: "all 0.2s",
+                              border: t.mood === m.val ? "1.5px solid #0D9E6E" : "1px solid #E2E8F0",
+                              background: t.mood === m.val ? "rgba(13,158,110,0.06)" : "#F8FAFC",
+                              transform: t.mood === m.val ? "scale(1.04)" : "scale(1)",
+                            }}>
+                            <div style={{ fontSize: 20 }}>{m.emoji}</div>
+                            <div style={{ fontSize: 10, color: t.mood === m.val ? "#0D9E6E" : "#64748B", fontWeight: 700, marginTop: 4, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{m.label}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 18 }}>
+                      <FormSelect label="CONFIDENCE LEVEL" name="confidence" value={t.confidence || ""} onChange={e => handleTradeChange(idx, e)} options={[{ value: "Low", label: "Low — Unsure about this setup" }, { value: "Medium", label: "Medium — Decent setup" }, { value: "High", label: "High — Strong conviction" }, { value: "Overconfident", label: "Overconfident — Can't lose 🚩" }]} />
+                    </div>
+
+                    <div style={{ marginBottom: 18 }}>
+                      <label style={{ ...labelStyle, marginBottom: 8 }}>EMOTIONAL TAGS</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"].map(tag => {
+                          const selected = (t.emotionalTags || []).includes(tag);
+                          return (
+                            <button key={tag} type="button" onClick={() => setTrades(prev => prev.map((tradeItem, tradeIndex) => tradeIndex === idx ? { ...tradeItem, emotionalTags: selected ? (tradeItem.emotionalTags || []).filter(x => x !== tag) : [...(tradeItem.emotionalTags || []), tag] } : tradeItem))}
+                              style={{
+                                padding: "6px 14px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                border: selected ? "1px solid #0D9E6E" : "1px solid #E2E8F0",
+                                background: selected ? "rgba(13,158,110,0.08)" : "#FFFFFF",
+                                color: selected ? "#0D9E6E" : "#64748B",
+                              }}>
+                              {tag === "FOMO" ? "😨 FOMO" : tag === "Revenge" ? "😡 Revenge" : tag === "Fear" ? "😰 Fear" : tag === "Greed" ? "🤑 Greed" : tag === "Calm" ? "🧘 Calm" : tag === "Bored" ? "😴 Bored" : tag === "Focused" ? "🎯 Focused" : "😤 Frustrated"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ ...labelStyle, marginBottom: 8 }}>WOULD YOU TAKE THIS TRADE AGAIN?</label>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        {[{ val: "Yes", icon: "✅", label: "Yes" }, { val: "No", icon: "❌", label: "No" }].map(option => (
+                          <button key={option.val} type="button" onClick={() => setTrades(prev => prev.map((tradeItem, tradeIndex) => tradeIndex === idx ? { ...tradeItem, wouldRetake: tradeItem.wouldRetake === option.val ? "" : option.val } : tradeItem))}
+                            style={{
+                              flex: 1, padding: "10px", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.2s", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                              border: t.wouldRetake === option.val ? `1.5px solid ${option.val === "Yes" ? "#0D9E6E" : "#D63B3B"}` : "1px solid #E2E8F0",
+                              background: t.wouldRetake === option.val ? (option.val === "Yes" ? "rgba(13,158,110,0.06)" : "rgba(214,59,59,0.06)") : "#F8FAFC",
+                              color: t.wouldRetake === option.val ? (option.val === "Yes" ? "#0D9E6E" : "#D63B3B") : "#64748B",
+                            }}>
+                            {option.icon} {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                   <label style={labelStyle}>NOTES</label>
                   <textarea name="notes" placeholder="Why you took this trade..." value={t.notes || ""} onChange={e => handleTradeChange(idx, e)} rows={2} style={{ ...inputBase, resize: "vertical", fontFamily: "'Plus Jakarta Sans',sans-serif" }} onFocus={onFocusGreen} onBlur={onBlurReset} />
                 </div>
@@ -1116,7 +1324,7 @@ function UploadTradeContent() {
                 <button onClick={() => saveIndianTrade(idx)} disabled={savedTrades[idx]}
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 24px", fontSize: 11, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, letterSpacing: "0.1em", color: "#FFFFFF", background: savedTrades[idx] ? "#0D9E6E" : "linear-gradient(135deg,#0D9E6E,#22C78E)", border: "none", borderRadius: 8, cursor: savedTrades[idx] ? "default" : "pointer", transition: "all 0.25s", boxShadow: savedTrades[idx] ? "none" : "0 3px 12px rgba(13,158,110,0.28)", opacity: savedTrades[idx] ? 0.8 : 1 }}
                 >
-                  {savedTrades[idx] ? (<><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>SAVED</>) : (<><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>SAVE TRADE {idx + 1}</>)}
+                  {savedTrades[idx] ? (<><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>SAVED</>) : (<><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>{jobId && idx === 0 ? `UPDATE TRADE ${idx + 1}` : `SAVE TRADE ${idx + 1}`}</>)}
                 </button>
               </SectionCard>
             ))}
@@ -1131,7 +1339,7 @@ function UploadTradeContent() {
 
             {/* Re-upload */}
             <div style={{ marginBottom: 20 }}>
-              <button onClick={() => { setTrade(null); setTrades([]); setSavedTrades([]); setFile(null); setError(null); setExtractedText(""); }}
+              <button onClick={() => { setTrade(null); setTrades([]); setSavedTrades([]); setFile(null); setError(null); setExtractedText(""); setJobId(""); setProcessingStatus(""); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 22px", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, letterSpacing: "0.1em", color: "#4A5568", background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 10, cursor: "pointer", transition: "all 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#F0EEE9"; e.currentTarget.style.borderColor = "#CBD5E1"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.borderColor = "#E2E8F0"; }}
@@ -1143,8 +1351,8 @@ function UploadTradeContent() {
           </>
         )}
 
-        {/* ── SINGLE TRADE FORM CARD (Forex or single Indian trade) ── */}
-        {trade && !(isInd && trades.length > 1) && (
+        {/* -- SINGLE TRADE FORM CARD (Forex or single Indian trade) -- */}
+        {trade && !(trades.length > 1) && (
           <SectionCard accentColor="#0D9E6E" title="Trade Details" subtitle="REVIEW &amp; EDIT EXTRACTED DATA" delay={0.1}>
 
             {/* Screenshot preview */}
@@ -1185,9 +1393,9 @@ function UploadTradeContent() {
                   <FormSelect label="CE / PE" name="optionType" value={trade?.optionType} onChange={handleChange} options={[{ value: "CE", label: "CE" }, { value: "PE", label: "PE" }]} />
                   <FormSelect label="BUY / SELL" name="action" value={trade?.action} onChange={handleChange} options={[{ value: "buy", label: "BUY" }, { value: "sell", label: "SELL" }]} />
                   {isFilled(trade?.quantity) && <FormInput label="QTY (lots)" name="quantity" value={trade?.quantity} onChange={handleChange} placeholder="e.g. 3" />}
-                  {isFilled(trade?.profit) && <FormInput label="PROFIT / LOSS (₹)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="e.g. 1500 or -500" />}
-                  {isFilled(trade?.entryPrice) && <FormInput label="ENTRY PREMIUM (₹)" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="e.g. 85.50" />}
-                  {isFilled(trade?.exitPrice) && <FormInput label="EXIT PREMIUM (₹)" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="e.g. 120" />}
+                  {isFilled(trade?.profit) && <FormInput label="PROFIT / LOSS (?)" name="profit" value={trade?.profit} onChange={handleChange} placeholder="e.g. 1500 or -500" />}
+                  {isFilled(trade?.entryPrice) && <FormInput label="ENTRY PREMIUM (?)" name="entryPrice" value={trade?.entryPrice} onChange={handleChange} placeholder="e.g. 85.50" />}
+                  {isFilled(trade?.exitPrice) && <FormInput label="EXIT PREMIUM (?)" name="exitPrice" value={trade?.exitPrice} onChange={handleChange} placeholder="e.g. 120" />}
                   {isFilled(trade?.tradeType) && <FormSelect label="TRADE TYPE" name="tradeType" value={trade?.tradeType} onChange={handleChange} options={[{ value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery" }, { value: "SWING", label: "Swing" }]} />}
                   <FormSelect
                     label={`STRATEGY${setupsLoading ? " (loading...)" : ""}`}
@@ -1447,6 +1655,77 @@ function UploadTradeContent() {
               )}
             </div>
 
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ background: "linear-gradient(180deg,#FFFFFF 0%,#FCFDFC 100%)", borderRadius: 14, padding: 20, border: "1px solid #E2E8F0", boxShadow: "0 8px 24px rgba(15,25,35,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "#0F1923", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.08em" }}>
+                    <span>🧠</span> TRADE PSYCHOLOGY
+                  </div>
+                  <div style={{ padding: "4px 9px", borderRadius: 999, background: "#F8FAFC", border: "1px solid #E2E8F0", fontSize: 10, fontWeight: 700, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em" }}>
+                    OPTIONAL
+                  </div>
+                </div>
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ ...labelStyle, marginBottom: 8 }}>HOW ARE YOU FEELING?</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[{ emoji: "😰", val: 1, label: "Stressed" }, { emoji: "😟", val: 2, label: "Anxious" }, { emoji: "😐", val: 3, label: "Neutral" }, { emoji: "😊", val: 4, label: "Good" }, { emoji: "🔥", val: 5, label: "Peak" }].map(m => (
+                      <button key={m.val} type="button" onClick={() => setTrade(prev => ({ ...prev, mood: prev.mood === m.val ? null : m.val }))}
+                        style={{
+                          flex: 1, padding: "10px 4px", borderRadius: 10, cursor: "pointer", textAlign: "center", transition: "all 0.2s",
+                          border: trade?.mood === m.val ? "1.5px solid #0D9E6E" : "1px solid #E2E8F0",
+                          background: trade?.mood === m.val ? "rgba(13,158,110,0.06)" : "#F8FAFC",
+                          transform: trade?.mood === m.val ? "scale(1.04)" : "scale(1)",
+                        }}>
+                        <div style={{ fontSize: 20 }}>{m.emoji}</div>
+                        <div style={{ fontSize: 10, color: trade?.mood === m.val ? "#0D9E6E" : "#64748B", fontWeight: 700, marginTop: 4, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{m.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ marginBottom: 18 }}>
+                  <FormSelect label="CONFIDENCE LEVEL" name="confidence" value={trade?.confidence || ""} onChange={handleChange} options={[{ value: "Low", label: "Low — Unsure about this setup" }, { value: "Medium", label: "Medium — Decent setup" }, { value: "High", label: "High — Strong conviction" }, { value: "Overconfident", label: "Overconfident — Can't lose 🚩" }]} />
+                </div>
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ ...labelStyle, marginBottom: 8 }}>EMOTIONAL TAGS</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"].map(tag => {
+                      const isSelected = (trade?.emotionalTags || []).includes(tag);
+                      return (
+                        <button key={tag} type="button" onClick={() => setTrade(prev => ({
+                          ...prev,
+                          emotionalTags: isSelected ? (prev.emotionalTags || []).filter(t => t !== tag) : [...(prev.emotionalTags || []), tag]
+                        }))}
+                          style={{
+                            padding: "6px 14px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                            border: isSelected ? "1px solid #0D9E6E" : "1px solid #E2E8F0",
+                            background: isSelected ? "rgba(13,158,110,0.08)" : "#FFFFFF",
+                            color: isSelected ? "#0D9E6E" : "#64748B"
+                          }}>
+                          {tag === "FOMO" ? "😨 FOMO" : tag === "Revenge" ? "😡 Revenge" : tag === "Fear" ? "😰 Fear" : tag === "Greed" ? "🤑 Greed" : tag === "Calm" ? "🧘 Calm" : tag === "Bored" ? "😴 Bored" : tag === "Focused" ? "🎯 Focused" : "😤 Frustrated"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: 8 }}>WOULD YOU TAKE THIS TRADE AGAIN?</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {[{ val: "Yes", icon: "✅", label: "Yes" }, { val: "No", icon: "❌", label: "No" }].map(option => (
+                      <button key={option.val} type="button" onClick={() => setTrade(prev => ({ ...prev, wouldRetake: prev.wouldRetake === option.val ? "" : option.val }))}
+                        style={{
+                          flex: 1, padding: "10px", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.2s", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                          border: trade?.wouldRetake === option.val ? `1.5px solid ${option.val === "Yes" ? "#0D9E6E" : "#D63B3B"}` : "1px solid #E2E8F0",
+                          background: trade?.wouldRetake === option.val ? (option.val === "Yes" ? "rgba(13,158,110,0.06)" : "rgba(214,59,59,0.06)") : "#F8FAFC",
+                          color: trade?.wouldRetake === option.val ? (option.val === "Yes" ? "#0D9E6E" : "#D63B3B") : "#64748B"
+                        }}>
+                        {option.icon} {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Notes */}
             <div style={{ marginBottom: 22 }}>
               <label style={labelStyle}>NOTES</label>
@@ -1511,7 +1790,7 @@ function UploadTradeContent() {
               </button>
 
               {/* Re-upload */}
-              <button onClick={() => { setTrade(null); setTrades([]); setSavedTrades([]); setFile(null); setError(null); setExtractedText(""); }}
+              <button onClick={() => { setTrade(null); setTrades([]); setSavedTrades([]); setFile(null); setError(null); setExtractedText(""); setJobId(""); setProcessingStatus(""); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 22px", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, letterSpacing: "0.1em", color: "#4A5568", background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 10, cursor: "pointer", transition: "all 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#F0EEE9"; e.currentTarget.style.borderColor = "#CBD5E1"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.borderColor = "#E2E8F0"; }}
@@ -1546,3 +1825,4 @@ export default function UploadTrade() {
     </Suspense>
   );
 }
+

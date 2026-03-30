@@ -6,9 +6,9 @@ const { sendOTPEmail } = require("../services/mailService");
 const crypto = require("crypto");
 
 // Generate JWT
-const generateToken = (id) => {
+const generateToken = (id, role) => {
   const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
     expiresIn
   });
 };
@@ -60,7 +60,8 @@ exports.registerUser = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
-      token: generateToken(user._id)
+      role: user.role,
+      token: generateToken(user._id, user.role)
     });
 
   } catch (error) {
@@ -81,12 +82,15 @@ exports.loginUser = async (req, res) => {
     }
 
     if (user && user.password && (await bcrypt.compare(password, user.password))) {
+      user.lastLogin = new Date();
+      await user.save();
 
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
-        token: generateToken(user._id)
+        role: user.role,
+        token: generateToken(user._id, user.role)
       });
 
     } else {
@@ -107,10 +111,30 @@ exports.googleLogin = async (req, res) => {
     }
 
     const client = getGoogleClient();
-    const clientId = getGoogleClientId();
+    const webClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+    const androidClientId = process.env.ANDROID_GOOGLE_CLIENT_ID?.trim();
+    
+    const audiences = [];
+    if (webClientId) audiences.push(webClientId);
+    if (androidClientId) audiences.push(androidClientId);
+
+    // Debug: Print the audience from the token before verification
+    try {
+      const parts = credential.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        console.log("[Auth] Token Audience (aud):", payload.aud);
+        console.log("[Auth] Token Authorized Party (azp):", payload.azp);
+      }
+    } catch (e) {
+      console.error("[Auth] Failed to parse token payload for debugging");
+    }
+
+    console.log("[Auth] Attempting Google login with allowed audiences:", audiences);
+
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: clientId
+      audience: audiences
     });
 
     const payload = ticket.getPayload();
@@ -128,12 +152,12 @@ exports.googleLogin = async (req, res) => {
     let user = await User.findOne({ email });
     if (!user) {
       user = await User.create({
-        name,
-        email,
-        password: undefined,
+        name: payload.name,
+        email: payload.email,
+        googleId: payload.sub,
+        avatar: payload.picture,
         authProvider: "google",
-        googleId,
-        avatar
+        lastLogin: new Date()
       });
     } else {
       // Upgrade existing local user to have googleId/avatar if missing (keep provider local unless it was google)
@@ -142,8 +166,12 @@ exports.googleLogin = async (req, res) => {
       if (!user.avatar && avatar) updates.avatar = avatar;
       if (user.authProvider !== "google" && user.authProvider !== "local") updates.authProvider = "local";
       if (Object.keys(updates).length > 0) {
+        updates.lastLogin = new Date(); // Track activity
         await User.updateOne({ _id: user._id }, { $set: updates });
         user = await User.findById(user._id);
+      } else {
+        user.lastLogin = new Date();
+        await user.save();
       }
     }
 
@@ -151,7 +179,8 @@ exports.googleLogin = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
-      token: generateToken(user._id)
+      role: user.role,
+      token: generateToken(user._id, user.role)
     });
   } catch (error) {
     console.error("[Auth] googleLogin error:", error);
@@ -174,6 +203,7 @@ exports.getMe = async (req, res) => {
       _id: req.user._id,
       name: req.user.name,
       email: req.user.email,
+      role: req.user.role,
       createdAt: req.user.createdAt
     });
   } catch (error) {

@@ -3,7 +3,7 @@
 import React from 'react';
 import { useMarket } from '@/context/MarketContext';
 
-export default function LoadingSpinner({ message = "LOADING DATA...", fullPage = false }) {
+export default function LoadingSpinner({ message = "LOADING DATA...", fullPage = false, showProgress = false, currentStep = 0, totalSteps = 3 }) {
     const { getThemeColors } = useMarket();
     const colors = getThemeColors();
 
@@ -80,10 +80,12 @@ export default function LoadingSpinner({ message = "LOADING DATA...", fullPage =
                     width: 24,
                     height: 24,
                     animation: 'pulseOpacity 1s ease-in-out infinite',
+                    willChange: 'opacity', // Hardware acceleration
                 }}>
                     <img
-                        src="/load.png"
+                        src="/formobileand tabicon.png"
                         alt="Loading"
+                        loading="eager" // Preload critical image
                         style={{ width: "100%", height: "100%", objectFit: "contain" }}
                         onError={(e) => {
                             e.target.style.display = 'none';
@@ -104,9 +106,34 @@ export default function LoadingSpinner({ message = "LOADING DATA...", fullPage =
                 letterSpacing: '0.15em',
                 fontFamily: "'JetBrains Mono', monospace",
                 animation: 'pulseOpacity 1.5s ease-in-out infinite',
+                minHeight: '16px',
+                transition: 'opacity 0.3s ease',
+                opacity: 1,
             }}>
                 {message}
             </div>
+            
+            {showProgress && (
+                <div style={{
+                    display: 'flex',
+                    gap: '6px',
+                    marginTop: '12px',
+                    alignItems: 'center',
+                }}>
+                    {Array.from({ length: totalSteps }).map((_, idx) => (
+                        <div
+                            key={idx}
+                            style={{
+                                width: idx <= currentStep ? '24px' : '8px',
+                                height: '8px',
+                                borderRadius: '4px',
+                                background: idx <= currentStep ? colors.primary : `${colors.primary}40`,
+                                transition: 'all 0.5s ease',
+                            }}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

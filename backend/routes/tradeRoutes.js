@@ -5,6 +5,7 @@ const {
     createTrade,
     getTrades,
     getTrade,
+    getTradeStatus,
     updateTrade,
     deleteTrade
 } = require("../controllers/tradeController");
@@ -14,7 +15,9 @@ const cacheMiddleware = require("../middleware/cacheMiddleware");
 
 router.post("/", protect, createTrade);
 
-router.get("/", protect, cacheMiddleware(10), getTrades);
+router.get("/", protect, cacheMiddleware(1), getTrades);
+
+router.get("/status/:id", protect, getTradeStatus);
 
 router.get("/:id", protect, getTrade);
 

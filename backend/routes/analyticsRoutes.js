@@ -13,7 +13,8 @@ const {
     getTradeQuality,
     getDrawdownAnalysis,
     getAIInsights,
-    getAdvancedAnalytics
+    getAdvancedAnalytics,
+    getPsychologyAnalytics
 } = require("../controllers/analyticsController");
 
 const cacheMiddleware = require("../middleware/cacheMiddleware");
@@ -28,10 +29,13 @@ router.get("/distribution", protect, cacheMiddleware(30), getTradeDistribution);
 router.get("/performance", protect, cacheMiddleware(30), getPerformanceMetrics);
 router.get("/time-analysis", protect, cacheMiddleware(30), getTimeAnalysis);
 router.get("/quality", protect, cacheMiddleware(30), getTradeQuality);
-router.get("/drawdown", protect, cacheMiddleware(30), getDrawdownAnalysis);
-router.get("/ai-insights", protect, cacheMiddleware(30), getAIInsights);
+router.get("/drawdown", protect, getDrawdownAnalysis); // No cache for real-time
+router.get("/ai-insights", protect, cacheMiddleware(15), getAIInsights); // 15min cache
 
 // All-in-one endpoint
-router.get("/advanced", protect, cacheMiddleware(30), getAdvancedAnalytics);
+router.get("/advanced", protect, cacheMiddleware(15), getAdvancedAnalytics); // 15min cache
+
+// Psychology analytics
+router.get("/psychology", protect, cacheMiddleware(30), getPsychologyAnalytics);
 
 module.exports = router;

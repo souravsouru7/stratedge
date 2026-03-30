@@ -89,8 +89,8 @@ export default function ProfilePage() {
             }}
           >
             <img
-              src="/logo.png"
-              alt="Stratedge"
+              src="/mainlogo.png"
+              alt="LOGNERA"
               style={{ width: "100%", height: "100%", objectFit: "contain" }}
             />
           </div>
@@ -102,7 +102,7 @@ export default function ProfilePage() {
                 letterSpacing: "0.06em"
               }}
             >
-              STRATEDGE
+              LOGNERA
             </div>
             <div
               style={{

@@ -1,3 +1,176 @@
+function parseForexLot(rawLot) {
+  if (rawLot == null) return null;
+  const cleaned = String(rawLot)
+    .replace(/[Oo]/g, "0")
+    .replace(/[Il]/g, "1")
+    .replace(/,/g, ".")
+    .replace(/\s+/g, "")
+    .trim();
+
+  if (!cleaned) return null;
+  const numeric = parseFloat(cleaned);
+  if (Number.isNaN(numeric)) return null;
+
+  if (!cleaned.includes(".") && numeric >= 100) {
+    return numeric / 100;
+  }
+
+  return numeric;
+}
+
+function safePositiveNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+function safeSignedNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+const KNOWN_FOREX_SYMBOLS = [
+  "EURUSD", "USDJPY", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
+  "EURJPY", "GBPJPY", "EURGBP", "EURAUD", "EURCAD", "EURCHF", "EURNZD",
+  "AUDJPY", "AUDCAD", "AUDCHF", "AUDNZD", "CADJPY", "CADCHF", "CHFJPY",
+  "GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD", "NZDJPY", "NZDCAD", "NZDCHF",
+  "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD",
+];
+
+function normalizeForexPair(rawPair) {
+  if (!rawPair) return null;
+
+  const original = String(rawPair).toUpperCase();
+  const compact = original.replace(/\s+/g, "");
+  const suffixMatch = compact.match(/(\.[A-Z0-9]+)$/);
+  const suffix = suffixMatch ? suffixMatch[1] : "";
+  const base = suffix ? compact.slice(0, -suffix.length) : compact;
+  const compactAlphaNum = compact.replace(/[^A-Z0-9]/g, "");
+
+  if (KNOWN_FOREX_SYMBOLS.includes(base)) {
+    return `${base}${suffix}`;
+  }
+
+  const ocrFixed = compactAlphaNum
+    .replace(/0/g, "O")
+    .replace(/1/g, "I")
+    .replace(/5/g, "S");
+
+  for (const symbol of KNOWN_FOREX_SYMBOLS) {
+    const suffixGuess = compact.includes(`${symbol}.X`) || compact.includes(`${symbol}X`) || compact.endsWith(`${symbol}X`)
+      ? ".X"
+      : suffix;
+
+    if (compact.includes(symbol) || ocrFixed.includes(symbol)) {
+      return `${symbol}${suffixGuess}`;
+    }
+  }
+
+  let best = null;
+  for (const symbol of KNOWN_FOREX_SYMBOLS) {
+    if (symbol.length !== ocrFixed.length) continue;
+    let mismatches = 0;
+    for (let i = 0; i < symbol.length; i += 1) {
+      if (symbol[i] !== ocrFixed[i]) mismatches += 1;
+      if (mismatches > 1) break;
+    }
+    if (mismatches <= 1) {
+      best = symbol;
+      break;
+    }
+  }
+
+  return `${best || ocrFixed}${suffix}`;
+}
+
+function extractForexHeader(line) {
+  const normalizedLine = String(line || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const actionMatch = normalizedLine.match(/\b(buy|sell)\b\s*([0-9OoIl.,]+)\b/i);
+  if (!actionMatch) return null;
+
+  const action = actionMatch[1].toLowerCase();
+  const lotSize = parseForexLot(actionMatch[2]);
+  const actionIndex = actionMatch.index ?? 0;
+  const leftSide = normalizedLine.slice(0, actionIndex).trim();
+  const rightSide = normalizedLine.slice(actionIndex + actionMatch[0].length).trim();
+  const pair = normalizeForexPair(leftSide) || normalizeForexPair(rightSide) || normalizeForexPair(normalizedLine);
+
+  if (!pair || !action || lotSize == null) return null;
+  return { pair, action, lotSize };
+}
+
+function normalizeForexLevel(value, reference) {
+  if (value == null || reference == null) return value;
+  if (!Number.isFinite(value) || !Number.isFinite(reference)) return value;
+
+  const largePair = Math.abs(reference) >= 100;
+  const maxDiff = largePair ? 5 : 1;
+  if (Math.abs(value - reference) <= maxDiff) return value;
+
+  if (largePair) {
+    const integerPart = Math.trunc(reference);
+    const decimals = String(value).includes(".") ? String(value).split(".")[1] : "";
+    if (decimals) {
+      const candidate = parseFloat(`${integerPart}.${decimals}`);
+      if (Number.isFinite(candidate) && Math.abs(candidate - reference) <= maxDiff) {
+        return candidate;
+      }
+    }
+  }
+
+  return value;
+}
+
+function normalizeForexTrade(trade) {
+  if (!trade || trade.entryPrice == null || trade.exitPrice == null) return trade;
+
+  const entry = trade.entryPrice;
+  const exit = trade.exitPrice;
+  const action = String(trade.action || "").toLowerCase();
+  const signedTrade = { ...trade };
+
+  if (signedTrade.stopLoss != null) {
+    signedTrade.stopLoss = normalizeForexLevel(signedTrade.stopLoss, entry);
+  }
+  if (signedTrade.takeProfit != null) {
+    signedTrade.takeProfit = normalizeForexLevel(signedTrade.takeProfit, entry);
+  }
+
+  if (signedTrade.profit != null) {
+    const isLoss = action === "sell" ? exit > entry : exit < entry;
+    signedTrade.profit = isLoss ? -Math.abs(signedTrade.profit) : Math.abs(signedTrade.profit);
+  }
+
+  if (signedTrade.commission != null) {
+    signedTrade.commission = -Math.abs(signedTrade.commission);
+  }
+
+  return signedTrade;
+}
+
+function extractForexPriceData(line) {
+  const source = String(line || "").trim();
+  if (!source) return null;
+  if (!/^\d/.test(source) && !/^-?\d/.test(source)) return null;
+  if (/^(#|S\s*\/?\s*L|T\s*\/?\s*P|TIP|Open|Swap|Commission|Balance|Profit)/i.test(source)) return null;
+
+  const decimalMatches = source.match(/-?\d+\.\d+/g) || [];
+  if (decimalMatches.length < 2) return null;
+
+  const entry = parseFloat(decimalMatches[0]);
+  const exit = parseFloat(decimalMatches[1]);
+  const pnl = decimalMatches.length >= 3 ? parseFloat(decimalMatches[decimalMatches.length - 1]) : null;
+
+  if (Number.isNaN(entry) || Number.isNaN(exit)) return null;
+
+  return {
+    entryPrice: entry,
+    exitPrice: exit,
+    profit: Number.isNaN(pnl) ? null : pnl,
+  };
+}
+
 exports.parseTrade = (text) => {
   // Normalize text to simplify matching
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
@@ -14,6 +187,7 @@ exports.parseTrade = (text) => {
   let stopLoss = null;
   let takeProfit = null;
   let openTime = null;
+  let ticket = null;
 
   const getSession = (timeStr) => {
     if (!timeStr) return "Unknown";
@@ -28,49 +202,78 @@ exports.parseTrade = (text) => {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const nextLine = lines[i + 1] || "";
 
     // Symbol, Action, Lot
-    const tradeLineMatch = line.match(/^([A-Z0-9\.\+\#\-]+),\s*(buy|sell)\s*(\d+\.\d+)/i);
-    if (tradeLineMatch) {
-      pair = tradeLineMatch[1];
-      action = tradeLineMatch[2].toLowerCase();
-      lotSize = tradeLineMatch[3];
+    const forexHeader = extractForexHeader(line);
+    if (forexHeader) {
+      pair = forexHeader.pair;
+      action = forexHeader.action;
+      lotSize = forexHeader.lotSize;
       continue;
     }
 
     // Prices (More robust: handles arrow, dots, dashes, or just spaces)
-    const priceMatch = line.match(/(\d+\.\d+)\s*(?:->|→|[-\.\s]+)\s*(\d+\.\d+)/);
-    if (priceMatch) {
-      entryPrice = priceMatch[1];
-      exitPrice = priceMatch[2];
+    const priceData = extractForexPriceData(line);
+    if (priceData) {
+      entryPrice = priceData.entryPrice;
+      exitPrice = priceData.exitPrice;
+      if (!profit && priceData.profit != null) profit = priceData.profit;
       continue;
     }
 
     // SL / TP (More robust: handles missing colons, different slash spacing)
     const slMatch = line.match(/S\s*\/?\s*L[:\s]*(\d+\.\d+)/i);
     if (slMatch) stopLoss = slMatch[1];
+    else if (/^S\s*\/?\s*L[:\s]*$/i.test(line)) {
+      const nextValue = nextLine.match(/^(\d+\.\d+)$/);
+      if (nextValue) stopLoss = nextValue[1];
+    }
 
-    const tpMatch = line.match(/T\s*\/?\s*P[:\s]*(\d+\.\d+)/i);
+    const tpMatch = line.match(/(?:T\s*\/?\s*P|TIP)[:\s]*(\d+\.\d+)/i);
     if (tpMatch) takeProfit = tpMatch[1];
+    else if (/^(?:T\s*\/?\s*P|TIP)[:\s]*$/i.test(line)) {
+      const nextValue = nextLine.match(/^(\d+\.\d+)$/);
+      if (nextValue) takeProfit = nextValue[1];
+    }
 
     // Swap / Commission
     const lineSwapMatch = line.match(/Swap[:\s]*(-?\d+\.\d+|-?\d+)/i);
     if (lineSwapMatch) swap = lineSwapMatch[1];
+    else if (/^Swap[:\s]*$/i.test(line)) {
+      const nextValue = nextLine.match(/^(-?\d+\.\d+|-?\d+)$/);
+      if (nextValue) swap = nextValue[1];
+    }
 
     const lineCommMatch = line.match(/Commission[:\s]*(-?\d+\.\d+|-?\d+)/i);
     if (lineCommMatch) commission = lineCommMatch[1];
+    else if (/^Commission[:\s]*$/i.test(line)) {
+      const nextValue = nextLine.match(/^(-?\d+\.\d+|-?\d+)$/);
+      if (nextValue) commission = nextValue[1];
+    }
 
     // Balance
     const balanceMatch = line.match(/Balance[:\s]*(-?\d+\.\d+|-?\d+)/i);
     if (balanceMatch) balance = balanceMatch[1];
+    else if (/^Balance[:\s]*$/i.test(line)) {
+      const nextValue = nextLine.match(/^(-?\d+\.\d+|-?\d+)$/);
+      if (nextValue) balance = nextValue[1];
+    }
 
     // Open Time
     const openTimeMatch = line.match(/Open[:\s]*(\d{4}\.\d{2}\.\d{2}\s*\d{2}:\d{2}:\d{2})/i);
     if (openTimeMatch) openTime = openTimeMatch[1];
+    else if (/^Open[:\s]*$/i.test(line)) {
+      const nextValue = nextLine.match(/^(\d{4}\.\d{2}\.\d{2}\s*\d{2}:\d{2}:\d{2})$/);
+      if (nextValue) openTime = nextValue[1];
+    }
 
     // Profit summary
     const summaryProfitMatch = line.match(/^Profit[:\s]*(-?\d+\.\d+|-?\d+)/i);
     if (summaryProfitMatch && !profit) profit = summaryProfitMatch[1];
+
+    const ticketMatch = line.match(/#\s*(\d{6,})|\b(\d{6,})\b/);
+    if (ticketMatch && !ticket) ticket = ticketMatch[1] || ticketMatch[2];
 
     // Individual profit fallback
     if (!profit && line.match(/^(-?\d+\.\d+|-?\d+)$/)) {
@@ -81,20 +284,70 @@ exports.parseTrade = (text) => {
     }
   }
 
-  return {
+  return normalizeForexTrade({
+    ticket: ticket || null,
     pair: pair || null,
     action: action || null,
-    lotSize: lotSize ? parseFloat(lotSize) : null,
-    entryPrice: entryPrice ? parseFloat(entryPrice) : null,
-    exitPrice: exitPrice ? parseFloat(exitPrice) : null,
-    profit: profit ? parseFloat(profit) : null,
-    commission: commission ? parseFloat(commission) : null,
-    balance: balance ? parseFloat(balance) : null,
-    swap: swap ? parseFloat(swap) : null,
-    stopLoss: stopLoss ? parseFloat(stopLoss) : null,
-    takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+    lotSize: lotSize != null ? safePositiveNumber(lotSize) : null,
+    entryPrice: entryPrice != null ? safePositiveNumber(entryPrice) : null,
+    exitPrice: exitPrice != null ? safePositiveNumber(exitPrice) : null,
+    profit: profit != null ? safeSignedNumber(profit) : null,
+    commission: commission != null ? safeSignedNumber(commission) : null,
+    balance: balance != null ? safeSignedNumber(balance) : null,
+    swap: swap != null ? safeSignedNumber(swap) : null,
+    stopLoss: stopLoss != null ? safePositiveNumber(stopLoss) : null,
+    takeProfit: takeProfit != null ? safePositiveNumber(takeProfit) : null,
     session: getSession(openTime)
-  };
+  });
+};
+
+exports.parseForexTradesFromOCR = (text) => {
+  if (!text || typeof text !== "string") return [];
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const blocks = [];
+  let currentBlock = null;
+  const detectedHeaders = [];
+
+  for (const line of lines) {
+    const forexHeader = extractForexHeader(line);
+    if (forexHeader) {
+      currentBlock = [line];
+      blocks.push(currentBlock);
+      detectedHeaders.push(`${forexHeader.pair}, ${forexHeader.action} ${forexHeader.lotSize}`);
+      continue;
+    }
+
+    if (currentBlock) {
+      currentBlock.push(line);
+    }
+  }
+
+  console.log("[Forex Parser] Total OCR lines:", lines.length);
+  console.log("[Forex Parser] Detected trade headers:", detectedHeaders.length);
+  if (detectedHeaders.length > 0) {
+    detectedHeaders.forEach((header, index) => {
+      console.log(`[Forex Parser] Header ${index + 1}: ${header}`);
+    });
+  }
+
+  if (blocks.length === 0) return [];
+
+  const parsed = blocks
+    .map((block, index) => {
+      console.log(`[Forex Parser] Block ${index + 1} lines (${block.length}):`, JSON.stringify(block));
+      const trade = exports.parseTrade(block.join("\n"));
+      console.log(`[Forex Parser] Parsed trade ${index + 1}:`, JSON.stringify(trade));
+      return trade;
+    })
+    .filter((trade) => trade.pair && (trade.entryPrice != null || trade.profit != null));
+
+  console.log("[Forex Parser] Final parsed trades count:", parsed.length);
+  return parsed;
 };
 
 // Common OCR typos: strike price correction for Indian indices
@@ -557,13 +810,13 @@ exports.parseIndianTrade = (text, opts = {}) => {
   return {
     pair: pair || null,
     type: action,
-    quantity: quantity ? parseFloat(quantity) : null,
-    entryPrice: entryPrice ? parseFloat(entryPrice) : null,
-    exitPrice: exitPrice ? parseFloat(exitPrice) : null,
-    profit: profit != null ? profit : null,
+    quantity: quantity != null ? safePositiveNumber(quantity) : null,
+    entryPrice: entryPrice != null ? safePositiveNumber(entryPrice) : null,
+    exitPrice: exitPrice != null ? safePositiveNumber(exitPrice) : null,
+    profit: profit != null ? safeSignedNumber(profit) : null,
     segment,
     instrumentType,
-    strikePrice: strikePrice ? parseFloat(strikePrice) : null,
+    strikePrice: strikePrice != null ? safePositiveNumber(strikePrice) : null,
     expiryDate: expiryDate || null,
     marketType: "Indian_Market",
     ...(broker && { broker }),
