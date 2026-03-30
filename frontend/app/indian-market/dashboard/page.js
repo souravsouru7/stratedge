@@ -13,7 +13,6 @@ import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import InstallPWA from "@/components/InstallPWA";
 import { getTrades } from "@/services/tradeApi";
 import {
     ResponsiveContainer,
@@ -401,7 +400,7 @@ export default function IndianMarketDashboard() {
                         IST: {time}
                     </div>
 
-                    <nav style={{ display: "flex", gap: 6 }}>
+                    <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {[
                             { href: "/indian-market/trades", label: "Journal" },
                             { href: "/indian-market/add-trade", label: "Log option" },
@@ -412,26 +411,32 @@ export default function IndianMarketDashboard() {
                                 key={n.href}
                                 href={n.href}
                                 style={{
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     color: "#E5E7EB",
-                                    fontWeight: 600,
+                                    fontWeight: 700,
                                     textDecoration: "none",
-                                    padding: "6px 12px",
+                                    padding: "10px 16px",
                                     borderRadius: 999,
-                                    transition: "all 0.15s",
+                                    transition: "all 0.2s",
                                     fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                    background: "rgba(15,23,42,0.6)",
-                                    border: "1px solid rgba(148,163,184,0.5)"
+                                    background: "rgba(15,23,42,0.8)",
+                                    border: "1.5px solid rgba(148,163,184,0.6)",
+                                    minHeight: "44px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
                                 }}
                                 onMouseEnter={e => {
-                                    e.currentTarget.style.background = "rgba(184,134,11,0.2)";
+                                    e.currentTarget.style.background = "rgba(184,134,11,0.25)";
                                     e.currentTarget.style.color = "#0F1923";
-                                    e.currentTarget.style.borderColor = "rgba(184,134,11,0.7)";
+                                    e.currentTarget.style.borderColor = "rgba(184,134,11,0.8)";
+                                    e.currentTarget.style.transform = "translateY(-2px)";
                                 }}
                                 onMouseLeave={e => {
-                                    e.currentTarget.style.background = "rgba(15,23,42,0.6)";
+                                    e.currentTarget.style.background = "rgba(15,23,42,0.8)";
                                     e.currentTarget.style.color = "#E5E7EB";
-                                    e.currentTarget.style.borderColor = "rgba(148,163,184,0.5)";
+                                    e.currentTarget.style.borderColor = "rgba(148,163,184,0.6)";
+                                    e.currentTarget.style.transform = "translateY(0)";
                                 }}
                             >
                                 {n.label}
@@ -440,7 +445,6 @@ export default function IndianMarketDashboard() {
                     </nav>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <InstallPWA />
                         <button
                             onClick={() => {
                                 localStorage.removeItem("token");

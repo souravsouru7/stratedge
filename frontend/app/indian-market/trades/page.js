@@ -6,7 +6,6 @@ import { getTrades, deleteTrade } from "@/services/tradeApi";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
 import { useMarket, MARKETS } from "@/context/MarketContext";
-import InstallPWA from "@/components/InstallPWA";
 
 /* Same theme as Forex */
 const theme = {
@@ -262,7 +261,7 @@ export default function IndianTradesPage() {
                     </Link>
                 </div>
 
-                <nav style={{ display: "flex", gap: 6 }}>
+                <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {[
                         { href: "/indian-market/trades", label: "Journal" },
                         { href: "/indian-market/add-trade", label: "Log Option" },
@@ -273,24 +272,30 @@ export default function IndianTradesPage() {
                             key={n.href}
                             href={n.href}
                             style={{
-                                fontSize: 11,
+                                fontSize: 13,
                                 color: theme.primary,
-                                fontWeight: 600,
+                                fontWeight: 700,
                                 textDecoration: "none",
-                                padding: "6px 12px",
+                                padding: "10px 16px",
                                 borderRadius: 999,
-                                transition: "all 0.15s",
+                                transition: "all 0.2s",
                                 fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                background: "rgba(13,158,110,0.05)",
-                                border: "1px solid rgba(13,158,110,0.2)"
+                                background: "rgba(13,158,110,0.08)",
+                                border: "1.5px solid rgba(13,158,110,0.25)",
+                                minHeight: "44px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center"
                             }}
                             onMouseEnter={e => {
-                                e.currentTarget.style.background = "rgba(13,158,110,0.15)";
-                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.5)";
+                                e.currentTarget.style.background = "rgba(13,158,110,0.18)",
+                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.6)",
+                                e.currentTarget.style.transform = "translateY(-2px)"
                             }}
                             onMouseLeave={e => {
-                                e.currentTarget.style.background = "rgba(13,158,110,0.05)";
-                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.2)";
+                                e.currentTarget.style.background = "rgba(13,158,110,0.08)",
+                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.25)",
+                                e.currentTarget.style.transform = "translateY(0)"
                             }}
                         >
                             {n.label}
@@ -299,7 +304,6 @@ export default function IndianTradesPage() {
                 </nav>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <InstallPWA />
                     <MarketSwitcher />
                 </div>
             </header>

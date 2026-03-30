@@ -209,7 +209,7 @@ function WeeklyReportsContent() {
           </Link>
         </div>
 
-        <nav style={{ display: "flex", gap: 4 }}>
+        <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {(marketParam === "Indian_Market"
             ? [
                 { href: "/indian-market/trades", label: "Journal" },
@@ -227,21 +227,32 @@ function WeeklyReportsContent() {
               key={n.href}
               href={n.href}
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 color: "#4A5568",
-                fontWeight: 600,
+                fontWeight: 700,
                 textDecoration: "none",
-                padding: "5px 10px",
-                borderRadius: 6,
-                transition: "all 0.15s",
+                padding: "10px 16px",
+                borderRadius: 999,
+                transition: "all 0.2s",
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
+                background: "rgba(13,158,110,0.08)",
+                border: "1.5px solid rgba(13,158,110,0.25)",
+                minHeight: "44px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center"
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#F0EEE9";
+                e.currentTarget.style.background = "rgba(13,158,110,0.18)";
                 e.currentTarget.style.color = "#0F1923";
+                e.currentTarget.style.borderColor = "rgba(13,158,110,0.6)";
+                e.currentTarget.style.transform = "translateY(-2px)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.background = "rgba(13,158,110,0.08)";
                 e.currentTarget.style.color = "#4A5568";
+                e.currentTarget.style.borderColor = "rgba(13,158,110,0.25)";
+                e.currentTarget.style.transform = "translateY(0)";
               }}
             >
               {n.label}
