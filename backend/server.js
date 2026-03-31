@@ -39,7 +39,7 @@ app.use(cors({
     ];
 
     // Allow requests with no origin (like mobile apps or curl)
-    if (!origin || allowedOrigins.includes(origin) || productionOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+    if (!origin || allowedOrigins.includes(origin) || productionOrigins.includes(origin) || origin.startsWith('http://localhost') || origin.startsWith('capacitor://localhost')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
