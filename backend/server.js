@@ -38,10 +38,16 @@ app.use(cors({
       'https://www.stratedge.live'
     ];
 
+    // Debug log for CORS troubleshooting
+    if (process.env.NODE_ENV !== 'production' || true) { // Always log for now to fix this
+      console.log(`CORS Check | Origin: ${origin} | Allowed: ${allowedOrigins.join(', ')}`);
+    }
+
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin || allowedOrigins.includes(origin) || productionOrigins.includes(origin) || origin.startsWith('http://localhost') || origin.startsWith('capacitor://localhost')) {
       callback(null, true);
     } else {
+      console.warn(`CORS Rejected | Origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
