@@ -1,35 +1,25 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./mobile-optimizations.css";
 import Providers from "./providers";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-plus-jakarta-sans",
-  subsets: ["latin"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-});
+import { getBaseMetadata } from "../config/seo";
 
 export const metadata: Metadata = {
-  title: "LOGNERA - AI Journal",
-  description: "Professional Trading Journal with AI Analytics",
+  ...getBaseMetadata(),
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/formobileand tabicon.png", type: "image/png" },
+      { url: "/logo.png", type: "image/png" },
     ],
-    shortcut: "/formobileand tabicon.png",
-    apple: "/formobileand tabicon.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "LOGNERA",
-    startupImage: "/formobileand tabicon.png",
+    title: "Edgecipline",
+    startupImage: "/logo.png",
   },
   formatDetection: {
     telephone: false,
@@ -52,10 +42,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${plusJakartaSans.variable} ${jetbrainsMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <Providers>{children}</Providers>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "Edgecipline",
+              url: "https://edgecipline.com",
+              logo: "https://edgecipline.com/logo.png",
+              sameAs: [
+                "https://twitter.com/edgecipline",
+                // Add more social links
+              ]
+            })
+          }}
+        />
       </body>
     </html>
   );

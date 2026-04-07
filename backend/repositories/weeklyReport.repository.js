@@ -1,0 +1,48 @@
+const WeeklyReport = require("../models/WeeklyReport");
+
+async function findWeeklyReportsByUser(userId, marketType, limit) {
+  return WeeklyReport.find({ user: userId, marketType })
+    .sort({ weekStart: -1 })
+    .limit(limit)
+    .select("user marketType periodType weekStart weekEnd snapshot aiFeedback aiModel promptVersion createdAt updatedAt")
+    .lean();
+}
+
+async function findWeeklyReportByIdAndUser(reportId, userId) {
+  return WeeklyReport.findOne({ _id: reportId, user: userId }).lean();
+}
+
+async function upsertRollingWeeklyReport(userId, marketType, weekStart, weekEnd, snapshot) {
+  return WeeklyReport.findOneAndUpdate(
+    { user: userId, marketType, periodType: "rolling7d", weekStart, weekEnd },
+    {
+      $setOnInsert: { user: userId, marketType, periodType: "rolling7d", weekStart, weekEnd },
+      $set: { snapshot },
+    },
+    { new: true, upsert: true }
+  );
+}
+
+async function updateWeeklyReportById(reportId, update) {
+  return WeeklyReport.findByIdAndUpdate(reportId, update, { new: true });
+}
+
+async function findRecentlyGeneratedWeeklyReport(userId, marketType, since) {
+  return WeeklyReport.findOne({
+    user: userId,
+    marketType,
+    periodType: "rolling7d",
+    aiFeedback: { $ne: null },
+    createdAt: { $gte: since },
+  })
+    .sort({ createdAt: -1 })
+    .select("_id user marketType periodType createdAt");
+}
+
+module.exports = {
+  findRecentlyGeneratedWeeklyReport,
+  findWeeklyReportByIdAndUser,
+  findWeeklyReportsByUser,
+  updateWeeklyReportById,
+  upsertRollingWeeklyReport,
+};

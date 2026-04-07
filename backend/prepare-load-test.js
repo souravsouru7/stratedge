@@ -1,3 +1,4 @@
+require("dotenv").config();
 const { client, isRedisReady } = require("./config/redis");
 
 (async () => {

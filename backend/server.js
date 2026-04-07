@@ -1,14 +1,21 @@
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
 
+// Load .env before any module that reads process.env at require-time (e.g. config/cloudinary via jobs/dataCleanupCron).
+require("dotenv").config();
+
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 
 const connectDB = require("./config/db");
-const { globalRateLimiter, authRateLimiter, uploadRateLimiter, statusRateLimiter } = require("./middleware/rateLimit");
+const { appConfig } = require("./config");
+const {
+  globalRateLimiter,
+  authRateLimiter,
+  statusRateLimiter,
+} = require("./middleware/rateLimiter");
 const { sanitizeInput } = require("./middleware/sanitizeInput");
 const { errorHandler } = require("./middleware/errorHandler");
 const { logger, stream } = require("./utils/logger");
@@ -18,7 +25,6 @@ const { connectRedis } = require("./config/redis");
 const { startWeeklyReportsCron } = require("./jobs/weeklyReportsCron");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
 
-dotenv.config();
 connectDB();
 connectRedis();
 
@@ -30,7 +36,13 @@ const app = express();
 
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+    // In development, avoid blocking the frontend with CORS when using localhost
+    // or local network IPs (e.g. 192.168.x.x). Production uses an allow-list below.
+    if (appConfig.env !== "production") {
+      return callback(null, true);
+    }
+
+    const allowedOrigins = appConfig.cors.allowedOrigins;
 
     // Hardcode production domains to ensure they are always allowed
     const productionOrigins = [
@@ -38,9 +50,9 @@ app.use(cors({
       'https://www.stratedge.live'
     ];
 
-    // Debug log for CORS troubleshooting
-    if (process.env.NODE_ENV !== 'production' || true) { // Always log for now to fix this
-      console.log(`CORS Check | Origin: ${origin} | Allowed: ${allowedOrigins.join(', ')}`);
+    // Optional debug log for CORS troubleshooting (disabled by default).
+    if (appConfig.cors.debug) {
+      console.log(`CORS Check | Origin: ${origin} | Allowed: ${allowedOrigins.join(", ")}`);
     }
 
     // Allow requests with no origin (like mobile apps or curl)
@@ -68,20 +80,25 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    if (res.statusCode >= 400) {
+    const logMeta = {
+      method: req.method,
+      route: req.originalUrl,
+      status: res.statusCode,
+      duration: `${duration}ms`,
+      userAgent: req.get('user-agent'),
+    };
+
+    if (res.statusCode >= 500) {
       logger.warn(`API request failed | method=${req.method} | route=${req.originalUrl} | status=${res.statusCode} | duration=${duration}ms`, {
-        method: req.method,
-        route: req.originalUrl,
-        status: res.statusCode,
-        duration: `${duration}ms`,
-        userAgent: req.get('user-agent'),
+        ...logMeta,
+      });
+    } else if (res.statusCode >= 400) {
+      logger.debug(`API client error | method=${req.method} | route=${req.originalUrl} | status=${res.statusCode} | duration=${duration}ms`, {
+        ...logMeta,
       });
     } else {
       logger.info(`API request | method=${req.method} | route=${req.originalUrl} | status=${res.statusCode} | duration=${duration}ms`, {
-        method: req.method,
-        route: req.originalUrl,
-        status: res.statusCode,
-        duration: `${duration}ms`,
+        ...logMeta,
       });
     }
   });
@@ -103,7 +120,7 @@ app.use("/api/trade", statusRateLimiter, require("./routes/tradeStatusRoutes"));
 app.use("/api/setups", require("./routes/setupRoutes"));
 app.use("/api/checklists", require("./routes/checklistRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
-app.use("/api/upload", uploadRateLimiter, require("./routes/uploadRoutes"));
+app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use("/api/reports", require("./routes/weeklyReportRoutes"));
 
 // Admin routes (completely separate workspace)
@@ -137,10 +154,10 @@ app.use((req, res) => {
 // Central error handler (must be last)
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = appConfig.port;
 
 app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`, { port: PORT, env: process.env.NODE_ENV || 'development' });
+  logger.info(`Server running on port ${PORT}`, { port: PORT, env: appConfig.env });
   console.log(`Server running on port ${PORT}`);
 });
 

@@ -1,3 +1,4 @@
+const { appConfig } = require("../config");
 const { logger } = require("../utils/logger");
 
 /**
@@ -5,20 +6,11 @@ const { logger } = require("../utils/logger");
  * Defaults can be overridden via environment variables
  */
 const TIMEOUT_CONFIG = {
-  // Global API request timeout (ms)
-  apiTimeout: parseInt(process.env.API_REQUEST_TIMEOUT_MS || "15000", 10), // 15 seconds
-  
-  // OCR service timeout (ms)
-  ocrTimeout: parseInt(process.env.OCR_SERVICE_TIMEOUT_MS || "30000", 10), // 30 seconds
-  
-  // AI service timeout (ms)
-  aiTimeout: parseInt(process.env.AI_SERVICE_TIMEOUT_MS || "20000", 10), // 20 seconds
-  
-  // Database operation timeout (ms)
-  dbTimeout: parseInt(process.env.DB_OPERATION_TIMEOUT_MS || "10000", 10), // 10 seconds
-  
-  // External API timeout (ms)
-  externalApiTimeout: parseInt(process.env.EXTERNAL_API_TIMEOUT_MS || "10000", 10), // 10 seconds
+  apiTimeout: appConfig.timeouts.apiTimeout,
+  ocrTimeout: appConfig.timeouts.ocrTimeout,
+  aiTimeout: appConfig.timeouts.aiTimeout,
+  dbTimeout: appConfig.timeouts.dbTimeout,
+  externalApiTimeout: appConfig.timeouts.externalApiTimeout,
 };
 
 /**
@@ -31,8 +23,8 @@ function timeoutMiddleware(req, res, next) {
   const startTime = Date.now();
   let timedOut = false;
 
-  // Create timeout timer
-  const timeoutTimer = setTimeout(() => {
+  // Create timeout timer (let so extendTimeout can reassign it)
+  let timeoutTimer = setTimeout(() => {
     timedOut = true;
     
     const duration = Date.now() - startTime;
@@ -85,6 +77,23 @@ function timeoutMiddleware(req, res, next) {
     timeout,
     get remainingTime() {
       return Math.max(0, timeout - (Date.now() - startTime));
+    },
+    // Allow individual routes to extend the deadline before it fires.
+    // Call req.timeoutConfig.extendTimeout(120_000) at the top of a slow handler.
+    extendTimeout(newMs) {
+      clearTimeout(timeoutTimer);
+      timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        const duration = Date.now() - startTime;
+        logger.warn(`Request timeout (extended) | method=${req.method} | route=${req.originalUrl} | duration=${duration}ms`);
+        if (!res.headersSent) {
+          res.status(408).json({
+            message: "Request timeout, please try again",
+            error: "REQUEST_TIMEOUT",
+            timeout: `${newMs}ms`,
+          });
+        }
+      }, newMs);
     },
   };
 

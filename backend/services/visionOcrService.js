@@ -4,7 +4,7 @@
  */
 
 const vision = require("@google-cloud/vision");
-const path = require("path");
+const { appConfig, assertGoogleVisionConfig } = require("../config");
 
 // Optional: image pre-processing to make OCR easier
 let sharp = null;
@@ -23,11 +23,16 @@ let client = null;
 
 function getVisionClient() {
   if (client) return client;
-  const keyPath =
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    path.join(__dirname, "../config/even-plating-440012-a9-0dc833ee5b8e.json");
+
   try {
-    client = new vision.ImageAnnotatorClient({ keyFilename: keyPath });
+    const credentials = assertGoogleVisionConfig();
+    client = new vision.ImageAnnotatorClient({
+      projectId: credentials.projectId,
+      credentials: {
+        client_email: credentials.clientEmail,
+        private_key: credentials.privateKey,
+      },
+    });
     return client;
   } catch (err) {
     console.error("[Vision OCR] Failed to init client:", err.message);
@@ -126,11 +131,11 @@ async function extractTextWithVision(imageBuffer) {
  * Check if Vision OCR is available (credentials present)
  */
 function isVisionAvailable() {
-  const keyPath =
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    path.join(__dirname, "../config/even-plating-440012-a9-0dc833ee5b8e.json");
-  const fs = require("fs");
-  return fs.existsSync(keyPath);
+  return Boolean(
+    appConfig.googleVision.projectId &&
+    appConfig.googleVision.clientEmail &&
+    appConfig.googleVision.privateKey
+  );
 }
 
 module.exports = {

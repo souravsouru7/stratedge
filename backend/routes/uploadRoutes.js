@@ -1,12 +1,19 @@
 const express = require("express");
 const router = express.Router();
 
-const upload = require("../middleware/uploadMiddleware");
 const { protect } = require("../middleware/authMiddleware");
-const { uploadRateLimiter } = require("../middleware/rateLimit");
+const {
+  statusRateLimiter,
+  uploadRateLimiter,
+} = require("../middleware/rateLimiter");
+const { uploadTradeImage } = require("../middleware/upload.middleware");
 
-const { uploadImage } = require("../controllers/uploadController");
+const {
+  getUploadJobStatus,
+  uploadImage,
+} = require("../controllers/uploadController");
 
-router.post("/", uploadRateLimiter, protect, upload.single("image"), uploadImage);
+router.post("/", protect, uploadRateLimiter, uploadTradeImage, uploadImage);
+router.get("/job-status/:id", protect, statusRateLimiter, getUploadJobStatus);
 
 module.exports = router;

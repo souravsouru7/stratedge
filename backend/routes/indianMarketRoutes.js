@@ -14,7 +14,16 @@ const cacheMiddleware = require("../middleware/cacheMiddleware");
 
 // Indian Market only — uses IndianTrade model, no shared Forex logic
 router.post("/", protect, createTrade);
-router.get("/", protect, cacheMiddleware(10), getTrades);
+router.get(
+  "/",
+  protect,
+  cacheMiddleware({
+    namespace: "trades",
+    scope: "indian_list",
+    ttlSeconds: 45,
+  }),
+  getTrades
+);
 router.get("/:id", protect, getTrade);
 router.put("/:id", protect, updateTrade);
 router.delete("/:id", protect, deleteTrade);

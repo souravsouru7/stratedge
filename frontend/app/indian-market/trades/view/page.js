@@ -125,9 +125,9 @@ function IndianTradeDetailContent() {
       <header style={{ background: theme.card, borderBottom: `1px solid ${theme.border}`, minHeight: 56, padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/mainlogo.png" alt="LOGNERA" style={{ width: 32, height: 32, objectFit: "contain" }} />
+            <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: 150, height: 40, objectFit: "contain", objectPosition: "left center" }} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary }}>LOGNERA</div>
+              <div style={{ display: "none" }}>EDGEDISCIPLINE</div>
               <div style={{ fontSize: 9, letterSpacing: "0.12em", color: theme.secondary, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>OPTIONS JOURNAL</div>
             </div>
           </Link>

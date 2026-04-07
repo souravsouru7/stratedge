@@ -83,7 +83,7 @@ export default function LoadingSpinner({ message = "LOADING DATA...", fullPage =
                     willChange: 'opacity', // Hardware acceleration
                 }}>
                     <img
-                        src="/formobileand tabicon.png"
+                        src="/logo.png"
                         alt="Loading"
                         loading="eager" // Preload critical image
                         style={{ width: "100%", height: "100%", objectFit: "contain" }}

@@ -268,9 +268,11 @@ exports.parseTrade = (text) => {
       if (nextValue) openTime = nextValue[1];
     }
 
-    // Profit summary
+    // Profit summary — only use if we're already inside a trade block (pair found),
+    // otherwise this matches the MetaTrader history header row "Profit: -91.45"
+    // which is a session total, not an individual trade P&L.
     const summaryProfitMatch = line.match(/^Profit[:\s]*(-?\d+\.\d+|-?\d+)/i);
-    if (summaryProfitMatch && !profit) profit = summaryProfitMatch[1];
+    if (summaryProfitMatch && !profit && pair) profit = summaryProfitMatch[1];
 
     const ticketMatch = line.match(/#\s*(\d{6,})|\b(\d{6,})\b/);
     if (ticketMatch && !ticket) ticket = ticketMatch[1] || ticketMatch[2];

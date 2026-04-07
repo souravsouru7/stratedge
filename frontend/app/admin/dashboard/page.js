@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      <AdminHeader title="LOGNERA" subtitle="ADMIN DASHBOARD" />
+      <AdminHeader subtitle="ADMIN DASHBOARD" />
 
       {/* ── MAIN ── */}
       <main style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }}>

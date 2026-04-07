@@ -1,50 +1,106 @@
 const { withTimeout, TIMEOUT_CONFIG } = require("../middleware/timeout");
 const { logger } = require("../utils/logger");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { appConfig } = require("../config");
+
+const GEMINI_EXTRACTION_TIMEOUT_MS = Math.max(TIMEOUT_CONFIG.aiTimeout, 90_000);
 
 async function callAIForTradeExtraction(prompt, timeoutMs = TIMEOUT_CONFIG.aiTimeout) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const openaiKey = appConfig.ai.openaiApiKey;
+  const geminiKey = appConfig.ai.geminiApiKey;
+
+  // Prefer OpenAI if configured, otherwise fall back to Gemini.
+  if (openaiKey) {
+    try {
+      const fetchPromise = fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: appConfig.ai.openaiModel,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0,
+          max_tokens: 500,
+        }),
+      });
+
+      const res = await withTimeout(fetchPromise, "OpenAI AI API call", timeoutMs);
+
+      if (!res.ok) {
+        const err = await res.text();
+        logger.warn(`OpenAI API error | status=${res.status}`, {
+          status: res.status,
+          error: err,
+        });
+        return null;
+      }
+
+      const result = await withTimeout(res.json(), "OpenAI AI API response parsing", 5000);
+      return result;
+    } catch (err) {
+      if (err.name === "TimeoutError") {
+        logger.error(`OpenAI AI extraction timed out`, {
+          error: err.message,
+          duration: err.duration,
+        });
+      } else {
+        logger.warn(`OpenAI AI extraction error`, {
+          error: err.message,
+        });
+      }
+      return null;
+    }
+  }
+
+  if (!geminiKey) {
+    logger.warn("AI extraction skipped: neither OPENAI_API_KEY nor GEMINI_API_KEY is set");
     return null;
   }
 
+  // Gemini fallback (returns an OpenAI-like shape so downstream parsing works unchanged)
   try {
-    // Create fetch promise with timeout
-    const fetchPromise = fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer apiKey`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0,
-        max_tokens: 300,
-      }),
-    });
-  
-    // Wrap with timeout
-    const res = await withTimeout(fetchPromise, "AI API call", timeoutMs);
-  
-    if (!res.ok) {
-      const err = await res.text();
-      logger.warn(`AI API error | status=${res.status}`, {
-        status: res.status,
-        error: err,
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const modelName = appConfig.ai.geminiTradeModel;
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const geminiTimeout = Math.max(timeoutMs, GEMINI_EXTRACTION_TIMEOUT_MS);
+
+    const runGemini = async (inputPrompt) => {
+      const geminiPromise = model.generateContent({
+        contents: [{ role: "user", parts: [{ text: inputPrompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 600,
+        },
       });
-      return null;
+      return withTimeout(geminiPromise, "Gemini AI call", geminiTimeout);
+    };
+
+    let result;
+    try {
+      result = await runGemini(prompt);
+    } catch (err) {
+      if (err.name !== "TimeoutError") throw err;
+
+      // Retry once with a shorter prompt to reduce model latency on large OCR text.
+      logger.warn("Gemini AI extraction timed out on first attempt, retrying with compact prompt", {
+        timeout: `${geminiTimeout}ms`,
+      });
+      const compactPrompt = String(prompt).slice(0, 2600);
+      result = await runGemini(compactPrompt);
     }
-  
-    const result = await withTimeout(res.json(), "AI API response parsing", 5000);
-    return result;
+
+    const text = result?.response?.text?.() || "";
+    return { choices: [{ message: { content: text } }] };
   } catch (err) {
-    if (err.name === 'TimeoutError') {
-      logger.error(`AI extraction timed out`, {
+    if (err.name === "TimeoutError") {
+      logger.error(`Gemini AI extraction timed out`, {
         error: err.message,
         duration: err.duration,
       });
     } else {
-      logger.warn(`AI extraction error`, {
+      logger.warn(`Gemini AI extraction error`, {
         error: err.message,
       });
     }
@@ -57,16 +113,29 @@ function stripJsonEnvelope(content) {
   return content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
+function toNumberOrNull(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 function mapIndianTradePayload(parsed) {
   return {
     pair: parsed.pair && typeof parsed.pair === "string" ? parsed.pair.trim() : null,
-    profit: typeof parsed.profit === "number" ? parsed.profit : null,
-    quantity: typeof parsed.quantity === "number" ? parsed.quantity : null,
-    strikePrice: typeof parsed.strikePrice === "number" ? parsed.strikePrice : null,
+    profit: toNumberOrNull(parsed.profit),
+    quantity: toNumberOrNull(parsed.quantity),
+    strikePrice: toNumberOrNull(parsed.strikePrice),
     optionType: parsed.optionType === "PE" || parsed.optionType === "CE" ? parsed.optionType : null,
     underlying: parsed.underlying && typeof parsed.underlying === "string" ? parsed.underlying.trim() : null,
-    entryPrice: typeof parsed.entryPrice === "number" ? parsed.entryPrice : null,
-    exitPrice: typeof parsed.exitPrice === "number" ? parsed.exitPrice : null,
+    entryPrice: toNumberOrNull(parsed.entryPrice),
+    exitPrice: toNumberOrNull(parsed.exitPrice),
     broker: parsed.broker && typeof parsed.broker === "string" ? parsed.broker.trim() : null,
   };
 }
@@ -122,8 +191,20 @@ Use null for missing values.`;
     const response = mappedTrades.length > 0 ? { ...mapped, trades: mappedTrades } : mapped;
     return options.includeRawResponse ? { ...response, rawResponse: content } : response;
   } catch (err) {
-    console.warn("[AI extraction] JSON parse error:", err.message);
-    return null;
+    // Gemini sometimes returns extra text around JSON. Try to recover the first JSON object.
+    try {
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) throw err;
+      const jsonStr = stripJsonEnvelope(match[0]);
+      const parsed = JSON.parse(jsonStr);
+      const mapped = mapIndianTradePayload(parsed);
+      const mappedTrades = mapIndianTradeList(parsed?.trades);
+      const response = mappedTrades.length > 0 ? { ...mapped, trades: mappedTrades } : mapped;
+      return options.includeRawResponse ? { ...response, rawResponse: content } : response;
+    } catch (err2) {
+      console.warn("[AI extraction] JSON parse error:", err.message);
+      return null;
+    }
   }
 }
 

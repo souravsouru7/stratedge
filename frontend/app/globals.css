@@ -3,6 +3,8 @@
 :root {
   --background: #000000;
   --foreground: #ffffff;
+  --font-plus-jakarta-sans: "Plus Jakarta Sans", Arial, Helvetica, sans-serif;
+  --font-jetbrains-mono: "JetBrains Mono", "Courier New", monospace;
 }
 
 @theme inline {

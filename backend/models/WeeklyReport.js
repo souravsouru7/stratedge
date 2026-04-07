@@ -37,6 +37,8 @@ const weeklyReportSchema = new mongoose.Schema(
 );
 
 weeklyReportSchema.index({ user: 1, marketType: 1, periodType: 1, weekStart: 1, weekEnd: 1 }, { unique: true });
+weeklyReportSchema.index({ user: 1, marketType: 1, weekStart: -1 });
+weeklyReportSchema.index({ user: 1, marketType: 1, periodType: 1, createdAt: -1 });
 
 module.exports = mongoose.model("WeeklyReport", weeklyReportSchema);
 

@@ -1,29 +1,49 @@
-const dotenv = require("dotenv");
+require("dotenv").config();
+
 const { Worker } = require("bullmq");
 const connectDB = require("../config/db");
+const { appConfig } = require("../config");
 const { connectRedis, bullmqConnection } = require("../config/redis");
+const { OCR_QUEUE_NAME } = require("../queues/ocrQueue");
 const { processTradeUpload, failTradeProcessing } = require("../services/tradeProcessingService");
 const { logger } = require("../utils/logger");
 const { jobFailureTracker } = require("../utils/jobFailureTracker");
 
-dotenv.config();
 connectDB();
 connectRedis();
 
 const worker = new Worker(
-  "ocrQueue",
+  OCR_QUEUE_NAME,
   async (job) => {
-    const { tradeId, imagePath } = job.data;
+    const { tradeId, imageUrl, imagePath, userId } = job.data;
     
     logger.info(`Job started | id=${job.id} | tradeId=${tradeId}`, {
       jobId: job.id,
       tradeId,
-      imagePath,
+      userId,
+      imageUrl: imageUrl || imagePath,
+      attempt: job.attemptsMade + 1,
       timestamp: new Date().toISOString(),
     });
 
     try {
-      const result = await processTradeUpload({ tradeId, imagePath });
+      await job.updateProgress({
+        stage: "processing",
+        attempt: job.attemptsMade + 1,
+      });
+
+      const result = await processTradeUpload({
+        tradeId,
+        imageUrl,
+        imagePath,
+        jobId: job.id,
+        attempt: job.attemptsMade + 1,
+      });
+
+      await job.updateProgress({
+        stage: "completed",
+        attempt: job.attemptsMade + 1,
+      });
       
       logger.info(`Job completed successfully | id=${job.id} | tradeId=${tradeId}`, {
         jobId: job.id,
@@ -64,6 +84,8 @@ const worker = new Worker(
   },
   {
     connection: bullmqConnection,
+    concurrency: appConfig.ocrWorker.concurrency,
+    lockDuration: appConfig.ocrWorker.lockDurationMs,
   }
 );
 
@@ -100,6 +122,9 @@ process.on("SIGTERM", async () => {
 logger.info("OCR worker started successfully", {
   timestamp: new Date().toISOString(),
   pid: process.pid,
+  queueName: OCR_QUEUE_NAME,
+  concurrency: appConfig.ocrWorker.concurrency,
+  lockDurationMs: appConfig.ocrWorker.lockDurationMs,
 });
 
 console.log("OCR worker running. Start with: node workers/ocrWorker.js");

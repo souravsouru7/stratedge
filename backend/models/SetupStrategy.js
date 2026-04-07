@@ -30,5 +30,7 @@ const setupStrategySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+setupStrategySchema.index({ user: 1, marketType: 1, createdAt: 1 });
+
 module.exports = mongoose.model("SetupStrategy", setupStrategySchema);
 

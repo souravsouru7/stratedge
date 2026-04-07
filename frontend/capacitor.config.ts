@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.stratedge.app',
-  appName: 'LOGNERA',
+  appId: 'com.edgecpline',
+  appName: 'Edgecipline',
   webDir: 'out',
   server: {
     cleartext: true
@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      serverClientId: '1045232719142-uccmv2nnco3rcmvs1k6s2l44h9jla1fg.apps.googleusercontent.com',
+      serverClientId: '394303085328-0spvnvp2tr0iktig0rkeqs435ktldjfu.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     }
   }

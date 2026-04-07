@@ -1,57 +1,68 @@
 const { Queue } = require("bullmq");
+const { appConfig } = require("../config");
 const { bullmqConnection } = require("../config/redis");
 const { logger } = require("../utils/logger");
 
-const ocrQueue = new Queue("ocrQueue", {
+const OCR_QUEUE_NAME = "ocrQueue";
+const OCR_JOB_NAME = "processTrade";
+const ocrQueue = new Queue(OCR_QUEUE_NAME, {
   connection: bullmqConnection,
   defaultJobOptions: {
     removeOnComplete: 100,
-    removeOnFail: 1000, // Keep more failed jobs for debugging
-    attempts: 2, // Retry failed jobs once
+    removeOnFail: 1000,
+    attempts: appConfig.ocrQueue.attempts,
     backoff: {
-      type: 'exponential',
-      delay: 2000, // Start with 2s delay, then exponential backoff
+      type: "exponential",
+      delay: appConfig.ocrQueue.backoffMs,
     },
   },
 });
 
-// Listen to queue events for monitoring
-ocrQueue.on('error', (error) => {
-  logger.error('OCR Queue error', {
+async function enqueueOcrJob({ tradeId, imageUrl, userId, marketType, broker }) {
+  return ocrQueue.add(
+    OCR_JOB_NAME,
+    {
+      tradeId,
+      imageUrl,
+      userId: userId?.toString(),
+      marketType,
+      broker: broker || "",
+    },
+    {
+      jobId: tradeId,
+    }
+  );
+}
+
+async function getOcrJobSnapshot(jobId) {
+  const job = await ocrQueue.getJob(jobId);
+  if (!job) {
+    return null;
+  }
+
+  return {
+    jobId: job.id,
+    state: await job.getState(),
+    attemptsMade: job.attemptsMade,
+    failedReason: job.failedReason || null,
+    progress: job.progress,
+    timestamp: job.timestamp,
+    processedOn: job.processedOn || null,
+    finishedOn: job.finishedOn || null,
+  };
+}
+
+ocrQueue.on("error", (error) => {
+  logger.error("OCR queue error", {
     error: error.message,
     stack: error.stack,
   });
 });
 
-ocrQueue.on('waiting', (jobId) => {
-  logger.debug(`Job waiting in queue | jobId=${jobId}`);
-});
-
-ocrQueue.on('active', (job) => {
-  logger.info(`Job active | jobId=${job.id} | tradeId=${job.data.tradeId}`, {
-    jobId: job.id,
-    tradeId: job.data.tradeId,
-  });
-});
-
-ocrQueue.on('completed', (job) => {
-  logger.info(`Job completed | jobId=${job.id} | tradeId=${job.data.tradeId}`, {
-    jobId: job.id,
-    tradeId: job.data.tradeId,
-  });
-});
-
-ocrQueue.on('failed', (job, error) => {
-  logger.error(`Job failed | jobId=${job?.id} | tradeId=${job?.data?.tradeId}`, {
-    jobId: job?.id,
-    tradeId: job?.data?.tradeId,
-    error: error?.message,
-    stack: error?.stack,
-  });
-});
-
-ocrQueue.on('stalled', (jobId) => {
-  logger.warn(`Job stalled | jobId=${jobId}`);
-});
-
-module.exports = { ocrQueue };
+module.exports = {
+  OCR_JOB_NAME,
+  OCR_QUEUE_NAME,
+  enqueueOcrJob,
+  getOcrJobSnapshot,
+  ocrQueue,
+};

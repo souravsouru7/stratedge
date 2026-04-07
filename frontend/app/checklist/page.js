@@ -131,10 +131,10 @@ export default function PreTradeChecklistPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link href={dashHref} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} />
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>LOGNERA</div>
+              <div style={{ display: "none" }}>EDGEDISCIPLINE</div>
               <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
                 PRE-TRADE CHECKLIST
               </div>

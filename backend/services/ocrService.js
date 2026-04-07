@@ -14,13 +14,13 @@ async function preprocessImageForTesseract(imageInput) {
   if (!sharp || !Buffer.isBuffer(imageInput)) return imageInput;
 
   try {
+    // Keep width modest — larger images slow Tesseract dramatically
     return await sharp(imageInput)
       .rotate()
-      .resize({ width: 1600, withoutEnlargement: true })
+      .resize({ width: 1200, withoutEnlargement: true })
       .grayscale()
       .normalize()
-      .sharpen()
-      .png()
+      .png({ compressionLevel: 1 }) // fast encode
       .toBuffer();
   } catch (error) {
     console.warn("[Tesseract OCR] Preprocess failed, using raw image:", error.message);
@@ -38,8 +38,12 @@ exports.extractText = async (imageInput, timeoutMs = TIMEOUT_CONFIG.ocrTimeout) 
     const result = await withTimeout(
       Tesseract.recognize(processedInput, "eng", {
         logger: () => {},
-        tessedit_pageseg_mode: String(Tesseract.PSM.SINGLE_BLOCK),
+        // SPARSE_TEXT is faster than SINGLE_BLOCK for trading screenshots
+        // which contain mixed tables, numbers, and labels
+        tessedit_pageseg_mode: String(Tesseract.PSM.SPARSE_TEXT),
         preserve_interword_spaces: "1",
+        // Limit character set to what trading data actually contains
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,+-:/% #@()\n\t ",
       }),
       "OCR extraction",
       timeoutMs

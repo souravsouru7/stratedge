@@ -1,9 +1,10 @@
 const mongoose = require("mongoose");
+const { appConfig, maskSecret } = require("./index");
 
 const connectDB = async () => {
   try {
-    console.log(`Connecting to MongoDB with URI: ${process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 20) + '...' : 'undefined'}`);
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
+    console.log(`Connecting to MongoDB with URI: ${maskSecret(appConfig.mongoUri, 20, 8)}`);
+    const conn = await mongoose.connect(appConfig.mongoUri, {
       serverSelectionTimeoutMS: 10000,
       family: 4,
     });

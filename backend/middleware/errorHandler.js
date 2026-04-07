@@ -1,64 +1,82 @@
-// Centralized error handler so users see friendly messages
-// and internals are only logged on the server.
-
 const multer = require("multer");
+const mongoose = require("mongoose");
+const ApiError = require("../utils/ApiError");
+const { appConfig } = require("../config");
 const { logger } = require("../utils/logger");
 
 function errorHandler(err, req, res, next) {
-  // Log all errors centrally
-  logger.error(`Error in ${req.method} ${req.originalUrl}`, {
-    message: err.message,
-    stack: err.stack,
-    route: req.originalUrl,
-    method: req.method,
-    userAgent: req.get('user-agent'),
-    ip: req.ip,
-  });
-
   if (res.headersSent) {
     return next(err);
   }
 
-  // Handle Multer-specific errors (file uploads)
+  let normalizedError = err;
+
   if (err instanceof multer.MulterError) {
     let message = "File upload error.";
     if (err.code === "LIMIT_FILE_SIZE") {
-      message = "File is too large. Maximum size is 5MB.";
+      message = "File is too large.";
+    } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      message = "Invalid file type. Only supported image files are allowed.";
     }
-    logger.warn(`Multer upload error | code=${err.code} | path=${req.originalUrl}`, {
-      code: err.code,
-      route: req.originalUrl,
-      message: err.message,
-    });
-    return res.status(400).json({ message });
+    normalizedError = new ApiError(400, message, err.code || "UPLOAD_ERROR");
   }
 
-  if (err.code === "INVALID_FILE_TYPE") {
-    logger.warn(`Invalid file type error | path=${req.originalUrl}`, {
-      route: req.originalUrl,
-      message: err.message,
-    });
-    return res.status(400).json({ message: err.message || "Only image files are allowed" });
+  if (err?.code === "INVALID_FILE_TYPE") {
+    normalizedError = new ApiError(400, err.message || "Invalid file type.", "INVALID_FILE_TYPE");
   }
 
-  // Custom status code if provided, otherwise 500
-  const status = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
-
-  // Do not leak internal error details to clients for server errors
-  const isServerError = status >= 500;
-  const message = isServerError
-    ? "Something went wrong. Please try again later."
-    : err.message || "Request failed.";
-
-  if (status === 401 || status === 403) {
-    logger.warn(`Authorization error response | status=${status} | path=${req.originalUrl}`, {
-      status,
-      route: req.originalUrl,
-      message: err.message,
-    });
+  if (err instanceof mongoose.Error.ValidationError) {
+    normalizedError = new ApiError(
+      400,
+      Object.values(err.errors).map((entry) => entry.message).join(", ") || "Validation failed.",
+      "VALIDATION_ERROR"
+    );
   }
 
-  res.status(status).json({ message });
+  if (err instanceof mongoose.Error.CastError) {
+    normalizedError = new ApiError(400, `Invalid ${err.path}.`, "INVALID_ID");
+  }
+
+  if (err?.code === 11000) {
+    const duplicateField = Object.keys(err.keyPattern || {})[0] || "resource";
+    normalizedError = new ApiError(409, `${duplicateField} already exists.`, "DUPLICATE_RESOURCE");
+  }
+
+  const statusCode = normalizedError?.statusCode && Number.isInteger(normalizedError.statusCode)
+    ? normalizedError.statusCode
+    : 500;
+  const errorCode = normalizedError?.errorCode || "INTERNAL_ERROR";
+  const isServerError = statusCode >= 500;
+  const responseMessage = isServerError
+    ? "Something went wrong"
+    : normalizedError?.message || "Request failed";
+
+  logger[isServerError ? "error" : "warn"](`Error in ${req.method} ${req.originalUrl}`, {
+    statusCode,
+    errorCode,
+    message: normalizedError?.message,
+    stack: normalizedError?.stack,
+    route: req.originalUrl,
+    method: req.method,
+    userAgent: req.get("user-agent"),
+    ip: req.ip,
+  });
+
+  const payload = {
+    status: "error",
+    message: responseMessage,
+    errorCode,
+  };
+
+  if (normalizedError?.details) {
+    payload.details = normalizedError.details;
+  }
+
+  if (appConfig.env !== "production" && normalizedError?.stack) {
+    payload.stack = normalizedError.stack;
+  }
+
+  res.status(statusCode).json(payload);
 }
 
 module.exports = {

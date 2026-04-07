@@ -1,35 +1,49 @@
-const { client, isRedisReady } = require("../config/redis");
+const { buildCacheKey, getCache, setCache } = require("../utils/cache");
 
-const cacheMiddleware = (minutes = 10) => async (req, res, next) => {
-    if (!isRedisReady()) {
-        return next();
+function stableQuerySuffix(query = {}) {
+  const keys = Object.keys(query).sort();
+  if (keys.length === 0) return "default";
+
+  return keys
+    .map((key) => `${key}=${Array.isArray(query[key]) ? query[key].join(",") : query[key]}`)
+    .join("&");
+}
+
+function resolveNamespace(option, req) {
+  return typeof option === "function" ? option(req) : option;
+}
+
+const cacheMiddleware = (options = {}) => async (req, res, next) => {
+  const normalizedOptions = typeof options === "number"
+    ? { ttlSeconds: options * 60 }
+    : options;
+
+  const ttlSeconds = normalizedOptions.ttlSeconds || 60;
+  const namespace = resolveNamespace(normalizedOptions.namespace, req) || "response";
+  const scope = resolveNamespace(normalizedOptions.scope, req) || req.baseUrl || req.path || "default";
+  const userId = req.user?._id?.toString?.() || "anonymous";
+  const querySuffix = stableQuerySuffix(req.query);
+  const key = buildCacheKey(namespace, userId, scope, req.path, querySuffix);
+
+  try {
+    const cachedData = await getCache(key);
+    if (cachedData !== null) {
+      return res.json(cachedData);
     }
 
-    const key = `cache:${req.user._id}:${req.originalUrl || req.url}`;
+    const originalJson = res.json.bind(res);
 
-    try {
-        const cachedData = await client.get(key);
-        if (cachedData) {
-            return res.json(JSON.parse(cachedData));
-        }
+    res.json = function cacheAwareJson(data) {
+      if (res.statusCode < 400) {
+        setCache(key, data, ttlSeconds).catch(() => {});
+      }
+      return originalJson(data);
+    };
 
-        const originalJson = res.json;
-
-        res.json = function (data) {
-            res.json = originalJson;
-
-            client
-                .setex(key, minutes * 60, JSON.stringify(data))
-                .catch((err) => console.error("Redis cache set error:", err));
-
-            return originalJson.call(this, data);
-        };
-
-        next();
-    } catch (err) {
-        console.error("Redis cache middleware error:", err);
-        next();
-    }
+    return next();
+  } catch (error) {
+    return next();
+  }
 };
 
 module.exports = cacheMiddleware;

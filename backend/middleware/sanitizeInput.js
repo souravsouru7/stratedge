@@ -1,3 +1,5 @@
+const ApiError = require("../utils/ApiError");
+
 // Basic request sanitization middleware applied globally.
 // - Blocks keys starting with '$' or containing '.' to reduce NoSQL / Mongo operator injection risk
 // - Can be extended later with more rules as needed.
@@ -23,15 +25,13 @@ function sanitizeInput(req, res, next) {
 
     for (const target of targets) {
       if (hasDangerousKey(target)) {
-        return res.status(400).json({
-          message: "Invalid input structure."
-        });
+        return next(new ApiError(400, "Invalid input structure.", "VALIDATION_ERROR"));
       }
     }
 
     next();
   } catch (err) {
-    return res.status(400).json({ message: "Invalid request payload." });
+    return next(new ApiError(400, "Invalid request payload.", "VALIDATION_ERROR"));
   }
 }
 

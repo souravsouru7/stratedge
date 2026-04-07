@@ -89,9 +89,9 @@ export default function ProfilePage() {
             }}
           >
             <img
-              src="/mainlogo.png"
-              alt="LOGNERA"
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              src="/mainlogo1.png"
+              alt="Edgecipline"
+              style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }}
             />
           </div>
           <div>
@@ -102,7 +102,7 @@ export default function ProfilePage() {
                 letterSpacing: "0.06em"
               }}
             >
-              LOGNERA
+              {""}
             </div>
             <div
               style={{

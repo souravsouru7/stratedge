@@ -1,28 +1,20 @@
 const Feedback = require("../models/Feedback");
 const Notification = require("../models/Notification");
-const cloudinary = require("../config/cloudinary");
+const ApiError = require("../utils/ApiError");
+const asyncHandler = require("../utils/asyncHandler");
 
 /**
  * @desc    Submit feedback/bug report
  * @route   POST /api/feedback
  * @access  Private
  */
-exports.submitFeedback = async (req, res) => {
-  try {
-    const { type, subject, message } = req.body;
-    if (!type || !subject || !message) {
-      return res.status(400).json({ message: "Please provide type, subject and message" });
-    }
+exports.submitFeedback = asyncHandler(async (req, res) => {
+  const { type, subject, message } = req.body;
+  if (!type || !subject || !message) {
+    throw new ApiError(400, "Please provide type, subject and message", "VALIDATION_ERROR");
+  }
 
-    let screenshotUrl = "";
-    if (req.file) {
-      const b64 = Buffer.from(req.file.buffer).toString("base64");
-      const dataURI = `data:${req.file.mimetype};base64,${b64}`;
-      const result = await cloudinary.uploader.upload(dataURI, {
-        folder: "feedback"
-      });
-      screenshotUrl = result.secure_url;
-    }
+  const screenshotUrl = req.uploadedImage?.imageUrl || "";
 
     const feedback = await Feedback.create({
       user: req.user._id,
@@ -41,65 +33,50 @@ exports.submitFeedback = async (req, res) => {
       metadata: { feedbackId: feedback._id, type, subject }
     });
 
-    res.status(201).json({ message: "Feedback submitted successfully", feedback });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.status(201).json({ message: "Feedback submitted successfully", feedback });
+});
 
 /**
  * @desc    Get all feedback (Admin)
  * @route   GET /api/admin/feedback
  * @access  Private/Admin
  */
-exports.getAllFeedback = async (req, res) => {
-  try {
-    const feedback = await Feedback.find()
-      .populate("user", "name email")
-      .sort({ createdAt: -1 });
-    res.json(feedback);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+exports.getAllFeedback = asyncHandler(async (req, res) => {
+  const feedback = await Feedback.find()
+    .populate("user", "name email")
+    .sort({ createdAt: -1 });
+  res.json(feedback);
+});
 
 /**
  * @desc    Update feedback status (Admin)
  * @route   PATCH /api/admin/feedback/:id
  * @access  Private/Admin
  */
-exports.updateFeedbackStatus = async (req, res) => {
-  try {
-    const { status, adminNotes } = req.body;
-    const feedback = await Feedback.findById(req.params.id);
+exports.updateFeedbackStatus = asyncHandler(async (req, res) => {
+  const { status, adminNotes } = req.body;
+  const feedback = await Feedback.findById(req.params.id);
 
-    if (!feedback) {
-      return res.status(404).json({ message: "Feedback not found" });
-    }
+  if (!feedback) {
+    throw new ApiError(404, "Feedback not found", "NOT_FOUND");
+  }
 
     if (status) feedback.status = status;
     if (adminNotes !== undefined) feedback.adminNotes = adminNotes;
 
-    await feedback.save();
-    res.json({ message: "Feedback updated successfully", feedback });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  await feedback.save();
+  res.json({ message: "Feedback updated successfully", feedback });
+});
 
 /**
  * @desc    Delete feedback (Admin)
  * @route   DELETE /api/admin/feedback/:id
  * @access  Private/Admin
  */
-exports.deleteFeedback = async (req, res) => {
-  try {
-    const feedback = await Feedback.findByIdAndDelete(req.params.id);
-    if (!feedback) {
-      return res.status(404).json({ message: "Feedback not found" });
-    }
-    res.json({ message: "Feedback deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+exports.deleteFeedback = asyncHandler(async (req, res) => {
+  const feedback = await Feedback.findByIdAndDelete(req.params.id);
+  if (!feedback) {
+    throw new ApiError(404, "Feedback not found", "NOT_FOUND");
   }
-};
+  res.json({ message: "Feedback deleted successfully" });
+});

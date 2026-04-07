@@ -11,11 +11,10 @@ const {
 } = require("../controllers/tradeController");
 
 const { protect } = require("../middleware/authMiddleware");
-const cacheMiddleware = require("../middleware/cacheMiddleware");
 
 router.post("/", protect, createTrade);
 
-router.get("/", protect, cacheMiddleware(1), getTrades);
+router.get("/", protect, getTrades);
 
 router.get("/status/:id", protect, getTradeStatus);
 

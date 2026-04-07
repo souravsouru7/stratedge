@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 const { submitFeedback } = require("../controllers/feedbackController");
 const { protect } = require("../middleware/authMiddleware");
-const upload = require("../middleware/uploadMiddleware");
+const { uploadFeedbackScreenshot } = require("../middleware/upload.middleware");
 
-router.post("/", protect, upload.single("screenshot"), submitFeedback);
+router.post("/", protect, uploadFeedbackScreenshot, submitFeedback);
 
 module.exports = router;

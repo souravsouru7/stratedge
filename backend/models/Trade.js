@@ -132,6 +132,31 @@ const tradeSchema = new mongoose.Schema(
       default: "pending"
     },
 
+    ocrJobId: {
+      type: String,
+      default: ""
+    },
+
+    ocrJobName: {
+      type: String,
+      default: "processTrade"
+    },
+
+    ocrAttempts: {
+      type: Number,
+      default: 0
+    },
+
+    queuedAt: {
+      type: Date,
+      default: null
+    },
+
+    processingStartedAt: {
+      type: Date,
+      default: null
+    },
+
     error: {
       type: String,
       default: null
@@ -211,5 +236,8 @@ tradeSchema.index({ user: 1 });
 tradeSchema.index({ createdAt: -1 });
 tradeSchema.index({ strategy: 1 });
 tradeSchema.index({ user: 1, createdAt: -1 });
+tradeSchema.index({ user: 1, marketType: 1, createdAt: -1 });
+tradeSchema.index({ user: 1, status: 1, createdAt: -1 });
+tradeSchema.index({ user: 1, marketType: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Trade", tradeSchema);

@@ -1,143 +1,52 @@
-import { API_URL as BASE_URL } from "@/config/api";
-
-const handleResponse = async (res, redirectOnAuthError = true) => {
-  if (!res.ok) {
-    if (res.status === 401 && redirectOnAuthError && typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
-      return new Promise(() => {});
-    }
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Request failed with status ${res.status}`);
-  }
-  return res.json();
-};
+import apiClient from "./apiClient";
 
 export const registerUser = async (data) => {
-  const res = await fetch(`${BASE_URL}/auth/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
-  });
-
-  return handleResponse(res, false);
+  return await apiClient.post(`/auth/register`, data);
 };
 
 export const loginUser = async (data) => {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
-  });
-
-  return handleResponse(res, false);
+  return await apiClient.post(`/auth/login`, data);
 };
 
-export const googleLogin = async (credential) => {
-  const res = await fetch(`${BASE_URL}/auth/google`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ credential })
-  });
-
-  return handleResponse(res, false);
+export const googleLogin = async (idToken) => {
+  return await apiClient.post(`/auth/google`, { idToken });
 };
 
 // Get basic profile of the logged-in user
 export const getProfile = async () => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-  const res = await fetch(`${BASE_URL}/auth/me`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    }
-  });
-
-  return handleResponse(res, true);
+  return await apiClient.get(`/auth/me`);
 };
 
 export const forgotPassword = async (email) => {
-  const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ email })
-  });
-
-  return handleResponse(res, false);
+  return await apiClient.post(`/auth/forgot-password`, { email });
 };
 
 export const verifyOTP = async (email, otp) => {
-  const res = await fetch(`${BASE_URL}/auth/verify-otp`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ email, otp })
-  });
-
-  return handleResponse(res, false);
+  return await apiClient.post(`/auth/verify-otp`, { email, otp });
 };
 
 export const resetPassword = async (email, otp, password) => {
-  const res = await fetch(`${BASE_URL}/auth/reset-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ email, otp, password })
-  });
-
-  return handleResponse(res, false);
+  return await apiClient.post(`/auth/reset-password`, { email, otp, password });
 };
 
 export const submitFeedback = async (data) => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const isFormData = data instanceof FormData;
-  
-  const res = await fetch(`${BASE_URL}/feedback`, {
-    method: "POST",
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: isFormData ? data : JSON.stringify(data)
-  });
-
-  return handleResponse(res, true);
+  // If FormData, we don't need to wrap it in a string and we shouldn't explicitly set Content-Type.
+  return await apiClient.post(`/feedback`, data, isFormData ? {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  } : undefined);
 };
 
 // Payment APIs
 export const createPaymentOrder = async () => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const res = await fetch(`${BASE_URL}/payments/order`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    }
-  });
-  return handleResponse(res, true);
+  return await apiClient.post(`/payments/order`);
 };
 
 export const verifyPayment = async (data) => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const res = await fetch(`${BASE_URL}/payments/verify`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify(data)
-  });
-  return handleResponse(res, true);
+  return await apiClient.post(`/payments/verify`, data);
+};
+
+export const testConnection = async () => {
+  // Can just ping the server base URL
+  return await apiClient.get('/');
 };

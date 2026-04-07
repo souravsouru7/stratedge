@@ -174,7 +174,7 @@ export default function AdminLoginPage() {
   const fields = [
     {
       name: "email", type: "email",
-      label: "Admin Email", placeholder: "admin@stratedge.com",
+      label: "Admin Email", placeholder: "admin@edgecipline.com",
       icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>,
     },
     {
@@ -211,9 +211,9 @@ export default function AdminLoginPage() {
         boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+          <div style={{ width: 168, height: 44, position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-start" }}><img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} /></div>
           <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>LOGNERA</div>
+            <div style={{ display: "none" }}>EDGEDISCIPLINE</div>
             <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#B8860B", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>ADMIN PORTAL</div>
           </div>
         </div>

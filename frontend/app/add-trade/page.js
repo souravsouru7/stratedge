@@ -1,764 +1,260 @@
 "use client";
-import { useState, useEffect, useRef, Suspense } from "react";
-import { createTrade } from "@/services/tradeApi";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { useMarket, MARKETS } from "@/context/MarketContext";
-import { fetchSetups } from "@/services/setupApi";
 
-function AddTradePageContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+import { Suspense, useRef } from "react";
+import Link from "next/link";
+import { Camera, Save, ArrowLeft } from "lucide-react";
+import CandlestickBackground from "@/features/shared/components/CandlestickBackground";
+import TickerTape            from "@/features/shared/components/TickerTape";
+import PageHeader            from "@/features/shared/components/PageHeader";
+import { useClock }          from "@/features/shared/hooks/useClock";
+import { useMarket }         from "@/context/MarketContext";
+import SectionCard           from "@/features/trade/components/SectionCard";
+import { FormInput }         from "@/features/trade/components/FormInput";
+import { FormSelect }        from "@/features/trade/components/FormSelect";
+import SetupChecklist        from "@/features/trade/components/SetupChecklist";
+import { useAddTrade }       from "@/features/trade/hooks/useAddTrade";
+import { Spinner }           from "@/features/shared";
+
+const MOODS = [
+  { emoji: "😰", val: 1, label: "Stressed" },
+  { emoji: "😟", val: 2, label: "Anxious" },
+  { emoji: "😐", val: 3, label: "Neutral" },
+  { emoji: "😊", val: 4, label: "Good" },
+  { emoji: "🔥", val: 5, label: "Peak" },
+];
+
+const EMOTIONS = ["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"];
+
+const monoStyle = { fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" };
+const labelSt   = { display: "block", fontSize: 11, fontWeight: 700, color: "#94A3B8", marginBottom: 8 };
+
+function AddTradeContent() {
   const { currentMarket, getCurrencySymbol, isIndianMarket } = useMarket();
+  const clock = useClock();
   const fileInputRef = useRef(null);
 
-  const theme = {
-    bull: "#0D9E6E",
-    bear: "#D63B3B",
-    primary: "#0D9E6E",
-    secondary: "#0F1923",
-    muted: "#94A3B8",
-    border: "#E2E8F0",
-    bg: "#F0EEE9",
-    card: "#FFFFFF"
-  };
+  const {
+    trade, setTrade, handleChange, handleStrategyChange, handleScreenshotChange,
+    setupRules, toggleSetupRule, updateSetupRuleLabel, addSetupRule, clearSetupRules,
+    handleSubmit, screenshotPreview, uploading, isSaving, setupsLoading, strategies, mounted
+  } = useAddTrade(currentMarket, isIndianMarket);
 
-  // Get market from query param or context
-  const marketType = searchParams.get('market') || currentMarket;
-
-  // Check authentication
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-    }
-  }, [router]);
-
-  const [trade, setTrade] = useState({
-    pair: "",
-    type: "BUY",
-    lotSize: "",
-    entryPrice: "",
-    exitPrice: "",
-    stopLoss: "",
-    takeProfit: "",
-    profit: "",
-    commission: "",
-    swap: "",
-    balance: "",
-    strategy: "",
-    strategyCustom: "",
-    session: "",
-    notes: "",
-    riskRewardRatio: "",
-    riskRewardCustom: "",
-    screenshot: "",
-    // Indian Market Fields
-    segment: "Equity",
-    instrumentType: "EQUITY",
-    quantity: "",
-    strikePrice: "",
-    expiryDate: "",
-    tradeType: "INTRADAY",
-    brokerage: "",
-    sttTaxes: "",
-    entryBasis: "Plan",
-    entryBasisCustom: "",
-    // Psychology fields
-    mood: null,
-    confidence: "",
-    emotionalTags: [],
-    mistakeTag: "",
-    lesson: "",
-    wouldRetake: "",
-  });
-
-  const [showCustomRR, setShowCustomRR] = useState(false);
-  const [screenshotPreview, setScreenshotPreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [strategies, setStrategies] = useState([]);
-  const [setupsLoading, setSetupsLoading] = useState(false);
-  const [setupRules, setSetupRules] = useState([]);
-
-  useEffect(() => {
-    // Automatic session detection based on current time
-    const now = new Date();
-    const hour = now.getUTCHours();
-
-    if (isIndianMarket) {
-      // Indian Market (NSE/BSE) typically 9:15 AM - 3:30 PM IST
-      // Simplified session detection could be added here if needed
-      setTrade(prev => ({ ...prev, session: "Morning Session" }));
-    } else {
-      let detectedSession = "Asian";
-      if (hour >= 8 && hour < 13) detectedSession = "London";
-      else if (hour >= 13 && hour < 21) detectedSession = "New York";
-      setTrade(prev => ({ ...prev, session: detectedSession }));
-    }
-  }, [isIndianMarket]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    if (name === "riskRewardRatio") {
-      setShowCustomRR(value === "custom");
-    }
-    if (name === "entryBasis") {
-      setTrade(prev => ({ ...prev, entryBasisCustom: value === "Custom" ? prev.entryBasisCustom : "" }));
-    }
-    setTrade(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Load saved setups/strategies for current market
-  useEffect(() => {
-    let cancelled = false;
-    const loadSetups = async () => {
-      try {
-        setSetupsLoading(true);
-        const serverStrategies = await fetchSetups(marketType);
-        if (cancelled) return;
-        if (Array.isArray(serverStrategies) && serverStrategies.length) {
-          const mapped = serverStrategies.map((s, sIdx) => ({
-            id: sIdx + 1,
-            name: s.name || "",
-            rules: Array.isArray(s.rules)
-              ? s.rules.map((r, rIdx) => ({
-                  id: rIdx + 1,
-                  label: r.label || "",
-                  followed: false,
-                }))
-              : [],
-          }));
-          setStrategies(mapped);
-        } else {
-          setStrategies([]);
-        }
-      } catch (e) {
-        console.error("Failed to load setups", e);
-        setStrategies([]);
-      } finally {
-        if (!cancelled) setSetupsLoading(false);
-      }
-    };
-    loadSetups();
-    return () => {
-      cancelled = true;
-    };
-  }, [marketType]);
-
-  const handleStrategyChange = (e) => {
-    const value = e.target.value;
-    setTrade(prev => ({ ...prev, strategy: value }));
-
-    const selected = strategies.find(s => s.name === value);
-    if (selected && Array.isArray(selected.rules) && selected.rules.length) {
-      setSetupRules(
-        selected.rules.map((r, idx) => ({
-          id: r.id ?? idx + 1,
-          label: r.label || "",
-          followed: false,
-        }))
-      );
-    } else {
-      setSetupRules([]);
-    }
-  };
-
-  const toggleSetupRule = (id) => {
-    setSetupRules(prev => prev.map(r => (r.id === id ? { ...r, followed: !r.followed } : r)));
-  };
-
-  const updateSetupRuleLabel = (id, value) => {
-    setSetupRules(prev => prev.map(r => (r.id === id ? { ...r, label: value } : r)));
-  };
-
-  const addSetupRule = () => {
-    setSetupRules(prev => [
-      ...prev,
-      { id: (prev[prev.length - 1]?.id || 0) + 1, label: "", followed: false },
-    ]);
-  };
-
-  const clearSetupRules = () => {
-    setSetupRules(prev => prev.map(r => ({ ...r, followed: false })));
-  };
-
-  const handleScreenshotChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => setScreenshotPreview(reader.result);
-    reader.readAsDataURL(file);
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const res = await fetch("http://localhost:5000/api/upload", {
-        method: "POST",
-        body: formData
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setTrade(prev => ({ ...prev, screenshot: data.url }));
-      } else {
-        alert("Failed to upload screenshot");
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      alert("Failed to upload screenshot");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const triggerFileInput = () => fileInputRef.current?.click();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!trade.pair) {
-      alert(`Please enter a ${isIndianMarket ? "Symbol" : "Pair"}`);
-      return;
-    }
-
-    const tradeData = {
-      pair: trade.pair,
-      type: trade.type.toUpperCase(),
-      entryPrice: trade.entryPrice ? parseFloat(trade.entryPrice) : undefined,
-      exitPrice: trade.exitPrice ? parseFloat(trade.exitPrice) : undefined,
-      stopLoss: trade.stopLoss ? parseFloat(trade.stopLoss) : undefined,
-      takeProfit: trade.takeProfit ? parseFloat(trade.takeProfit) : undefined,
-      profit: trade.profit ? parseFloat(trade.profit) : undefined,
-      balance: trade.balance ? parseFloat(trade.balance) : undefined,
-      session: trade.session || undefined,
-      strategy: trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined),
-      notes: trade.notes || undefined,
-      riskRewardRatio: trade.riskRewardRatio || undefined,
-      riskRewardCustom: trade.riskRewardCustom || undefined,
-      screenshot: trade.screenshot || undefined,
-      // Forex specific
-      lotSize: !isIndianMarket && trade.lotSize ? parseFloat(trade.lotSize) : undefined,
-      commission: !isIndianMarket && trade.commission ? parseFloat(trade.commission) : undefined,
-      swap: !isIndianMarket && trade.swap ? parseFloat(trade.swap) : undefined,
-      // Indian Market specific
-      segment: isIndianMarket ? trade.segment : undefined,
-      instrumentType: isIndianMarket ? trade.instrumentType : undefined,
-      strikePrice: isIndianMarket && trade.strikePrice ? parseFloat(trade.strikePrice) : undefined,
-      expiryDate: isIndianMarket && trade.expiryDate ? trade.expiryDate : undefined,
-      quantity: isIndianMarket && trade.quantity ? parseFloat(trade.quantity) : undefined,
-      tradeType: isIndianMarket ? trade.tradeType : undefined,
-      brokerage: isIndianMarket && trade.brokerage ? parseFloat(trade.brokerage) : undefined,
-      sttTaxes: isIndianMarket && trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined,
-      entryBasis: trade.entryBasis || "Plan",
-      entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : undefined,
-      // Psychology fields
-      mood: trade.mood || undefined,
-      confidence: trade.confidence || undefined,
-      emotionalTags: trade.emotionalTags && trade.emotionalTags.length > 0 ? trade.emotionalTags : undefined,
-      mistakeTag: trade.mistakeTag || undefined,
-      lesson: trade.lesson || undefined,
-      wouldRetake: trade.wouldRetake || undefined,
-    };
-
-    const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
-    const followedCount = activeRules.filter(r => r.followed).length;
-    const setupScore = activeRules.length > 0 ? Math.round((followedCount / activeRules.length) * 100) : null;
-    tradeData.setupRules = activeRules.map(({ label, followed }) => ({ label: label.trim(), followed }));
-    tradeData.setupScore = setupScore;
-
-    try {
-      const result = await createTrade(tradeData, marketType);
-      if (result && result._id) {
-        alert("Trade saved successfully!");
-        router.push(marketType === MARKETS.INDIAN_MARKET ? "/indian-market/dashboard" : "/dashboard");
-      } else {
-        throw new Error(result?.message || "Failed to save trade");
-      }
-    } catch (err) {
-      console.error("Save error:", err);
-      alert(err.message || "Failed to save trade. Please try again.");
-    }
-  };
+  const bull = parseFloat(trade.profit || 0) >= 0;
+  const inProgress = uploading || isSaving;
 
   return (
-    <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.secondary }}>
-      <header style={{
-        position: "sticky", top: 0, zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
-        background: theme.card,
-        backdropFilter: "blur(20px)",
-        borderBottom: `1px solid ${theme.border}`,
-        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href={isIndianMarket ? "/indian-market/dashboard" : "/dashboard"} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
-            <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.secondary, lineHeight: 1 }}>
-                LOGNERA
-              </div>
-              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: isIndianMarket ? "#1B5E20" : theme.primary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                {isIndianMarket ? "OPTIONS JOURNAL · NSE" : "FOREX AI JOURNAL"}
-              </div>
-            </div>
+    <div style={{ minHeight: "100vh", background: "#F0EEE9", fontFamily: "'Plus Jakarta Sans',sans-serif", color: "#0F1923" }}>
+      <PageHeader showMarketSwitcher showClock clock={clock} />
+      <TickerTape />
+
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: "40px 20px", opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(16px)", transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 6 }}>
+              Log New <span style={{ color: isIndianMarket ? '#0D9E6E' : "#0D9E6E" }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
+            </h1>
+            <p style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, ...monoStyle }}>
+              {isIndianMarket ? "NSE / BSE / F&O MARKET ENTRY" : "GLOBAL CURRENCY MARKET ENTRY"}
+            </p>
+          </div>
+          <Link href="/trades" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700, color: "#4A5568", textDecoration: "none", padding: "8px 12px", background: "#FFF", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+            <ArrowLeft size={14} /> JOURNAL
           </Link>
         </div>
 
-        <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {(isIndianMarket ? [
-            { href: "/indian-market/trades", label: "Journal" },
-            { href: "/indian-market/add-trade", label: "Log Option" },
-            { href: "/indian-market/analytics", label: "Analytics" },
-            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
-          ] : [
-            { href: "/trades", label: "Journal" },
-            { href: "/add-trade", label: "Log Trade" },
-            { href: "/analytics", label: "Analytics" },
-            { href: "/weekly-reports?market=Forex", label: "Weekly AI" },
-          ]).map(n => (
-            <Link key={n.href} href={n.href} style={{
-              fontSize: 13,
-              color: theme.primary,
-              fontWeight: 700,
-              textDecoration: "none",
-              padding: "10px 16px",
-              borderRadius: 999,
-              transition: "all 0.2s",
-              fontFamily: "'Plus Jakarta Sans',sans-serif",
-              background: "rgba(13,158,110,0.08)",
-              border: "1.5px solid rgba(13,158,110,0.25)",
-              minHeight: "44px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "rgba(13,158,110,0.18)";
-                e.currentTarget.style.borderColor = "rgba(13,158,110,0.6)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "rgba(13,158,110,0.08)";
-                e.currentTarget.style.borderColor = "rgba(13,158,110,0.25)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              router.push("/login");
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
-              borderRadius: 6, padding: "6px 12px",
-              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
-              color: theme.bear, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
-              transition: "all 0.2s",
-            }}
-          >
-            LOGOUT
-          </button>
-        </div>
-      </header>
-
-      <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 24px" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, color: theme.secondary }}>
-          Log New <span style={{ color: isIndianMarket ? '#1B5E20' : theme.primary }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
-        </h1>
-        <p style={{ fontSize: 12, color: theme.muted, marginBottom: 32, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>
-          {isIndianMarket ? "NSE / BSE / F&O MARKET ENTRY" : "GLOBAL CURRENCY MARKET ENTRY"}
-        </p>
-
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Market-Specific Fields First */}
-            {isIndianMarket && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Segment</label>
-                  <select name="segment" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.segment}>
-                    <option value="Equity">Equity (Cash)</option>
-                    <option value="F&O">F&O (Derivatives)</option>
-                    <option value="Commodity">Commodity</option>
-                    <option value="Currency">Currency (India)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Trade Type</label>
-                  <select name="tradeType" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.tradeType}>
-                    <option value="INTRADAY">Intraday</option>
-                    <option value="DELIVERY">Delivery/Swing</option>
-                  </select>
-                </div>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Instrument</label>
-                  <select name="instrumentType" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.instrumentType}>
-                    <option value="EQUITY">Equity</option>
-                    <option value="FUTURE">Future</option>
-                    <option value="OPTION">Option</option>
-                  </select>
-                </div>
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 24 }}>
+          {/* ── Market Specific ── */}
+          {isIndianMarket && (
+            <SectionCard title="Market Segment" accentColor="#10B981">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }}>
+                <FormSelect label="SEGMENT" name="segment" value={trade.segment} onChange={handleChange} options={[{v:"Equity",l:"Equity"},{v:"F&O",l:"F&O"},{v:"Commodity",l:"Commodity"}].map(o=>({value:o.v,label:o.l}))} />
+                <FormSelect label="TRADE TYPE" name="tradeType" value={trade.tradeType} onChange={handleChange} options={[{v:"INTRADAY",l:"Intraday"},{v:"DELIVERY",l:"Delivery"}].map(o=>({value:o.v,label:o.l}))} />
+                <FormSelect label="INSTRUMENT" name="instrumentType" value={trade.instrumentType} onChange={handleChange} options={[{v:"EQUITY",l:"Equity"},{v:"FUTURE",l:"Future"},{v:"OPTION",l:"Option"}].map(o=>({value:o.v,label:o.l}))} />
               </div>
-            )}
+            </SectionCard>
+          )}
 
-            {/* Core Fields */}
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>{isIndianMarket ? "Symbol" : "Pair"}</label>
-              <input name="pair" placeholder={isIndianMarket ? "e.g. RELIANCE" : "e.g. XAUUSD"} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.pair} />
+          {/* ── Core Details ── */}
+          <SectionCard title="Core Details" accentColor="#0D9E6E">
+            <div style={{ display: "grid", gap: 20 }}>
+              <FormInput label={isIndianMarket ? "SYMBOL" : "PAIR"} name="pair" value={trade.pair} onChange={handleChange} placeholder={isIndianMarket ? "RELIANCE" : "XAUUSD"} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <FormSelect label="ACTION" name="type" value={trade.type} onChange={handleChange} options={[{v:"BUY",l:"BUY"},{v:"SELL",l:"SELL"}].map(o=>({value:o.v,label:o.l}))} />
+                <FormInput label={isIndianMarket ? "QUANTITY" : "LOT SIZE"} name={isIndianMarket ? "quantity" : "lotSize"} value={isIndianMarket ? trade.quantity : trade.lotSize} onChange={handleChange} placeholder={isIndianMarket ? "100" : "0.01"} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <FormInput label="ENTRY PRICE" name="entryPrice" value={trade.entryPrice} onChange={handleChange} type="number" step="any" />
+                <FormInput label="EXIT PRICE" name="exitPrice" value={trade.exitPrice} onChange={handleChange} type="number" step="any" />
+              </div>
+              <FormInput 
+                label={`NET PROFIT (${getCurrencySymbol()})`} 
+                name="profit" 
+                value={trade.profit} 
+                onChange={handleChange} 
+                type="number" 
+                step="any"
+                style={{ 
+                  color: bull ? "#0D9E6E" : "#D63B3B", 
+                  fontSize: 18,
+                  fontWeight: 800,
+                  background: bull ? "rgba(13,158,110,0.05)" : "rgba(214,59,59,0.05)"
+                }} 
+              />
             </div>
+          </SectionCard>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Action</label>
-                <select name="type" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.type}>
-                  <option value="BUY">BUY</option>
-                  <option value="SELL">SELL</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>{isIndianMarket ? "Quantity" : "Lot Size"}</label>
-                <input name={isIndianMarket ? "quantity" : "lotSize"} placeholder={isIndianMarket ? "100" : "0.01"} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={isIndianMarket ? trade.quantity : trade.lotSize} />
-              </div>
+          {/* ── Risk Management ── */}
+          <SectionCard title="Risk Management" accentColor="#B8860B">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <FormInput label="STOP LOSS" name="stopLoss" value={trade.stopLoss} onChange={handleChange} type="number" step="any" />
+              <FormInput label="TAKE PROFIT" name="takeProfit" value={trade.takeProfit} onChange={handleChange} type="number" step="any" />
             </div>
+          </SectionCard>
 
-            {/* Price Fields */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Entry Price</label>
-                <input name="entryPrice" type="number" step="0.00001" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.entryPrice} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Exit Price</label>
-                <input name="exitPrice" type="number" step="0.00001" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.exitPrice} />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Net Profit ({getCurrencySymbol()})</label>
-              <input name="profit" type="number" step="0.01" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14, fontWeight: 700, color: trade.profit >= 0 ? theme.bull : theme.bear }} onChange={handleChange} value={trade.profit} />
-            </div>
-
-            {/* Conditional F&O Fields */}
-            {isIndianMarket && (trade.instrumentType === "OPTION" || trade.instrumentType === "FUTURE") && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Strike Price</label>
-                  <input name="strikePrice" type="number" placeholder="e.g. 22000" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.strikePrice} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Expiry Date</label>
-                  <input type="date" name="expiryDate" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.expiryDate} />
-                </div>
-              </div>
-            )}
-
-            {/* Risk Management */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Stop Loss</label>
-                <input name="stopLoss" type="number" step="0.00001" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.stopLoss} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Take Profit</label>
-                <input name="takeProfit" type="number" step="0.00001" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.takeProfit} />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>RR Ratio</label>
-              <select name="riskRewardRatio" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.riskRewardRatio}>
-                <option value="">Select Ratio</option>
-                <option value="1:1">1:1</option>
-                <option value="1:2">1:2</option>
-                <option value="1:3">1:3</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-
-            {/* Cost Fields */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {isIndianMarket ? (
-                <>
-                  <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Brokerage</label>
-                    <input name="brokerage" type="number" step="0.01" placeholder="₹20" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.brokerage} />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>STT & Other Taxes</label>
-                    <input name="sttTaxes" type="number" step="0.01" placeholder="₹15" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.sttTaxes} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Commission</label>
-                    <input name="commission" type="number" step="0.01" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.commission} />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Swap</label>
-                    <input name="swap" type="number" step="0.01" placeholder="0.00" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.swap} />
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>
-                Strategy / Setup{setupsLoading ? " (loading...)" : ""}
-              </label>
-              <select
-                name="strategy"
-                style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}
-                onChange={handleStrategyChange}
-                value={trade.strategy}
-              >
-                <option value="">Select setup...</option>
-                {strategies
-                  .filter(s => s.name && s.name.trim().length > 0)
-                  .map(s => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                <option value="Custom">Custom</option>
-              </select>
+          {/* ── Strategy & Checklist ── */}
+          <SectionCard title="Strategy" accentColor="#0D9E6E">
+            <div style={{ marginBottom: 20 }}>
+              <FormSelect 
+                label={`SETUP ${setupsLoading ? "(...)" : ""}`} 
+                name="strategy" 
+                value={trade.strategy} 
+                onChange={handleStrategyChange} 
+                options={[{value:"",label:"Select..."}, ...strategies.map(s=>({value:s.name,label:s.name})), {value:"Custom",label:"Custom"}]} 
+              />
               {trade.strategy === "Custom" && (
-                <input
-                  name="strategyCustom"
-                  placeholder="Enter setup name"
-                  style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14, marginTop: 8 }}
-                  onChange={handleChange}
-                  value={trade.strategyCustom}
-                />
+                <div style={{ marginTop: 12 }}>
+                  <FormInput label="CUSTOM NAME" name="strategyCustom" value={trade.strategyCustom} onChange={handleChange} />
+                </div>
               )}
             </div>
+            <SetupChecklist rules={setupRules} onToggle={toggleSetupRule} onUpdateLabel={updateSetupRuleLabel} onAdd={addSetupRule} onClear={clearSetupRules} />
+          </SectionCard>
 
-            {/* Setup checklist */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted }}>Setup checklist</label>
-                <button
-                  type="button"
-                  onClick={clearSetupRules}
-                  style={{ background: "transparent", border: "none", color: theme.muted, fontSize: 11, cursor: "pointer", fontWeight: 700 }}
-                >
-                  Clear ticks
-                </button>
+          {/* ── Psychology ── */}
+          <SectionCard title="Psychology" accentColor="#8B5CF6">
+            <div style={{ marginBottom: 24 }}>
+              <label style={labelSt}>EMOTIONAL STATE</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+                {MOODS.map(m => (
+                  <button key={m.val} type="button" onClick={() => setTrade(p => ({ ...p, mood: p.mood === m.val ? null : m.val }))}
+                    style={{ 
+                      padding: "12px 4px", borderRadius: 14, cursor: "pointer", 
+                      border: trade.mood === m.val ? "2px solid #0D9E6E" : "1px solid #E2E8F0", 
+                      background: trade.mood === m.val ? "rgba(13,158,110,0.08)" : "#FFF",
+                      transition: "all 0.2s"
+                    }}>
+                    <div style={{ fontSize: 24, marginBottom: 4 }}>{m.emoji}</div>
+                    <div style={{ fontSize: 9, color: trade.mood === m.val ? "#0D9E6E" : "#94A3B8", fontWeight: 800, letterSpacing: "0.02em" }}>{m.label.toUpperCase()}</div>
+                  </button>
+                ))}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {setupRules.length === 0 ? (
-                  <div style={{ fontSize: 13, color: theme.muted }}>
-                    Select a setup above to load its checklist, or add your own rules.
-                  </div>
-                ) : (
-                  setupRules.map(rule => (
-                    <div key={rule.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card }}>
-                      <button
-                        type="button"
-                        onClick={() => toggleSetupRule(rule.id)}
-                        style={{
-                          width: 20, height: 20, borderRadius: 6,
-                          border: rule.followed ? `1.5px solid ${theme.primary}` : "1.5px solid #CBD5E1",
-                          background: rule.followed ? `linear-gradient(135deg, ${theme.primary}, #22C78E)` : "#FFFFFF",
-                          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-                        }}
-                      >
-                        {rule.followed && (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.8">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </button>
-                      <input
-                        type="text"
-                        value={rule.label}
-                        onChange={e => updateSetupRuleLabel(rule.id, e.target.value)}
-                        placeholder="Add setup rule..."
-                        style={{ border: "none", outline: "none", background: "transparent", fontSize: 13, flex: 1 }}
-                      />
+            </div>
+            
+            <FormSelect label="TRADE CONFIDENCE" name="confidence" value={trade.confidence} onChange={handleChange} options={["Low", "Medium", "High", "Overconfident"].map(v=>({value:v,label:v}))} />
+            
+            <div style={{ marginTop: 24 }}>
+              <label style={labelSt}>EMOTIONAL TAGS</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {EMOTIONS.map(tag => {
+                  const sel = trade.emotionalTags?.includes(tag);
+                  return (
+                    <button key={tag} type="button" onClick={() => setTrade(p => ({ ...p, emotionalTags: sel ? p.emotionalTags.filter(t=>t!==tag) : [...(p.emotionalTags||[]), tag] }))}
+                      style={{ 
+                        padding: "8px 18px", borderRadius: 99, fontSize: 12, fontWeight: 700, 
+                        cursor: "pointer", border: sel ? "2px solid #0D9E6E" : "1.5px solid #E2E8F0", 
+                        background: sel ? "rgba(13,158,110,0.1)" : "#FFF", 
+                        color: sel ? "#0D9E6E" : "#94A3B8",
+                        transition: "all 0.2s"
+                      }}>
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── Visual Evidence ── */}
+          <SectionCard title="Visual Evidence" accentColor="#94A3B8">
+            <input type="file" ref={fileInputRef} accept="image/*" onChange={e => handleScreenshotChange(e.target.files[0])} style={{ display: "none" }} />
+            <div 
+              onClick={() => !inProgress && fileInputRef.current.click()} 
+              style={{ 
+                border: "2px dashed #E2E8F0", borderRadius: 16, padding: 32, textAlign: "center", 
+                cursor: inProgress ? "not-allowed" : "pointer", 
+                background: "#fafafa",
+                transition: "all 0.2s"
+              }}
+              onMouseEnter={e => !inProgress && (e.currentTarget.style.borderColor = "#0D9E6E")}
+              onMouseLeave={e => !inProgress && (e.currentTarget.style.borderColor = "#E2E8F0")}
+            >
+              {screenshotPreview ? (
+                <div style={{ position: "relative" }}>
+                  <img src={screenshotPreview} alt="Preview" style={{ maxHeight: 300, width: "100%", objectFit: "contain", margin: "0 auto", borderRadius: 12 }} />
+                  {uploading && (
+                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyCenter: "center", borderRadius: 12 }}>
+                      <Spinner size="40px" color="#0D9E6E" />
                     </div>
-                  ))
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={addSetupRule}
-                style={{ background: "transparent", border: "none", color: theme.primary, fontSize: 12, fontWeight: 800, marginTop: 12, cursor: "pointer" }}
-              >
-                + Add rule
-              </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#F0EEE9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>
+                    <Camera size={28} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#0F1923" }}>Upload Screenshots</div>
+                    <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>Drag & drop or click to browse</div>
+                  </div>
+                </div>
+              )}
             </div>
+          </SectionCard>
 
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Entry Basis</label>
-              <select name="entryBasis" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.entryBasis}>
-                <option value="Plan">Rule Based / Plan</option>
-                <option value="Emotion">Emotional</option>
-                <option value="Impulsive">Impulsive</option>
-                <option value="Custom">Custom Basis</option>
-              </select>
-            </div>
-
-            {trade.entryBasis === "Custom" && (
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Custom Basis Detail</label>
-                <input name="entryBasisCustom" placeholder="Describe basis..." style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.entryBasisCustom} />
-              </div>
+          <button 
+            type="submit" 
+            disabled={inProgress} 
+            style={{ 
+              width: "100%", padding: "20px", borderRadius: 16, 
+              background: "linear-gradient(135deg, #0D9E6E, #0F1923)", 
+              color: "#FFF", fontSize: 14, fontWeight: 800, 
+              cursor: inProgress ? "not-allowed" : "pointer", 
+              marginTop: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              boxShadow: "0 10px 20px rgba(13,158,110,0.15)",
+              border: "none",
+              transition: "all 0.2s"
+            }}
+            onMouseEnter={e => !inProgress && (e.currentTarget.style.transform = "translateY(-2px)")}
+            onMouseLeave={e => !inProgress && (e.currentTarget.style.transform = "translateY(0)")}
+          >
+            {inProgress ? (
+              <>
+                <Spinner size="18px" color="#FFF" />
+                {uploading ? "UPLOADING..." : "SYNCING DATA..."}
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                COMMIT TRADE TO JOURNAL
+              </>
             )}
-
-            {/* ── Psychology / Emotional Tracking ── */}
-            <div style={{ background: theme.card, borderRadius: 16, padding: 20, border: `1px solid ${theme.border}` }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: theme.secondary, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                <span>🧠</span> Trade Psychology
-                <span style={{ fontSize: 9, color: theme.muted, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em" }}>OPTIONAL</span>
-              </div>
-
-              {/* Mood Rating */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 8 }}>How are you feeling?</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {[{ emoji: "😰", val: 1, label: "Stressed" }, { emoji: "😟", val: 2, label: "Anxious" }, { emoji: "😐", val: 3, label: "Neutral" }, { emoji: "😊", val: 4, label: "Good" }, { emoji: "🔥", val: 5, label: "Peak" }].map(m => (
-                    <button key={m.val} type="button" onClick={() => setTrade(prev => ({ ...prev, mood: prev.mood === m.val ? null : m.val }))}
-                      style={{
-                        flex: 1, padding: "10px 4px", borderRadius: 12, cursor: "pointer", textAlign: "center", transition: "all 0.2s",
-                        border: trade.mood === m.val ? `2px solid ${theme.primary}` : `1px solid ${theme.border}`,
-                        background: trade.mood === m.val ? "rgba(13,158,110,0.08)" : theme.card,
-                        transform: trade.mood === m.val ? "scale(1.08)" : "scale(1)",
-                      }}>
-                      <div style={{ fontSize: 22 }}>{m.emoji}</div>
-                      <div style={{ fontSize: 9, color: trade.mood === m.val ? theme.primary : theme.muted, fontWeight: 700, marginTop: 2 }}>{m.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Confidence Level */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Confidence Level</label>
-                <select name="confidence" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.confidence}>
-                  <option value="">Select confidence...</option>
-                  <option value="Low">Low — Unsure about this setup</option>
-                  <option value="Medium">Medium — Decent setup</option>
-                  <option value="High">High — Strong conviction</option>
-                  <option value="Overconfident">Overconfident — Can't lose 🚩</option>
-                </select>
-              </div>
-
-              {/* Emotional Tags */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 8 }}>Emotional Tags <span style={{ fontWeight: 500 }}>(select all that apply)</span></label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"].map(tag => {
-                    const isSelected = trade.emotionalTags.includes(tag);
-                    return (
-                      <button key={tag} type="button" onClick={() => {
-                        setTrade(prev => ({
-                          ...prev,
-                          emotionalTags: prev.emotionalTags.includes(tag)
-                            ? prev.emotionalTags.filter(t => t !== tag)
-                            : [...prev.emotionalTags, tag]
-                        }));
-                      }}
-                        style={{
-                          padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",
-                          border: isSelected ? `1.5px solid ${theme.primary}` : `1px solid ${theme.border}`,
-                          background: isSelected ? "rgba(13,158,110,0.1)" : theme.card,
-                          color: isSelected ? theme.primary : theme.muted,
-                        }}>
-                        {tag === "FOMO" ? "😨 FOMO" : tag === "Revenge" ? "😡 Revenge" : tag === "Fear" ? "😰 Fear" : tag === "Greed" ? "🤑 Greed" : tag === "Calm" ? "🧘 Calm" : tag === "Bored" ? "😴 Bored" : tag === "Focused" ? "🎯 Focused" : "😤 Frustrated"}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Mistake Tag */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Mistake Tag</label>
-                <input name="mistakeTag" placeholder="e.g. moved SL, entered too early, oversized..." style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.mistakeTag} />
-              </div>
-
-              {/* Lesson Learned */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Lesson Learned</label>
-                <input name="lesson" placeholder="What did I learn from this trade?" style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} onChange={handleChange} value={trade.lesson} />
-              </div>
-
-              {/* Would Retake */}
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 8 }}>Would you take this trade again?</label>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {[{ val: "Yes", icon: "✅", label: "Yes" }, { val: "No", icon: "❌", label: "No" }].map(opt => (
-                    <button key={opt.val} type="button" onClick={() => setTrade(prev => ({ ...prev, wouldRetake: prev.wouldRetake === opt.val ? "" : opt.val }))}
-                      style={{
-                        flex: 1, padding: "12px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.2s",
-                        border: trade.wouldRetake === opt.val ? `2px solid ${opt.val === "Yes" ? theme.primary : theme.bear}` : `1px solid ${theme.border}`,
-                        background: trade.wouldRetake === opt.val ? (opt.val === "Yes" ? "rgba(13,158,110,0.08)" : "rgba(214,59,59,0.08)") : theme.card,
-                        color: trade.wouldRetake === opt.val ? (opt.val === "Yes" ? theme.primary : theme.bear) : theme.muted,
-                      }}>
-                      {opt.icon} {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Screenshot & Notes Section */}
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Visual Evidence</label>
-              <input type="file" ref={fileInputRef} accept="image/*" onChange={handleScreenshotChange} className="hidden" style={{ display: "none" }} />
-              <div onClick={triggerFileInput} style={{ border: `2px dashed ${theme.border}`, borderRadius: 12, padding: 32, textAlign: "center", cursor: "pointer", background: "rgba(255,255,255,0.5)" }}>
-                {screenshotPreview ? (
-                  <div>
-                    <img src={screenshotPreview} alt="Trade Evidence" style={{ maxHeight: 200, margin: "0 auto", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                    <p style={{ fontSize: 10, color: theme.muted, fontWeight: 700, marginTop: 12 }}>CLICK TO UPDATE</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ width: 40, height: 40, background: theme.bg, borderRadius: 20, margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.muted} strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
-                    </div>
-                    <p style={{ fontSize: 13, color: theme.secondary, fontWeight: 600 }}>{uploading ? "Uploading..." : "Drop trade screenshot here"}</p>
-                    <p style={{ fontSize: 10, color: theme.muted, marginTop: 4 }}>PNG, JPG up to 10MB</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Trade Execution Notes</label>
-              <textarea name="notes" placeholder="Describe your thought process, emotions, and execution details..." style={{ width: "100%", padding: "16px", borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14, minHeight: 120, resize: "vertical" }} onChange={handleChange} value={trade.notes} />
-            </div>
-
-          </div>
-
-          <button type="submit" disabled={uploading} style={{
-            width: "100%", padding: "18px", borderRadius: 14, border: "none", cursor: uploading ? "not-allowed" : "pointer",
-            background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%)`, color: "#fff",
-            fontSize: 13, fontWeight: 800, letterSpacing: "0.08em", marginTop: 16
-          }}>
-            {uploading ? "SYNCING..." : "COMMIT TRADE TO DASHBOARD"}
           </button>
         </form>
       </main>
+
+      <style jsx>{`
+        @media (max-width: 640px) {
+          main { padding: 24px 16px !important; }
+        }
+      `}</style>
     </div>
   );
 }
+
 export default function AddTradePage() {
-  return (
-    <Suspense fallback={<div className="p-10 text-center">Loading form...</div>}>
-      <AddTradePageContent />
-    </Suspense>
-  );
+  return <Suspense><AddTradeContent /></Suspense>;
 }

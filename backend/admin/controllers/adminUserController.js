@@ -1,15 +1,16 @@
 const User = require("../../models/Users");
 const Trade = require("../../models/Trade");
 const IndianTrade = require("../../models/IndianTrade");
+const ApiError = require("../../utils/ApiError");
+const asyncHandler = require("../../utils/asyncHandler");
 
 /**
  * @desc    Get all users with their statistics
  * @route   GET /api/admin/users
  * @access  Private/Admin
  */
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find({ role: { $ne: "admin" } }).select("+password").lean();
+exports.getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find({ role: { $ne: "admin" } }).select("+password").lean();
 
     // Enrich users with trade counts
     const enrichedUsers = await Promise.all(
@@ -29,27 +30,23 @@ exports.getAllUsers = async (req, res) => {
       })
     );
 
-    res.json(enrichedUsers);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.json(enrichedUsers);
+});
 
 /**
  * @desc    Delete a user and all their data
  * @route   DELETE /api/admin/users/:id
  * @access  Private/Admin
  */
-exports.deleteUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+exports.deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    throw new ApiError(404, "User not found", "NOT_FOUND");
+  }
 
-    if (user.role === "admin") {
-      return res.status(403).json({ message: "Cannot delete an admin user" });
-    }
+  if (user.role === "admin") {
+    throw new ApiError(403, "Cannot delete an admin user", "FORBIDDEN");
+  }
 
     // Delete associated data
     await Promise.all([
@@ -58,55 +55,47 @@ exports.deleteUser = async (req, res) => {
       User.findByIdAndDelete(user._id)
     ]);
 
-    res.json({ message: "User and all associated data deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.json({ message: "User and all associated data deleted successfully" });
+});
 
 /**
  * @desc    Toggle user active/inactive status
  * @route   PATCH /api/admin/users/:id/status
  * @access  Private/Admin
  */
-exports.toggleUserStatus = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+exports.toggleUserStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    throw new ApiError(404, "User not found", "NOT_FOUND");
+  }
 
     // Toggle logic: active <-> inactive
     // If it's expired, we might want to keep it expired or move to inactive
     user.subscriptionStatus = user.subscriptionStatus === "active" ? "inactive" : "active";
     
     await user.save();
-    res.json({ 
-      message: `User status updated to ${user.subscriptionStatus}`,
-      user: {
-        _id: user._id,
-        subscriptionStatus: user.subscriptionStatus
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.json({ 
+    message: `User status updated to ${user.subscriptionStatus}`,
+    user: {
+      _id: user._id,
+      subscriptionStatus: user.subscriptionStatus
+    }
+  });
+});
 
 /**
  * @desc    Extend user subscription plan
  * @route   PATCH /api/admin/users/:id/extend
  * @access  Private/Admin
  */
-exports.extendUserPlan = async (req, res) => {
-  try {
-    const { days } = req.body;
-    const extensionDays = parseInt(days) || 30;
+exports.extendUserPlan = asyncHandler(async (req, res) => {
+  const { days } = req.body;
+  const extensionDays = parseInt(days, 10) || 30;
 
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    throw new ApiError(404, "User not found", "NOT_FOUND");
+  }
 
     let newExpiry;
     const now = new Date();
@@ -125,35 +114,27 @@ exports.extendUserPlan = async (req, res) => {
     user.subscriptionStatus = "active"; // Reactivate if it was expired/inactive
     
     await user.save();
-    res.json({ 
-      message: `Plan extended by ${extensionDays} days`,
-      expiry: user.subscriptionExpiry,
-      status: user.subscriptionStatus
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.json({ 
+    message: `Plan extended by ${extensionDays} days`,
+    expiry: user.subscriptionExpiry,
+    status: user.subscriptionStatus
+  });
+});
 
 /**
  * @desc    Get all users whose plans have expired
  * @route   GET /api/admin/users/expired
  * @access  Private/Admin
  */
-exports.getExpiredUsers = async (req, res) => {
-  try {
-    const now = new Date();
-    // Users with no role or role user, where expiry is in the past
-    const expiredUsers = await User.find({
-      role: { $ne: "admin" },
-      subscriptionExpiry: { $lt: now }
-    }).sort({ subscriptionExpiry: -1 }).lean();
+exports.getExpiredUsers = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const expiredUsers = await User.find({
+    role: { $ne: "admin" },
+    subscriptionExpiry: { $lt: now }
+  }).sort({ subscriptionExpiry: -1 }).lean();
 
-    res.json(expiredUsers);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.json(expiredUsers);
+});
 
 /**
  * @desc    Send renewal reminder email to a user
@@ -163,21 +144,18 @@ exports.getExpiredUsers = async (req, res) => {
 const { sendRenewalReminder } = require("../../services/mailService");
 
 exports.sendRenewalReminderAction = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (!user.subscriptionExpiry) {
-      return res.status(400).json({ message: "User has no subscription history" });
-    }
-
-    await sendRenewalReminder(user.email, user.name, user.subscriptionExpiry);
-    
-    res.json({ message: `Renewal reminder sent to ${user.email}` });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    throw new ApiError(404, "User not found", "NOT_FOUND");
   }
+
+  if (!user.subscriptionExpiry) {
+    throw new ApiError(400, "User has no subscription history", "VALIDATION_ERROR");
+  }
+
+  await sendRenewalReminder(user.email, user.name, user.subscriptionExpiry);
+  res.json({ message: `Renewal reminder sent to ${user.email}` });
 };
+
+exports.sendRenewalReminderAction = asyncHandler(exports.sendRenewalReminderAction);
 

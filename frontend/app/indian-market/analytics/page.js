@@ -11,6 +11,8 @@ import {
   getTimeAnalysis,
   getDrawdownAnalysis,
   getAIInsights,
+  getTradeQuality,
+  getPsychologyAnalytics,
   getPnLBreakdown
 } from "@/services/analyticsApi";
 import {
@@ -97,13 +99,15 @@ function DistList({ title, data, currency = "₹", maxItems = 6 }) {
   );
 }
 
-function PathToAdvanced({ summary, ai, perf, currency }) {
+function PathToAdvanced({ summary, ai, perf, quality, psychology, currency }) {
   const totalTrades = summary?.totalTrades ?? 0;
   const totalProfit = parseFloat(summary?.totalProfit || 0);
   const winRate = parseFloat(summary?.winRate || 0);
   const planPct = parseFloat(ai?.behaviorDiscipline?.ruleEmotion?.planPct || 0);
   const aiScore = parseFloat(ai?.score || 0);
   const profitFactor = parseFloat(perf?.profitFactor || 0);
+  const qualityScore = parseFloat(quality?.qualityScore || 0);
+  const psychologyScore = parseFloat(psychology?.psychologyScore || 0);
 
   const checks = [
     { label: "Log at least 5 trades with details (strategy, entry basis)", done: totalTrades >= 5, value: `${totalTrades} / 5` },
@@ -112,7 +116,9 @@ function PathToAdvanced({ summary, ai, perf, currency }) {
     { label: "Total P&L positive", done: totalProfit > 0, value: `${currency}${totalProfit.toFixed(0)}` },
     { label: "Plan-based entries ≥ 70%", done: planPct >= 70, value: `${planPct}%` },
     { label: "AI discipline score ≥ 60", done: aiScore >= 60, value: `${aiScore}` },
-    { label: "Profit factor ≥ 1.2", done: profitFactor >= 1.2, value: profitFactor.toFixed(2) }
+    { label: "Profit factor ≥ 1.2", done: profitFactor >= 1.2, value: profitFactor.toFixed(2) },
+    { label: "Quality score ≥ 70", done: qualityScore >= 70, value: `${qualityScore}` },
+    { label: "Psychology score ≥ 60", done: psychologyScore >= 60, value: `${psychologyScore}` }
   ];
   const doneCount = checks.filter((c) => c.done).length;
   const totalCount = checks.length;
@@ -211,6 +217,37 @@ function InsightTag({ text, type = "info" }) {
   );
 }
 
+function ProgressBar({ value, max = 100, color = theme.bull, label }) {
+  const safeMax = max || 1;
+  const pct = Math.min(100, Math.max(0, (Number(value) / safeMax) * 100));
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {label && (
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: theme.muted, fontWeight: 700 }}>{label}</span>
+          <span style={{ fontSize: 11, color, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{pct.toFixed(1)}%</span>
+        </div>
+      )}
+      <div style={{ height: 8, background: "#F0EEE9", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${color}, ${color}88)`, borderRadius: 4, transition: "width 0.6s ease" }} />
+      </div>
+    </div>
+  );
+}
+
+function ListItem({ label, value, color = theme.primary, sub }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${theme.border}` }}>
+      <div style={{ maxWidth: "70%" }}>
+        <div style={{ fontSize: 12, color: theme.secondary, fontWeight: 600 }}>{label}</div>
+        {sub && <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>{sub}</div>}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 900, color, fontFamily: "'JetBrains Mono',monospace" }}>{value}</div>
+    </div>
+  );
+}
+
 export default function IndianAnalyticsPage() {
   const router = useRouter();
   const { currentMarket } = useMarket();
@@ -223,7 +260,9 @@ export default function IndianAnalyticsPage() {
     drawdown: null,
     ai: null,
     breakdown: null,
-    distribution: null
+    distribution: null,
+    quality: null,
+    psychology: null
   });
   const [timeFilter, setTimeFilter] = useState("daily"); // daily, weekly, monthly
 
@@ -236,26 +275,48 @@ export default function IndianAnalyticsPage() {
     fetchData();
   }, [router]);
 
+  const runInBatches = async (tasks, batchSize = 3, pauseMs = 200) => {
+    const results = [];
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const batch = tasks.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map((task) => task()));
+      results.push(...batchResults);
+      if (i + batchSize < tasks.length) {
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      }
+    }
+    return results;
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [summary, rr, perf, time, drawdown, ai, breakdown, distribution] = await Promise.all([
-        getSummary(MARKETS.INDIAN_MARKET),
-        getRiskRewardAnalysis(MARKETS.INDIAN_MARKET),
-        getPerformanceMetrics(MARKETS.INDIAN_MARKET),
-        getTimeAnalysis(MARKETS.INDIAN_MARKET),
-        getDrawdownAnalysis(MARKETS.INDIAN_MARKET),
-        getAIInsights(MARKETS.INDIAN_MARKET),
-        getPnLBreakdown(MARKETS.INDIAN_MARKET),
-        getTradeDistribution(MARKETS.INDIAN_MARKET)
+      const [summary, rr, perf, time, drawdown, ai, breakdown, distribution, quality, psychology] = await runInBatches([
+        () => getSummary(MARKETS.INDIAN_MARKET),
+        () => getRiskRewardAnalysis(MARKETS.INDIAN_MARKET),
+        () => getPerformanceMetrics(MARKETS.INDIAN_MARKET),
+        () => getTimeAnalysis(MARKETS.INDIAN_MARKET),
+        () => getDrawdownAnalysis(MARKETS.INDIAN_MARKET),
+        () => getAIInsights(MARKETS.INDIAN_MARKET),
+        () => getPnLBreakdown(MARKETS.INDIAN_MARKET),
+        () => getTradeDistribution(MARKETS.INDIAN_MARKET),
+        () => getTradeQuality(MARKETS.INDIAN_MARKET),
+        () => getPsychologyAnalytics(MARKETS.INDIAN_MARKET)
       ]);
-      setData({ summary, rr, perf, time, drawdown, ai, breakdown, distribution });
+      setData({ summary, rr, perf, time, drawdown, ai, breakdown, distribution, quality, psychology });
+    } catch (error) {
+      console.error("Failed to fetch Indian analytics data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const currency = "₹";
+  const totalTrades = parseFloat(data.summary?.totalTrades || 0);
+  const hasAnyTrades = totalTrades > 0;
+  const hasEnoughTrades = totalTrades >= 5;
+  const tradesWithRR = parseFloat(data.quality?.tradesWithRR || 0);
+  const hasRRFields = hasEnoughTrades && tradesWithRR > 0;
 
   return (
     <div
@@ -315,7 +376,7 @@ export default function IndianAnalyticsPage() {
                 justifyContent: "center"
               }}
             >
-              <img src="/mainlogo.png" alt="LOGNERA" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} />
             </div>
             <div>
               <div
@@ -328,7 +389,7 @@ export default function IndianAnalyticsPage() {
                   lineHeight: 1
                 }}
               >
-                LOGNERA
+                {""}
               </div>
               <div
                 style={{
@@ -405,29 +466,35 @@ export default function IndianAnalyticsPage() {
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
               <StatCard
                 label="TOTAL P&L"
-                value={`${currency}${parseFloat(data.summary?.totalProfit || 0).toLocaleString("en-IN")}`}
-                color={parseFloat(data.summary?.totalProfit || 0) >= 0 ? theme.bull : theme.bear}
-                sub="Lifetime profit / loss"
+                value={hasAnyTrades ? `${currency}${parseFloat(data.summary?.totalProfit || 0).toLocaleString("en-IN")}` : "—"}
+                color={hasAnyTrades ? (parseFloat(data.summary?.totalProfit || 0) >= 0 ? theme.bull : theme.bear) : theme.secondary}
+                sub={hasAnyTrades ? "Lifetime profit / loss" : "Log trades to compute"}
               />
               <StatCard
                 label="NET AFTER COSTS"
-                value={`${currency}${parseFloat(data.summary?.netProfit || 0).toLocaleString("en-IN")}`}
-                color={parseFloat(data.summary?.netProfit || 0) >= 0 ? theme.bull : theme.bear}
-                sub={`Brokerage & taxes: ${currency}${parseFloat(data.summary?.totalCosts || 0).toLocaleString(
-                  "en-IN"
-                )}`}
+                value={hasAnyTrades ? `${currency}${parseFloat(data.summary?.netProfit || 0).toLocaleString("en-IN")}` : "—"}
+                color={hasAnyTrades ? (parseFloat(data.summary?.netProfit || 0) >= 0 ? theme.bull : theme.bear) : theme.secondary}
+                sub={
+                  hasAnyTrades
+                    ? `Brokerage & taxes: ${currency}${parseFloat(data.summary?.totalCosts || 0).toLocaleString("en-IN")}`
+                    : "Log trades to compute"
+                }
               />
               <StatCard
                 label="WIN RATE"
-                value={`${data.summary?.winRate || 0}%`}
-                color={parseFloat(data.summary?.winRate || 0) >= 50 ? theme.bull : theme.bear}
-                sub={`${data.summary?.winningTrades || 0} Wins / ${data.summary?.losingTrades || 0} Losses`}
+                value={hasAnyTrades ? `${data.summary?.winRate || 0}%` : "—"}
+                color={hasAnyTrades ? (parseFloat(data.summary?.winRate || 0) >= 50 ? theme.bull : theme.bear) : theme.secondary}
+                sub={hasAnyTrades ? `${data.summary?.winningTrades || 0} Wins / ${data.summary?.losingTrades || 0} Losses` : "Log trades to compute win rate"}
               />
               <StatCard
                 label="AI SCORE"
-                value={data.ai?.score || "N/A"}
-                color={theme.gold}
-                sub="Model-based discipline score"
+                value={
+                  hasEnoughTrades
+                    ? (data.ai?.score != null ? data.ai.score : "—")
+                    : "—"
+                }
+                color={hasEnoughTrades ? theme.gold : theme.muted}
+                sub={hasEnoughTrades ? "Model-based discipline score" : "Unlock after logging 5 trades"}
               />
             </div>
 
@@ -645,6 +712,81 @@ export default function IndianAnalyticsPage() {
               </div>
             </div>
 
+            {/* TRADE QUALITY */}
+            <div
+              style={{
+                background: theme.card,
+                borderRadius: 14,
+                border: `1px solid ${theme.border}`,
+                padding: 24,
+                marginBottom: 24,
+                boxShadow: "0 2px 10px rgba(15,23,42,0.05)"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900 }}>Trade Quality</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginTop: 4 }}>
+                    RR distribution + breakeven calibration from your journal.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
+                <StatCard
+                  label="QUALITY SCORE"
+                  value={hasRRFields ? `${data.quality?.qualityScore || 0}/100` : "—"}
+                  color={
+                    hasRRFields
+                      ? parseFloat(data.quality?.qualityScore || 0) >= 70
+                        ? theme.bull
+                        : parseFloat(data.quality?.qualityScore || 0) >= 40
+                          ? theme.gold
+                          : theme.bear
+                      : theme.muted
+                  }
+                  sub={hasRRFields ? "Overall trade quality rating" : "Add RR fields (entry + SL + TP)"}
+                />
+                <StatCard
+                  label="BREAKEVEN RATE"
+                  value={hasRRFields ? `${data.quality?.breakevenRate || 0}%` : "—"}
+                  color={hasRRFields ? (parseFloat(data.quality?.breakevenRate || 0) <= 30 ? theme.bull : theme.bear) : theme.muted}
+                  sub={hasRRFields ? "Trades near flat (|P&L| < 5)" : "Need RR trades to calibrate breakeven"}
+                />
+                <StatCard
+                  label="TRADES WITH RR"
+                  value={hasRRFields ? data.quality?.tradesWithRR || 0 : "—"}
+                  color={hasRRFields ? theme.primary : theme.muted}
+                  sub={hasRRFields ? "Has SL/TP + entryPrice" : "No RR-ready trades yet"}
+                />
+              </div>
+
+              <div style={{ fontSize: 12, fontWeight: 900, color: theme.secondary, marginBottom: 10 }}>
+                RR Buckets (Win Rate)
+              </div>
+              {Array.isArray(data.quality?.rrAnalysis) && data.quality.rrAnalysis.length > 0 ? (
+                <div style={{ border: `1px solid ${theme.border}`, borderRadius: 14, background: "#fff", overflow: "hidden" }}>
+                  {data.quality.rrAnalysis.slice(0, 6).map((r) => {
+                    const winRate = parseFloat(r.winRate || 0);
+                    const c = winRate >= 50 ? theme.bull : theme.bear;
+                    return (
+                      <ListItem
+                        key={r.label}
+                        label={r.label}
+                        value={`${winRate}%`}
+                        color={c}
+                        sub={`${r.total} trades • Avg: ${currency}${parseFloat(r.avgProfit || 0).toFixed(2)}`}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>
+                  Add trades with <code>entryPrice</code>, <code>stopLoss</code> and <code>takeProfit</code> to unlock RR quality analytics.
+                </div>
+              )}
+            </div>
+
             {/* TIME EDGE & AI INSIGHTS */}
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               <div
@@ -656,31 +798,77 @@ export default function IndianAnalyticsPage() {
                   padding: 20
                 }}
               >
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>When you trade best</div>
-                <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>
-                  Based on your NIFTY / BANKNIFTY options history.
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 900 }}>Timing Edge</div>
+                    <div style={{ fontSize: 11, color: theme.muted, marginTop: 4, lineHeight: 1.5 }}>
+                      Best-performing day/hour/session from your NIFTY / BANKNIFTY journal.
+                    </div>
+                  </div>
+                  <div style={{ background: `${theme.bull}14`, border: `1px solid ${theme.bull}44`, color: theme.primary, fontSize: 10, fontWeight: 900, padding: "6px 10px", borderRadius: 999 }}>
+                    {data.time?.bestHour?.hour != null ? `${data.time.bestHour.hour}:00` : "—"} Peak Hour
+                  </div>
                 </div>
-                {data.time && (
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: 12, lineHeight: 1.7 }}>
-                    <li>
-                      <strong>Best day:</strong> {data.time.bestDay?.name || "N/A"} (avg{" "}
-                      {currency}
-                      {data.time.bestDay?.profit || "0.00"})
-                    </li>
-                    <li>
-                      <strong>Worst day:</strong> {data.time.worstDay?.name || "N/A"} (avg{" "}
-                      {currency}
-                      {data.time.worstDay?.profit || "0.00"})
-                    </li>
-                    <li>
-                      <strong>Best hour:</strong> {data.time.bestHour?.hour ?? "-"}h (win rate{" "}
-                      {data.time.bestHour?.winRate || "0.0"}%)
-                    </li>
-                    <li>
-                      <strong>Best session:</strong> {data.time.bestSession?.name || "N/A"} (
-                      {data.time.bestSession?.trades || 0} trades)
-                    </li>
-                  </ul>
+
+                {data.time ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Day</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
+                        {data.time.bestDay?.name || "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginTop: 4, lineHeight: 1.4 }}>
+                        Avg Profit:{" "}
+                        {data.time.bestDay?.profit != null ? `${currency}${parseFloat(data.time.bestDay.profit).toFixed(0)}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.bestDay?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
+                        {data.time.bestDay?.winRate != null ? `${data.time.bestDay.winRate}% WR` : "—"}
+                      </div>
+                    </div>
+
+                    <div style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Hour</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
+                        {data.time.bestHour?.hour != null ? `${data.time.bestHour.hour}h` : "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginTop: 4, lineHeight: 1.4 }}>
+                        Avg Profit:{" "}
+                        {data.time.bestHour?.profit != null ? `${currency}${parseFloat(data.time.bestHour.profit).toFixed(0)}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.bestHour?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
+                        {data.time.bestHour?.winRate != null ? `${data.time.bestHour.winRate}% WR` : "—"}
+                      </div>
+                    </div>
+
+                    <div style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Session</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
+                        {data.time.bestSession?.name || "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginTop: 4, lineHeight: 1.4 }}>
+                        Trades: {data.time.bestSession?.trades != null ? data.time.bestSession.trades : "—"}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.bestSession?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
+                        {data.time.bestSession?.winRate != null ? `${data.time.bestSession.winRate}% WR` : "—"}
+                      </div>
+                    </div>
+
+                    <div style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Worst Day</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: theme.bear, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
+                        {data.time.worstDay?.name || "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginTop: 4, lineHeight: 1.4 }}>
+                        Avg Profit:{" "}
+                        {data.time.worstDay?.profit != null ? `${currency}${parseFloat(data.time.worstDay.profit).toFixed(0)}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.worstDay?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
+                        {data.time.worstDay?.winRate != null ? `${data.time.worstDay.winRate}% WR` : "—"}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>Not enough data to compute timing edge yet.</div>
                 )}
               </div>
 
@@ -711,14 +899,20 @@ export default function IndianAnalyticsPage() {
                     BETA MODEL V2
                   </div>
                 </div>
+                {data.ai?.weeklyNarrative && (
+                  <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6, marginBottom: 12 }}>
+                    {data.ai.weeklyNarrative}
+                  </div>
+                )}
+
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {data.ai?.insights?.length ? (
-                    data.ai.insights.slice(0, 6).map((txt, idx) => (
+                    data.ai.insights.slice(0, 5).map((txt, idx) => (
                       <InsightTag
                         key={idx}
                         text={txt}
                         type={
-                          txt.includes("⚠️") || txt.includes("drawdown")
+                          txt.includes("⚠️") || txt.toLowerCase().includes("drawdown")
                             ? "warning"
                             : txt.includes("Excellent") || txt.includes("Great")
                             ? "success"
@@ -730,6 +924,62 @@ export default function IndianAnalyticsPage() {
                     <div style={{ fontSize: 12, color: theme.muted }}>Not enough data yet.</div>
                   )}
                 </div>
+
+                {data.ai?.behaviorDiscipline?.ruleEmotion && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+                    <div style={{ background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em" }}>PLAN VS EMOTION</div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
+                        {parseFloat(data.ai.behaviorDiscipline.ruleEmotion.planPct || 0).toFixed(1)}%
+                      </div>
+                      <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>
+                        Emotion: {parseFloat(data.ai.behaviorDiscipline.ruleEmotion.emotionPct || 0).toFixed(1)}%
+                      </div>
+                    </div>
+
+                    <div style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em" }}>REVENGE TRADES</div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
+                        {data.ai.behaviorDiscipline.revengeTradesCount || 0}
+                      </div>
+                      <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>
+                        Count of size-up right after a loss
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {Array.isArray(data.ai?.recommendations) && data.ai.recommendations.length > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${theme.border}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: theme.secondary, marginBottom: 10 }}>
+                      Next Actions
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {data.ai.recommendations.slice(0, 4).map((rec, i) => (
+                        <InsightTag
+                          key={i}
+                          text={rec}
+                          type={rec.includes("⚠️") || rec.toLowerCase().includes("avoid") ? "warning" : "success"}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {Array.isArray(data.ai?.nextWeekChecklist) && data.ai.nextWeekChecklist.length > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${theme.border}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: theme.secondary, marginBottom: 10 }}>
+                      Next Week Checklist
+                    </div>
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: 12, lineHeight: 1.7 }}>
+                      {data.ai.nextWeekChecklist.slice(0, 3).map((item, idx) => (
+                        <li key={idx} style={{ color: theme.muted }}>
+                          • {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -806,8 +1056,207 @@ export default function IndianAnalyticsPage() {
               )}
             </div>
 
+            {/* PSYCHOLOGY ANALYTICS */}
+            <div
+              style={{
+                background: theme.card,
+                borderRadius: 14,
+                border: `1px solid ${theme.border}`,
+                padding: 24,
+                marginBottom: 24,
+                boxShadow: "0 2px 10px rgba(15,23,42,0.05)"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900 }}>Psychology Analytics</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginTop: 4 }}>
+                    Discipline + mood calibration from your option journal.
+                  </div>
+                </div>
+                {data.psychology?.totalTrackedTrades ? (
+                  <div style={{ fontSize: 12, color: theme.secondary, fontWeight: 900, padding: "8px 12px", borderRadius: 999, border: `1px solid ${theme.border}`, background: theme.bg }}>
+                    {data.psychology.totalTrackedTrades} tracked trades
+                  </div>
+                ) : null}
+              </div>
+
+              {data.psychology && data.psychology.totalTrackedTrades > 0 ? (
+                <>
+                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
+                    <StatCard
+                      label="PSYCHOLOGY SCORE"
+                      value={`${data.psychology.psychologyScore}/100`}
+                      color={
+                        parseFloat(data.psychology.psychologyScore || 0) >= 70
+                          ? theme.bull
+                          : parseFloat(data.psychology.psychologyScore || 0) >= 40
+                            ? theme.gold
+                            : theme.bear
+                      }
+                      sub="Composite discipline rating"
+                    />
+                    <StatCard
+                      label="PLAN ADHERENCE"
+                      value={`${data.psychology.scoreBreakdown?.planAdherencePct || 0}%`}
+                      color={parseFloat(data.psychology.scoreBreakdown?.planAdherencePct || 0) >= 70 ? theme.bull : theme.bear}
+                      sub="Trades executed from plan"
+                      delay={0}
+                    />
+                    <StatCard
+                      label="CALM TRADING"
+                      value={`${data.psychology.scoreBreakdown?.calmTradingPct || 0}%`}
+                      color={parseFloat(data.psychology.scoreBreakdown?.calmTradingPct || 0) >= 50 ? theme.bull : theme.gold}
+                      sub="Calm / focused behavior"
+                      delay={0}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+                    <div style={{ flex: "1 1 320px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>Mood vs Performance</div>
+                      {Array.isArray(data.psychology.moodAnalysis) && data.psychology.moodAnalysis.length > 0 ? (
+                        data.psychology.moodAnalysis.map((m) => {
+                          const winRate = parseFloat(m.winRate || 0);
+                          const c = winRate >= 50 ? theme.bull : theme.bear;
+                          return (
+                            <div key={m.level} style={{ marginBottom: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                                <div style={{ fontSize: 12, fontWeight: 900, color: theme.secondary }}>{m.label}</div>
+                                <div style={{ fontSize: 11, fontWeight: 900, color: c, fontFamily: "'JetBrains Mono',monospace" }}>
+                                  {currency}{parseFloat(m.avgProfit || 0).toFixed(2)} avg
+                                </div>
+                              </div>
+                              <ProgressBar value={winRate} max={100} color={c} label={`${m.trades} trades`} />
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>
+                          Start tagging your mood when logging trades to unlock this section.
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ flex: "1 1 320px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>Confidence Calibration</div>
+                      {Array.isArray(data.psychology.confidenceAnalysis) && data.psychology.confidenceAnalysis.length > 0 ? (
+                        data.psychology.confidenceAnalysis.map((c) => {
+                          const winRate = parseFloat(c.winRate || 0);
+                          const isOver = String(c.level).toLowerCase().includes("over");
+                          const barColor = isOver ? theme.bear : winRate >= 50 ? theme.bull : theme.bear;
+                          return (
+                            <div key={c.level} style={{ marginBottom: 10 }}>
+                              <ProgressBar value={winRate} max={100} color={barColor} label={`${c.level} • ${c.trades} trades`} />
+                              <div style={{ fontSize: 11, color: theme.muted, marginTop: -2 }}>
+                                Avg: {currency}{parseFloat(c.avgProfit || 0).toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>
+                          Start tagging your confidence level to unlock this section.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+                    <div style={{ flex: "1 1 520px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>Emotional Tag Impact</div>
+                      {Array.isArray(data.psychology.emotionalTagImpact) && data.psychology.emotionalTagImpact.length > 0 ? (
+                        <div>
+                          {data.psychology.emotionalTagImpact.slice(0, 8).map((t) => {
+                            const winRate = parseFloat(t.winRate || 0);
+                            const c = winRate >= 50 ? theme.bull : theme.bear;
+                            return (
+                              <ListItem
+                                key={t.tag}
+                                label={`${t.emoji || ""} ${t.tag}`}
+                                value={`${winRate}%`}
+                                color={c}
+                                sub={`${t.trades} trades • Avg: ${currency}${parseFloat(t.avgProfit || 0).toFixed(2)}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>
+                          Tag your emotions when logging trades to see their impact.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                    <div style={{ flex: "1 1 320px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>Would Retake (✅)</div>
+                      {data.psychology.wouldRetakeAnalysis?.yes ? (
+                        <div style={{ background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 14 }}>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: theme.bull, marginBottom: 8 }}>Would Retake</div>
+                          <div style={{ fontSize: 11, color: theme.muted, display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span>Trades</span>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, color: theme.secondary }}>{data.psychology.wouldRetakeAnalysis.yes.trades}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: theme.muted, display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span>Win Rate</span>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, color: theme.bull }}>{data.psychology.wouldRetakeAnalysis.yes.winRate}%</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: theme.muted, display: "flex", justifyContent: "space-between" }}>
+                            <span>Avg P&L</span>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, color: theme.secondary }}>
+                              {currency}{parseFloat(data.psychology.wouldRetakeAnalysis.yes.avgProfit || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>Use the "Would Retake" toggle when logging trades.</div>
+                      )}
+                    </div>
+
+                    <div style={{ flex: "1 1 320px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>Would NOT Retake (❌)</div>
+                      {data.psychology.wouldRetakeAnalysis?.no ? (
+                        <div style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 14 }}>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: theme.bear, marginBottom: 8 }}>Would NOT Retake</div>
+                          <div style={{ fontSize: 11, color: theme.muted, display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span>Trades</span>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, color: theme.secondary }}>{data.psychology.wouldRetakeAnalysis.no.trades}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: theme.muted, display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span>Win Rate</span>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, color: theme.bear }}>{data.psychology.wouldRetakeAnalysis.no.winRate}%</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: theme.muted, display: "flex", justifyContent: "space-between" }}>
+                            <span>Avg P&L</span>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 900, color: theme.secondary }}>
+                              {currency}{parseFloat(data.psychology.wouldRetakeAnalysis.no.avgProfit || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>Use the "Would Retake" toggle when logging trades.</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: 18, borderRadius: 12, border: `1px dashed ${theme.border}`, background: "#F8FAFC", color: theme.muted, fontSize: 12, lineHeight: 1.6 }}>
+                  Psychology analytics unlocks after you log trades with mood, confidence, emotional tags, and the “Would Retake” toggle.
+                </div>
+              )}
+            </div>
+
             {/* Path to Advanced / Profitable */}
-            <PathToAdvanced summary={data.summary} ai={data.ai} perf={data.perf} currency={currency} />
+            <PathToAdvanced
+              summary={data.summary}
+              ai={data.ai}
+              perf={data.perf}
+              quality={data.quality}
+              psychology={data.psychology}
+              currency={currency}
+            />
           </>
         )}
       </main>

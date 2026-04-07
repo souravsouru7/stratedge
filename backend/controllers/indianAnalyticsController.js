@@ -453,7 +453,9 @@ exports.getTimeAnalysis = async (req, res) => {
     if (dayEntries.length > 0) {
       // Sort by profit desc
       const sortedDays = [...dayEntries].sort((a, b) => parseFloat(b[1].profit) - parseFloat(a[1].profit));
-      bestDay = sortedDays[0];
+      if (parseFloat(sortedDays[0][1].profit) > 0) {
+        bestDay = sortedDays[0];
+      }
       // Only set worst if it's different and we have enough data
       if (sortedDays.length > 1) {
         worstDay = sortedDays[sortedDays.length - 1];
@@ -474,7 +476,9 @@ exports.getTimeAnalysis = async (req, res) => {
 
     if (hourEntries.length > 0) {
       const sortedHours = [...hourEntries].sort((a, b) => parseFloat(b[1].profit) - parseFloat(a[1].profit));
-      bestHour = sortedHours[0];
+      if (parseFloat(sortedHours[0][1].profit) > 0) {
+        bestHour = sortedHours[0];
+      }
       if (sortedHours.length > 1) {
         worstHour = sortedHours[sortedHours.length - 1];
       }

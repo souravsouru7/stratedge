@@ -5,6 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
+    "dev:all": "concurrently -n api,worker -c blue,green \"npm run dev\" \"npm run worker\"",
     "start": "node server.js",
     "worker": "node workers/ocrWorker.js",
     "cleanup:analyze": "node scripts/runDataCleanup.js analyze",
@@ -19,6 +20,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "firebase-admin": "^13.6.0",
     "@google-cloud/vision": "^5.3.4",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
@@ -28,7 +30,6 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.1",
-    "google-auth-library": "^10.6.1",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
@@ -45,6 +46,7 @@
     "winston": "^3.19.0"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "nodemon": "^3.1.14"
   }
 }

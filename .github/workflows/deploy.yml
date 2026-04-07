@@ -21,9 +21,11 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/stratedge/backend
+            cd ~/stratedge/backen
             git pull origin main
-            npm install --production
+            npm install
             
-            # Restart both server and OCR worker using PM2 ecosystem config
-            pm2 reload ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+            # Run backend using the current unified script
+            pm2 delete stratedge-backend-all || true
+            pm2 start npm --name "stratedge-backend-all" -- run dev:all
+            pm2 save

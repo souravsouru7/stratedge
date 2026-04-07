@@ -1,46 +1,48 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/Users");
+const { appConfig } = require("../config");
+const ApiError = require("../utils/ApiError");
+const asyncHandler = require("../utils/asyncHandler");
 
-const protect = async (req, res, next) => {
+const protect = asyncHandler(async (req, res, next) => {
   let token;
 
   if (!req.headers.authorization || !req.headers.authorization.startsWith("Bearer")) {
     console.warn(`[Security] Missing token | path=${req.originalUrl} | ip=${req.ip}`);
-    return res.status(401).json({ message: "No token provided" });
+    throw new ApiError(401, "No token provided", "AUTH_REQUIRED");
+  }
+
+  token = req.headers.authorization.split(" ")[1];
+
+  if (!token) {
+    console.warn(`[Security] Malformed authorization header | path=${req.originalUrl} | ip=${req.ip}`);
+    throw new ApiError(401, "No token provided", "AUTH_REQUIRED");
   }
 
   try {
-    token = req.headers.authorization.split(" ")[1];
-
-    if (!token) {
-      console.warn(`[Security] Malformed authorization header | path=${req.originalUrl} | ip=${req.ip}`);
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
+    const decoded = jwt.verify(token, appConfig.jwt.secret);
     req.user = await User.findById(decoded.id).select("-password");
-
-    if (!req.user) {
-      console.warn(`[Security] Token for missing user | path=${req.originalUrl} | ip=${req.ip}`);
-      return res.status(401).json({ message: "Not authorized" });
-    }
-
-    return next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
       console.warn(`[Security] Expired token | path=${req.originalUrl} | ip=${req.ip}`);
-      return res.status(401).json({ message: "Token expired, please login again" });
+      throw new ApiError(401, "Token expired, please login again", "TOKEN_EXPIRED");
     }
 
     if (error.name === "JsonWebTokenError" || error.name === "NotBeforeError") {
       console.warn(`[Security] Invalid token | path=${req.originalUrl} | ip=${req.ip}`);
-      return res.status(403).json({ message: "Invalid token" });
+      throw new ApiError(401, "Invalid token", "INVALID_TOKEN");
     }
 
     console.error("[Security] Token verification failure:", error.message);
-    return res.status(401).json({ message: "Not authorized" });
+    throw new ApiError(401, "Not authorized", "AUTH_FAILED");
   }
-};
+
+  if (!req.user) {
+    console.warn(`[Security] Token for missing user | path=${req.originalUrl} | ip=${req.ip}`);
+    throw new ApiError(401, "Not authorized", "AUTH_FAILED");
+  }
+
+  return next();
+});
 
 module.exports = { protect };

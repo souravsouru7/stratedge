@@ -1,30 +1,12 @@
-const multer = require("multer");
+const { createUploadMiddleware } = require("./upload.middleware");
 
-const storage = multer.memoryStorage();
-
-// Limit uploads to reasonably sized image/PDF files
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5 MB
+// Backward-compatible adapter for legacy routes that expect `upload.single(field)`.
+module.exports = {
+  single(fieldName) {
+    return createUploadMiddleware({
+      fieldName,
+      folderName: "uploads",
+      required: false,
+    });
   },
-  fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/jpg"
-    ];
-
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      const error = new Error("Only image files are allowed");
-      error.statusCode = 400;
-      error.code = "INVALID_FILE_TYPE";
-      console.warn(`[Security] Invalid file upload rejected | mimetype=${file.mimetype}`);
-      return cb(error);
-    }
-
-    cb(null, true);
-  }
-});
-
-module.exports = upload;
+};

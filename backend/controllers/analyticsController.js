@@ -1,4 +1,10 @@
 const Trade = require("../models/Trade");
+const { appConfig } = require("../config");
+
+const forexQuery = (req) => ({
+  user: req.user._id,
+  marketType: { $ne: "Indian_Market" }
+});
 
 // Small helper to shift trade timestamps into a configurable
 // "trader timezone" before bucketing by day/hour.
@@ -6,7 +12,7 @@ const Trade = require("../models/Trade");
 // leave unset/0 to keep server-local time.
 const getAnalyticsLocalDate = (dateLike) => {
   const base = new Date(dateLike);
-  const offsetHours = parseFloat(process.env.TIMEZONE_OFFSET_HOURS || "0");
+  const offsetHours = appConfig.timezoneOffsetHours;
   if (!offsetHours || Number.isNaN(offsetHours)) return base;
   const shiftedMs = base.getTime() + offsetHours * 60 * 60 * 1000;
   return new Date(shiftedMs);
@@ -18,7 +24,7 @@ const getAnalyticsLocalDate = (dateLike) => {
 
 exports.getSummary = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query).sort({ createdAt: -1 });
 
     const totalTrades = trades.length;
@@ -67,7 +73,7 @@ exports.getSummary = async (req, res) => {
 
 exports.getWeeklyStats = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query);
     const weekly = {};
 
@@ -91,7 +97,7 @@ exports.getWeeklyStats = async (req, res) => {
 // 1. Risk/Reward Analysis
 exports.getRiskRewardAnalysis = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query);
 
     const tradesWithRR = trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice);
@@ -210,7 +216,7 @@ exports.getRiskRewardAnalysis = async (req, res) => {
 // 2. Trade Distribution
 exports.getTradeDistribution = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query);
 
     // By Currency Pair
@@ -294,7 +300,7 @@ exports.getTradeDistribution = async (req, res) => {
 // 3. Performance Metrics
 exports.getPerformanceMetrics = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query).sort({ createdAt: 1 });
 
     const winningTrades = trades.filter(t => t.profit > 0);
@@ -343,8 +349,8 @@ exports.getPerformanceMetrics = async (req, res) => {
 // 4. Time Analysis (Fixed)
 exports.getTimeAnalysis = async (req, res) => {
   try {
-    const query = { user: req.user._id };
-    let trades = await Trade.find(query);
+    const query = forexQuery(req);
+    let trades = await Trade.find(forexQuery(req));
 
     // Optional date range filter for "byDay/byHour" style widgets.
     // range=all (default) | range=thisWeek
@@ -451,7 +457,9 @@ exports.getTimeAnalysis = async (req, res) => {
     if (dayEntries.length > 0) {
       // Sort by profit desc
       const sortedDays = [...dayEntries].sort((a, b) => parseFloat(b[1].profit) - parseFloat(a[1].profit));
-      bestDay = sortedDays[0];
+      if (parseFloat(sortedDays[0][1].profit) > 0) {
+        bestDay = sortedDays[0];
+      }
       // Only set worst if it's different and we have enough data
       if (sortedDays.length > 1) {
         worstDay = sortedDays[sortedDays.length - 1];
@@ -472,7 +480,9 @@ exports.getTimeAnalysis = async (req, res) => {
 
     if (hourEntries.length > 0) {
       const sortedHours = [...hourEntries].sort((a, b) => parseFloat(b[1].profit) - parseFloat(a[1].profit));
-      bestHour = sortedHours[0];
+      if (parseFloat(sortedHours[0][1].profit) > 0) {
+        bestHour = sortedHours[0];
+      }
       if (sortedHours.length > 1) {
         worstHour = sortedHours[sortedHours.length - 1];
       }
@@ -569,7 +579,7 @@ exports.getTimeAnalysis = async (req, res) => {
 // 5. Trade Quality
 exports.getTradeQuality = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query);
 
     const rrRanges = [
@@ -638,7 +648,7 @@ exports.getTradeQuality = async (req, res) => {
 // 6. Drawdown Analysis
 exports.getDrawdownAnalysis = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query).sort({ createdAt: 1 });
 
     if (trades.length === 0) {
@@ -699,7 +709,7 @@ exports.getDrawdownAnalysis = async (req, res) => {
 // 7. AI Insights (Enhanced with Session) - OPTIMIZED
 exports.getAIInsights = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query).lean(); // Use .lean() for faster queries
 
     if (trades.length < 5) {
@@ -994,7 +1004,7 @@ exports.getAIInsights = async (req, res) => {
 // 8. Advanced Analytics (all-in-one) - OPTIMIZED
 exports.getAdvancedAnalytics = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query).sort({ createdAt: 1 }).lean(); // Use .lean()
 
     if (!trades.length) {
@@ -1082,7 +1092,7 @@ exports.getAdvancedAnalytics = async (req, res) => {
 
 exports.getPsychologyAnalytics = async (req, res) => {
   try {
-    const query = { user: req.user._id };
+    const query = forexQuery(req);
     const trades = await Trade.find(query).sort({ createdAt: 1 });
 
     if (trades.length === 0) {

@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
-require("dotenv").config();
 
 const Trade = require("../models/Trade");
+const { appConfig } = require("../config");
 const { RETENTION_POLICY, CleanupStats, cleanOldTradeData, cleanOldImages } = require("../jobs/dataCleanupCron");
 
 /**
@@ -12,7 +12,7 @@ async function analyzeStorage() {
   
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(appConfig.mongoUri);
     console.log("✅ Connected to MongoDB\n");
 
     // Get total trade count
@@ -98,7 +98,7 @@ async function runCleanup(dryRun = false) {
   console.log("\n=== DATA CLEANUP JOB ===\n");
   
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(appConfig.mongoUri);
     console.log("✅ Connected to MongoDB\n");
 
     if (dryRun) {

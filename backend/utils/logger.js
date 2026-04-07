@@ -1,5 +1,6 @@
 const winston = require('winston');
 const path = require('path');
+const { appConfig } = require('../config');
 
 // Define log levels and colors
 const logLevels = {
@@ -7,11 +8,13 @@ const logLevels = {
     error: 0,
     warn: 1,
     info: 2,
+    debug: 3,
   },
   colors: {
     error: 'red',
     warn: 'yellow',
     info: 'green',
+    debug: 'cyan',
   },
 };
 
@@ -30,7 +33,8 @@ const logFormat = winston.format.combine(
 
 // Create logger instance
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  // Default to `warn` to keep terminal output focused on actionable issues.
+  level: appConfig.logLevel,
   levels: logLevels.levels,
   transports: [
     // Console transport

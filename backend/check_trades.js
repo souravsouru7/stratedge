@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const Trade = require("./models/Trade");
-require('dotenv').config({ path: './.env' });
+const { appConfig } = require("./config");
 
 async function run() {
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(appConfig.mongoUri);
   const trades = await Trade.find({});
   console.log("Total trades in DB:", trades.length);
   trades.forEach(t => {
@@ -19,7 +19,7 @@ async function run() {
   
   const getAnalyticsLocalDate = (dateLike) => {
     const base = new Date(dateLike);
-    const offsetHours = parseFloat(process.env.TIMEZONE_OFFSET_HOURS || "0");
+    const offsetHours = appConfig.timezoneOffsetHours;
     if (!offsetHours || Number.isNaN(offsetHours)) return base;
     const shiftedMs = base.getTime() + offsetHours * 60 * 60 * 1000;
     return new Date(shiftedMs);

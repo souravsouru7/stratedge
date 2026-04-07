@@ -66,4 +66,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.index({ role: 1, subscriptionExpiry: -1 });
+userSchema.index({ role: 1, subscriptionStatus: 1, subscriptionExpiry: -1 });
+
 module.exports = mongoose.model("User", userSchema);

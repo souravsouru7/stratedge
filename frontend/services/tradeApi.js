@@ -1,95 +1,39 @@
-import { API_URL as BASE_URL } from "@/config/api";
+import apiClient from "./apiClient";
 
-// Helper to get base URL based on market
-const getBaseUrl = (marketType) => {
+// Helper to get URL path prefix based on market
+const getMarketPath = (marketType) => {
   if (marketType === 'Indian_Market') {
-    return `${BASE_URL}/indian`;
+    return `/indian`;
   }
-  return BASE_URL;
-};
-
-const handleResponse = async (res) => {
-  if (!res.ok) {
-    if (res.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
-      return new Promise(() => {});
-    }
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Request failed with status ${res.status}`);
-  }
-  return res.json();
+  return ``;
 };
 
 export const createTrade = async (tradeData, marketType = 'Forex') => {
-  const token = localStorage.getItem("token");
-
-  // Use dedicated Indian Market endpoint if applicable
-  const baseUrl = marketType === 'Indian_Market'
-    ? `${BASE_URL}/indian`
-    : BASE_URL;
-
-  const res = await fetch(`${baseUrl}/trades`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(tradeData)
-  });
-
-  return handleResponse(res);
+  const path = getMarketPath(marketType);
+  // apiClient handles the 'Authorization' header and response data returning!
+  return await apiClient.post(`${path}/trades`, tradeData);
 };
 
-
-
 export const getTrades = async (marketType = 'Forex') => {
-  const token = localStorage.getItem("token");
-  const baseUrl = getBaseUrl(marketType);
-  const url = marketType === 'Indian_Market' ? `${baseUrl}/trades` : `${baseUrl}/trades`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return handleResponse(res);
+  const path = getMarketPath(marketType);
+  return await apiClient.get(`${path}/trades`);
 };
 
 export const getTrade = async (id, marketType = 'Forex') => {
-  const token = localStorage.getItem("token");
-  const baseUrl = getBaseUrl(marketType);
-  const res = await fetch(`${baseUrl}/trades/${id}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return handleResponse(res);
+  const path = getMarketPath(marketType);
+  return await apiClient.get(`${path}/trades/${id}`);
 };
 
 export const getTradeStatus = async (id) => {
-  const token = localStorage.getItem("token");
-  const res = await fetch(`${BASE_URL}/trade/status/${id}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return handleResponse(res);
+  return await apiClient.get(`/trade/status/${id}`);
 };
 
 export const deleteTrade = async (id, marketType = 'Forex') => {
-  const token = localStorage.getItem("token");
-  const baseUrl = getBaseUrl(marketType);
-  const res = await fetch(`${baseUrl}/trades/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return handleResponse(res);
+  const path = getMarketPath(marketType);
+  return await apiClient.delete(`${path}/trades/${id}`);
 };
 
 export const updateTrade = async (id, tradeData, marketType = 'Forex') => {
-  const token = localStorage.getItem("token");
-  const baseUrl = getBaseUrl(marketType);
-  const res = await fetch(`${baseUrl}/trades/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(tradeData)
-  });
-  return handleResponse(res);
+  const path = getMarketPath(marketType);
+  return await apiClient.put(`${path}/trades/${id}`, tradeData);
 };

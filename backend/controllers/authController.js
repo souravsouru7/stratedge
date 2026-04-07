@@ -1,301 +1,228 @@
 const User = require("../models/Users");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { OAuth2Client } = require("google-auth-library");
 const { sendOTPEmail } = require("../services/mailService");
-const crypto = require("crypto");
+const { appConfig } = require("../config");
+const { getFirebaseAdmin } = require("../config/firebaseAdmin");
+const ApiError = require("../utils/ApiError");
+const asyncHandler = require("../utils/asyncHandler");
 
-// Generate JWT
-const generateToken = (id, role) => {
-  const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
-  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn
+const generateToken = (id, role) =>
+  jwt.sign({ id, role }, appConfig.jwt.secret, {
+    expiresIn: appConfig.jwt.expiresIn,
   });
-};
 
-const getGoogleClientId = () => {
-  return (
-    process.env.GOOGLE_CLIENT_ID ||
-    process.env.GOOGLE_OAUTH_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-  );
-};
-
-const getGoogleClient = () => {
-  const clientId = getGoogleClientId();
-  if (!clientId) {
-    const err = new Error("Missing Google OAuth client id in backend env (set GOOGLE_CLIENT_ID)");
-    err.code = "GOOGLE_OAUTH_CONFIG_MISSING";
-    throw err;
-  }
-  return new OAuth2Client(clientId);
-};
-
-// Register User
-exports.registerUser = async (req, res) => {
+async function verifyFirebaseToken(firebaseIdToken) {
   try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "All fields are required (name, email, password)" });
+    const admin = getFirebaseAdmin();
+    return await admin.auth().verifyIdToken(firebaseIdToken);
+  } catch (error) {
+    if (error?.code === "FIREBASE_CONFIG_MISSING") {
+      throw new ApiError(500, "Server misconfigured for Firebase login", "FIREBASE_CONFIG_MISSING");
     }
+    throw new ApiError(401, "Firebase authentication failed", "AUTH_FAILED");
+  }
+}
 
-    const userExists = await User.findOne({ email });
+exports.registerUser = asyncHandler(async (req, res) => {
+  const { name, email, password } = req.body;
 
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
+  if (!name || !email || !password) {
+    throw new ApiError(400, "All fields are required (name, email, password)", "VALIDATION_ERROR");
+  }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+  const userExists = await User.findOne({ email });
+  if (userExists) {
+    throw new ApiError(400, "User already exists", "VALIDATION_ERROR");
+  }
 
-    const user = await User.create({
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  const user = await User.create({
+    name,
+    email,
+    password: hashedPassword,
+    authProvider: "local",
+  });
+
+  res.status(201).json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id, user.role),
+  });
+});
+
+exports.loginUser = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email }).select("+password");
+
+  if (user?.authProvider === "google") {
+    throw new ApiError(401, "This account uses Google sign-in. Please continue with Google.", "AUTH_PROVIDER_MISMATCH");
+  }
+
+  if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
+    throw new ApiError(401, "Invalid credentials", "INVALID_CREDENTIALS");
+  }
+
+  user.lastLogin = new Date();
+  await user.save();
+
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id, user.role),
+  });
+});
+
+exports.googleLogin = asyncHandler(async (req, res) => {
+  const { idToken, credential } = req.body || {};
+  const firebaseIdToken = idToken || credential;
+
+  if (!firebaseIdToken) {
+    throw new ApiError(400, "Missing Firebase ID token", "VALIDATION_ERROR");
+  }
+
+  const decodedToken = await verifyFirebaseToken(firebaseIdToken);
+
+  const identities = decodedToken.firebase?.identities || {};
+  const signInProvider = decodedToken.firebase?.sign_in_provider;
+  const email = decodedToken.email;
+  const emailVerified = decodedToken.email_verified;
+
+  if (!email || !emailVerified) {
+    throw new ApiError(401, "Google email not verified", "AUTH_FAILED");
+  }
+
+  if (signInProvider !== "google.com") {
+    throw new ApiError(401, "Unsupported Firebase sign-in provider", "AUTH_FAILED");
+  }
+
+  const googleId = identities["google.com"]?.[0] || decodedToken.uid;
+  const name =
+    decodedToken.name ||
+    (decodedToken.given_name ? `${decodedToken.given_name} ${decodedToken.family_name || ""}`.trim() : "Trader");
+  const avatar = decodedToken.picture || null;
+
+  let user = await User.findOne({ email });
+  if (!user) {
+    user = await User.create({
       name,
       email,
-      password: hashedPassword,
-      authProvider: "local"
+      googleId,
+      avatar,
+      authProvider: "google",
+      lastLogin: new Date(),
     });
+  } else {
+    const updates = {};
+    if (!user.googleId) updates.googleId = googleId;
+    if (!user.avatar && avatar) updates.avatar = avatar;
+    if (user.authProvider !== "google" && user.authProvider !== "local") updates.authProvider = "local";
 
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id, user.role)
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Login User
-exports.loginUser = async (req, res) => {
-  try {
-
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email }).select("+password");
-
-    if (user && user.authProvider === "google") {
-      return res.status(401).json({ message: "This account uses Google sign-in. Please continue with Google." });
-    }
-
-    if (user && user.password && (await bcrypt.compare(password, user.password))) {
+    if (Object.keys(updates).length > 0) {
+      updates.lastLogin = new Date();
+      await User.updateOne({ _id: user._id }, { $set: updates });
+      user = await User.findById(user._id);
+    } else {
       user.lastLogin = new Date();
       await user.save();
-
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id, user.role)
-      });
-
-    } else {
-      res.status(401).json({ message: "Invalid credentials" });
     }
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
   }
-};
 
-// Google Login (ID token -> verify -> find/create -> JWT)
-exports.googleLogin = async (req, res) => {
-  try {
-    const { credential } = req.body || {};
-    if (!credential) {
-      return res.status(400).json({ message: "Missing credential" });
-    }
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token: generateToken(user._id, user.role),
+  });
+});
 
-    const client = getGoogleClient();
-    const webClientId = process.env.GOOGLE_CLIENT_ID?.trim();
-    const androidClientId = process.env.ANDROID_GOOGLE_CLIENT_ID?.trim();
-    
-    const audiences = [];
-    if (webClientId) audiences.push(webClientId);
-    if (androidClientId) audiences.push(androidClientId);
-
-    // Debug: Print the audience from the token before verification
-    try {
-      const parts = credential.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-        console.log("[Auth] Token Audience (aud):", payload.aud);
-        console.log("[Auth] Token Authorized Party (azp):", payload.azp);
-      }
-    } catch (e) {
-      console.error("[Auth] Failed to parse token payload for debugging");
-    }
-
-    console.log("[Auth] Attempting Google login with allowed audiences:", audiences);
-
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: audiences
-    });
-
-    const payload = ticket.getPayload();
-    const email = payload?.email;
-    const emailVerified = payload?.email_verified;
-
-    if (!email || !emailVerified) {
-      return res.status(401).json({ message: "Google email not verified" });
-    }
-
-    const googleId = payload.sub;
-    const name = payload.name || (payload.given_name ? `${payload.given_name} ${payload.family_name || ""}`.trim() : "Trader");
-    const avatar = payload.picture || null;
-
-    let user = await User.findOne({ email });
-    if (!user) {
-      user = await User.create({
-        name: payload.name,
-        email: payload.email,
-        googleId: payload.sub,
-        avatar: payload.picture,
-        authProvider: "google",
-        lastLogin: new Date()
-      });
-    } else {
-      // Upgrade existing local user to have googleId/avatar if missing (keep provider local unless it was google)
-      const updates = {};
-      if (!user.googleId) updates.googleId = googleId;
-      if (!user.avatar && avatar) updates.avatar = avatar;
-      if (user.authProvider !== "google" && user.authProvider !== "local") updates.authProvider = "local";
-      if (Object.keys(updates).length > 0) {
-        updates.lastLogin = new Date(); // Track activity
-        await User.updateOne({ _id: user._id }, { $set: updates });
-        user = await User.findById(user._id);
-      } else {
-        user.lastLogin = new Date();
-        await user.save();
-      }
-    }
-
-    return res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id, user.role)
-    });
-  } catch (error) {
-    console.error("[Auth] googleLogin error:", error);
-    if (error?.code === "GOOGLE_OAUTH_CONFIG_MISSING") {
-      return res.status(500).json({ message: "Server misconfigured for Google login" });
-    }
-    return res.status(401).json({ message: "Google authentication failed" });
+exports.getMe = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw new ApiError(401, "Not authorized", "AUTH_FAILED");
   }
-};
 
-// Get current user's basic profile
-exports.getMe = async (req, res) => {
-  try {
-    // `protect` middleware attaches the full user document (without password)
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
+  res.json({
+    _id: req.user._id,
+    name: req.user.name,
+    email: req.user.email,
+    role: req.user.role,
+    createdAt: req.user.createdAt,
+  });
+});
 
-    res.json({
-      _id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role,
-      createdAt: req.user.createdAt
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+exports.forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    throw new ApiError(400, "Email is required", "VALIDATION_ERROR");
   }
-};
 
-// Forgot Password - Send OTP
-exports.forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (user.authProvider === "google") {
-      return res.status(400).json({ message: "This account uses Google sign-in. Please use Google to login." });
-    }
-
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-    user.resetPasswordOTP = otp;
-    user.resetPasswordOTPExpires = otpExpires;
-    await user.save();
-
-    await sendOTPEmail(email, otp);
-
-    res.json({ message: "OTP sent to your email" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ApiError(404, "User not found", "NOT_FOUND");
   }
-};
 
-// Verify OTP
-exports.verifyOTP = async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ message: "Email and OTP are required" });
-    }
-
-    const user = await User.findOne({ 
-      email, 
-      resetPasswordOTP: otp,
-      resetPasswordOTPExpires: { $gt: Date.now() }
-    });
-
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
-
-    res.json({ message: "OTP verified. You can now reset your password." });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (user.authProvider === "google") {
+    throw new ApiError(400, "This account uses Google sign-in. Please use Google to login.", "AUTH_PROVIDER_MISMATCH");
   }
-};
 
-// Reset Password
-exports.resetPassword = async (req, res) => {
-  try {
-    const { email, otp, password } = req.body;
-    if (!email || !otp || !password) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpires = Date.now() + 10 * 60 * 1000;
 
-    const user = await User.findOne({ 
-      email, 
-      resetPasswordOTP: otp,
-      resetPasswordOTPExpires: { $gt: Date.now() }
-    });
+  user.resetPasswordOTP = otp;
+  user.resetPasswordOTPExpires = otpExpires;
+  await user.save();
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
+  await sendOTPEmail(email, otp);
+  res.json({ message: "OTP sent to your email" });
+});
 
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
-    
-    // Clear OTP fields
-    user.resetPasswordOTP = undefined;
-    user.resetPasswordOTPExpires = undefined;
-    await user.save();
-
-    res.json({ message: "Password reset successful. Please login with your new password." });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+exports.verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    throw new ApiError(400, "Email and OTP are required", "VALIDATION_ERROR");
   }
-};
+
+  const user = await User.findOne({
+    email,
+    resetPasswordOTP: otp,
+    resetPasswordOTPExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired OTP", "VALIDATION_ERROR");
+  }
+
+  res.json({ message: "OTP verified. You can now reset your password." });
+});
+
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, password } = req.body;
+  if (!email || !otp || !password) {
+    throw new ApiError(400, "All fields are required", "VALIDATION_ERROR");
+  }
+
+  const user = await User.findOne({
+    email,
+    resetPasswordOTP: otp,
+    resetPasswordOTPExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired OTP", "VALIDATION_ERROR");
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  user.password = await bcrypt.hash(password, salt);
+  user.resetPasswordOTP = undefined;
+  user.resetPasswordOTPExpires = undefined;
+  await user.save();
+
+  res.json({ message: "Password reset successful. Please login with your new password." });
+});

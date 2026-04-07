@@ -1,4 +1,5 @@
 const Trade = require("../models/Trade");
+const { appConfig } = require("../config");
 const { logger } = require("../utils/logger");
 const cloudinary = require("../config/cloudinary");
 
@@ -7,17 +8,10 @@ const cloudinary = require("../config/cloudinary");
  * Defaults can be overridden via environment variables
  */
 const RETENTION_POLICY = {
-  // Delete rawOCRText after N days
-  rawOCRTextDays: parseInt(process.env.CLEANUP_RAW_OCR_DAYS || "7", 10),
-  
-  // Delete aiRawResponse after N days
-  aiRawResponseDays: parseInt(process.env.CLEANUP_AI_RESPONSE_DAYS || "7", 10),
-  
-  // Optional: Delete old images after N days (0 = disabled)
-  imageCleanupDays: parseInt(process.env.CLEANUP_IMAGES_DAYS || "0", 10),
-  
-  // Batch size for processing (prevent memory issues)
-  batchSize: parseInt(process.env.CLEANUP_BATCH_SIZE || "100", 10),
+  rawOCRTextDays: appConfig.cleanup.rawOCRTextDays,
+  aiRawResponseDays: appConfig.cleanup.aiRawResponseDays,
+  imageCleanupDays: appConfig.cleanup.imageCleanupDays,
+  batchSize: appConfig.cleanup.batchSize,
 };
 
 /**
@@ -309,7 +303,7 @@ async function runDataCleanupJob() {
  * Schedule the cleanup job to run daily
  */
 function startDataCleanupCron() {
-  const enabled = (process.env.ENABLE_DATA_CLEANUP_CRON || "true").toLowerCase() === "true";
+  const enabled = appConfig.cleanup.enabled;
   
   if (!enabled) {
     logger.info("Data cleanup cron job is disabled by ENABLE_DATA_CLEANUP_CRON");
@@ -318,7 +312,7 @@ function startDataCleanupCron() {
 
   // Default: Run daily at 3 AM (server time)
   // Low-traffic time to minimize impact
-  const schedule = process.env.DATA_CLEANUP_CRON_SCHEDULE || "0 3 * * *";
+  const schedule = appConfig.cleanup.schedule;
 
   if (!require("node-cron").validate(schedule)) {
     logger.warn("Invalid cleanup cron schedule, skipping", { schedule });

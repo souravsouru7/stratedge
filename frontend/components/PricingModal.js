@@ -30,9 +30,9 @@ export default function PricingModal({ isOpen, onClose, onSuccess }) {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_SRnPs0KKtSxqJd", // Safe fallback for demo
         amount: order.amount,
         currency: order.currency,
-        name: "StratEdge AI",
+        name: "Edgecipline AI",
         description: "3 Months Premium Access",
-        image: "/mainlogo.png",
+        image: "/mainlogo1.png",
         order_id: order.id,
         handler: async function (response) {
           try {
@@ -128,7 +128,7 @@ export default function PricingModal({ isOpen, onClose, onSuccess }) {
             Unlock Full Potential
           </h2>
           <p style={{ fontSize: "15px", color: "#64748B", lineHeight: "1.6", marginBottom: "32px", maxWidth: "90%", margin: "0 auto 32px" }}>
-            Experience the full power of StratEdge AI with unlimited extractions and professional insights.
+            Experience the full power of Edgecipline AI with unlimited extractions and professional insights.
           </p>
 
           {/* Pricing Card Section */}

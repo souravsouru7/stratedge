@@ -1,35 +1,32 @@
 const Payment = require("../../models/Payment");
 const User = require("../../models/Users");
+const ApiError = require("../../utils/ApiError");
+const asyncHandler = require("../../utils/asyncHandler");
 
 /**
  * @desc    Get all payments for admin
  * @route   GET /api/admin/payments
  * @access  Private/Admin
  */
-exports.getAllPayments = async (req, res) => {
-  try {
-    const payments = await Payment.find()
-      .populate("user", "name email")
-      .sort({ createdAt: -1 });
-    res.json(payments);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+exports.getAllPayments = asyncHandler(async (req, res) => {
+  const payments = await Payment.find()
+    .populate("user", "name email")
+    .sort({ createdAt: -1 });
+  res.json(payments);
+});
 
 /**
  * @desc    Update payment status (Confirm/Refund)
  * @route   PATCH /api/admin/payments/:id/status
  * @access  Private/Admin
  */
-exports.updatePaymentStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const payment = await Payment.findById(req.params.id);
+exports.updatePaymentStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const payment = await Payment.findById(req.params.id);
 
-    if (!payment) {
-      return res.status(404).json({ message: "Payment not found" });
-    }
+  if (!payment) {
+    throw new ApiError(404, "Payment not found", "NOT_FOUND");
+  }
 
     const previousStatus = payment.status;
     payment.status = status;
@@ -69,32 +66,34 @@ exports.updatePaymentStatus = async (req, res) => {
         }
     }
 
-    await payment.save();
-    res.json({ message: "Payment status updated", payment });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  await payment.save();
+  res.json({ message: "Payment status updated", payment });
+});
 
 /**
  * @desc    Add a manual payment record
  * @route   POST /api/admin/payments/manual
  * @access  Private/Admin
  */
-exports.addManualPayment = async (req, res) => {
-  try {
-    const { userId, amount, transactionId, planType, notes } = req.body;
+exports.addManualPayment = asyncHandler(async (req, res) => {
+  const { userId, amount, transactionId, planType, notes } = req.body;
+  const normalizedTransactionId = (transactionId || `MAN-${Date.now()}`).trim();
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found", "NOT_FOUND");
+  }
+
+  const existingPayment = await Payment.findOne({ transactionId: normalizedTransactionId }).select("_id");
+  if (existingPayment) {
+    throw new ApiError(400, "Transaction ID already exists. Please use a unique transaction ID.", "VALIDATION_ERROR");
+  }
 
     // Create payment record
     const payment = new Payment({
       user: userId,
       amount: amount || 150,
-      transactionId: transactionId || `MAN-${Date.now()}`,
+      transactionId: normalizedTransactionId,
       planType: planType || "3_months",
       paymentMethod: "manual",
       status: "completed",
@@ -116,13 +115,12 @@ exports.addManualPayment = async (req, res) => {
     user.subscriptionExpiry = newExpiry;
     user.subscriptionStatus = "active";
     user.totalPaid = (user.totalPaid || 0) + payment.amount;
-    
+
     payment.expiryDate = newExpiry;
 
-    await Promise.all([user.save(), payment.save()]);
+    // Save payment first so duplicate transaction IDs never extend a user's plan accidentally.
+    await payment.save();
+    await user.save();
 
-    res.status(1).json({ message: "Manual payment recorded successfully", payment });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  res.status(201).json({ message: "Manual payment recorded successfully", payment });
+});

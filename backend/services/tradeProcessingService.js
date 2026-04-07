@@ -1,6 +1,7 @@
 const Trade = require("../models/Trade");
 const ExtractionLog = require("../models/ExtractionLog");
 const { clearUserCache } = require("../utils/cacheUtils");
+const { buildCacheKey, setCache } = require("../utils/cache");
 const { extractText } = require("./ocrService");
 const { extractIndianTradeWithAI, extractTradeWithAI } = require("./aiExtractionService");
 const {
@@ -19,9 +20,10 @@ const {
   calculateIndianConfidenceScore,
 } = require("./extractionQualityService");
 const { logger } = require("../utils/logger");
+const { appConfig } = require("../config");
 const { TIMEOUT_CONFIG } = require("../middleware/timeout");
 
-const PROCESSING_TIMEOUT_MS = parseInt(process.env.PROCESSING_TIMEOUT_MS || "20000", 10); // 20 seconds
+const PROCESSING_TIMEOUT_MS = appConfig.timeouts.processingTimeoutMs;
 
 /**
  * Enhanced timeout wrapper with proper error handling and cleanup
@@ -197,8 +199,15 @@ async function runAiWithRetry({ marketType, text, includeRawResponse = true, bro
         "Processing timeout"
       );
 
+      // If AI returned nothing or couldn't be parsed, we treat it as non-fatal.
+      // The pipeline can continue using OCR-only extraction and mark for review.
       if (!result) {
-        throw new Error("Empty AI response");
+        lastError = new Error("Empty AI response");
+        logger.warn(`AI returned empty result | marketType=${marketType} | attempt=${attempt}`, {
+          marketType,
+          attempt,
+        });
+        continue;
       }
 
       return result;
@@ -213,9 +222,12 @@ async function runAiWithRetry({ marketType, text, includeRawResponse = true, bro
     }
   }
 
-  const failure = new Error("AI processing failed");
-  failure.cause = lastError;
-  throw failure;
+  // Non-fatal: let the caller continue with OCR-only values.
+  logger.warn(`AI extraction failed after retries | marketType=${marketType}`, {
+    marketType,
+    lastError: lastError?.message,
+  });
+  return null;
 }
 
 function mergeIndianAiData(parsedTrade, aiData) {
@@ -381,34 +393,44 @@ async function logExtraction({ trade, extractedText, parsedTrade, parsedTrades, 
   }
 }
 
-async function processTradeUpload({ tradeId, imagePath }) {
+async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt = 1 }) {
   const trade = await Trade.findById(tradeId);
   if (!trade) {
     throw new Error("Trade not found");
   }
 
+  const sourceImage = imageUrl || imagePath || trade.imageUrl || trade.screenshot;
+  if (!sourceImage) {
+    throw new Error("No image URL available for OCR processing");
+  }
+
   await Trade.findByIdAndUpdate(tradeId, {
     status: "processing",
+    ocrJobId: jobId || trade.ocrJobId || tradeId,
+    ocrAttempts: attempt,
+    processingStartedAt: trade.processingStartedAt || new Date(),
     error: null,
   });
 
   return withTimeout((async () => {
     const marketType = trade.marketType || "Forex";
-    let extractedText;
+    let extractedText = "";
+    let ocrSkipped = false;
 
     try {
-      extractedText = await runOcrWithRetry(imagePath);
+      extractedText = await runOcrWithRetry(sourceImage);
     } catch (error) {
-      logger.error(`OCR failure | tradeId=${tradeId}`, {
+      // OCR timed out or failed — don't crash the job, fall back to AI-only mode
+      ocrSkipped = true;
+      logger.warn(`OCR failed | tradeId=${tradeId} | falling back to AI-only extraction`, {
         tradeId,
         reason: error.message,
-        stack: error.stack,
       });
-      throw error.message === "Processing timeout" ? error : new Error("OCR failed after retry");
     }
 
     const cleanedText = cleanOcrText(extractedText);
-    const weakOcr = isWeakOcrText(cleanedText);
+    // Treat as weak if OCR was skipped or produced too little text
+    const weakOcr = ocrSkipped || isWeakOcrText(cleanedText);
     const broker = detectBrokerPattern(cleanedText, trade.broker || undefined);
 
     logger.info(`OCR output | tradeId=${tradeId}`, {
@@ -478,7 +500,7 @@ async function processTradeUpload({ tradeId, imagePath }) {
       try {
         aiData = await runAiWithRetry({
           marketType,
-          text: cleanedText || imagePath,
+          text: cleanedText || sourceImage,
           includeRawResponse: true,
           brokerHint: broker,
           expectedMultiple: marketType === "Indian_Market" && ((parsedTrades && parsedTrades.length > 1) || /POSITIONS|HOLDINGS|CLOSED/i.test(cleanedText)),
@@ -515,7 +537,8 @@ async function processTradeUpload({ tradeId, imagePath }) {
           reason: error.message,
           stack: error.stack,
         });
-        throw error.message === "Processing timeout" ? error : new Error("AI processing failed");
+        // Preserve the real underlying error message (e.g. missing API key / empty response)
+        throw error.message === "Processing timeout" ? error : error;
       }
 
       quality = marketType === "Indian_Market"
@@ -569,19 +592,54 @@ async function processTradeUpload({ tradeId, imagePath }) {
       parsedTrades,
     });
 
-    const update = buildTradeUpdate({
-      trade,
-      parsedTrade,
-      parsedTrades,
-      extractedText: cleanedText,
-      aiRawResponse,
-      confidenceScore: quality.score,
-      isValid: finalValidation.isValid,
-      needsReview,
-      validationFailures: finalValidation.failures,
-    });
+    // When multiple trades are parsed, the ghost/placeholder trade that was created
+    // on upload must be DELETED — it was never a real trade, just a job tracker.
+    // The user will create individual trades from the frontend after reviewing.
+    // Only keep (and update) the ghost trade when there is exactly one parsed trade.
+    const isMultiTrade = Array.isArray(parsedTrades) && parsedTrades.length > 1;
 
-    await Trade.findByIdAndUpdate(tradeId, update, { new: true, runValidators: true });
+    if (isMultiTrade) {
+      const statusBridgeKey = buildCacheKey("trade_status_bridge", trade.user?.toString(), tradeId);
+      await setCache(
+        statusBridgeKey,
+        {
+          jobId: trade.ocrJobId || tradeId,
+          status: "completed",
+          attemptsMade: attempt || trade.ocrAttempts || 0,
+          error: null,
+          data: {
+            parsedData: { parsedTrade, parsedTrades },
+            parsedTrade,
+            parsedTrades,
+            imageUrl: trade.imageUrl || trade.screenshot || "",
+            screenshot: trade.screenshot || trade.imageUrl || "",
+            extractedText: cleanedText,
+            marketType: trade.marketType || "Forex",
+          },
+        },
+        15 * 60
+      );
+
+      await Trade.findByIdAndDelete(tradeId);
+      logger.info(`Ghost trade deleted (multi-trade result) | tradeId=${tradeId} | count=${parsedTrades.length}`, {
+        tradeId,
+        parsedTradeCount: parsedTrades.length,
+      });
+    } else {
+      const update = buildTradeUpdate({
+        trade,
+        parsedTrade,
+        parsedTrades,
+        extractedText: cleanedText,
+        aiRawResponse,
+        confidenceScore: quality.score,
+        isValid: finalValidation.isValid,
+        needsReview,
+        validationFailures: finalValidation.failures,
+      });
+      await Trade.findByIdAndUpdate(tradeId, update, { new: true, runValidators: true });
+    }
+
     await logExtraction({ trade, extractedText: cleanedText, parsedTrade, parsedTrades, aiUsed: !!aiData });
     await clearUserCache(trade.user);
 

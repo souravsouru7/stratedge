@@ -1,22 +1,36 @@
-const { client, isRedisReady } = require("../config/redis");
+const { deleteCacheByPattern } = require("./cache");
+const { logger } = require("./logger");
 
 /**
- * Clears all analytics cache keys for a specific user.
- * Keys follow the pattern: cache:userId:*
+ * Clears all per-user cache namespaces without relying on brittle URL-based keys.
  */
 const clearUserCache = async (userId) => {
-    if (!isRedisReady()) return;
+  const normalizedUserId = userId?.toString?.() || String(userId || "");
+  if (!normalizedUserId) return;
 
-    try {
-        const pattern = `cache:${userId}:*`;
-        const keys = await client.keys(pattern);
-        if (keys.length > 0) {
-            await client.del(...keys);
-            console.log(`Cleared ${keys.length} cache keys for user ${userId}`);
-        }
-    } catch (err) {
-        console.error('Error clearing Redis cache:', err);
+  const patterns = [
+    `dashboard:${normalizedUserId}:*`,
+    `analytics:*:${normalizedUserId}:*`,
+    `trades:${normalizedUserId}:*`,
+    `weekly_reports:${normalizedUserId}:*`,
+  ];
+
+  try {
+    const results = await Promise.all(patterns.map((pattern) => deleteCacheByPattern(pattern)));
+    const deleted = results.reduce((sum, count) => sum + count, 0);
+
+    if (deleted > 0) {
+      logger.info("Cleared user cache", {
+        userId: normalizedUserId,
+        deleted,
+      });
     }
+  } catch (error) {
+    logger.warn("Failed to clear user cache", {
+      userId: normalizedUserId,
+      error: error.message,
+    });
+  }
 };
 
 module.exports = { clearUserCache };

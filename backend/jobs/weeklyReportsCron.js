@@ -1,7 +1,8 @@
 const cron = require("node-cron");
-const User = require("../models/Users");
-const WeeklyReport = require("../models/WeeklyReport");
-const { generateRolling7dReportForUser } = require("../controllers/weeklyReportController");
+const { appConfig } = require("../config");
+const userRepository = require("../repositories/user.repository");
+const weeklyReportRepository = require("../repositories/weeklyReport.repository");
+const { generateRolling7dReportForUser } = require("../services/weeklyReport.service");
 
 let isRunning = false;
 
@@ -9,7 +10,7 @@ async function runWeeklyReportsJob() {
   if (isRunning) return;
   isRunning = true;
   try {
-    const users = await User.find({}, { _id: 1 }).lean();
+    const users = await userRepository.findUsersForWeeklyReports();
     const marketTypes = ["Forex", "Indian_Market"];
     const cooldownMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -17,13 +18,11 @@ async function runWeeklyReportsJob() {
       for (const marketType of marketTypes) {
         try {
           const since = new Date(Date.now() - cooldownMs);
-          const recentlyGenerated = await WeeklyReport.findOne({
-            user: u._id,
+          const recentlyGenerated = await weeklyReportRepository.findRecentlyGeneratedWeeklyReport(
+            u._id,
             marketType,
-            periodType: "rolling7d",
-            aiFeedback: { $ne: null },
-            createdAt: { $gte: since },
-          }).lean();
+            since
+          );
 
           if (!recentlyGenerated) {
             await generateRolling7dReportForUser({ userId: u._id, marketType });
@@ -41,7 +40,7 @@ async function runWeeklyReportsJob() {
 }
 
 function startWeeklyReportsCron() {
-  const enabled = (process.env.ENABLE_WEEKLY_REPORTS_CRON || "true").toLowerCase() === "true";
+  const enabled = appConfig.weeklyReports.enabled;
   if (!enabled) {
     console.log("[weeklyReportsCron] disabled by ENABLE_WEEKLY_REPORTS_CRON");
     return;
@@ -49,7 +48,7 @@ function startWeeklyReportsCron() {
 
   // Daily run (server time). It only generates if last generation was >7 days ago.
   // You can override schedule with WEEKLY_REPORTS_CRON, e.g. "0 9 * * *"
-  const schedule = process.env.WEEKLY_REPORTS_CRON || "0 9 * * *";
+  const schedule = appConfig.weeklyReports.schedule;
 
   if (!cron.validate(schedule)) {
     console.warn("[weeklyReportsCron] invalid cron schedule, skipping:", schedule);

@@ -826,6 +826,31 @@ export default function EdgeciplineLanding() {
           </div>
         </div>
       </footer>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            name: "Edgecipline",
+            applicationCategory: "FinanceApplication",
+            operatingSystem: "All",
+            description: "The AI-Powered Trading Journal with Automated OCR Trade Detection.",
+            url: "https://edgecipline.com",
+            featureList: [
+              "Automated OCR Trade Entry",
+              "AI Trading Coach insights",
+              "Advanced Psychology Analytics",
+              "Trade journaling software"
+            ],
+            offers: {
+              "@type": "Offer",
+              price: "0",
+              priceCurrency: "USD",
+            }
+          })
+        }}
+      />
     </div>
   );
 }
