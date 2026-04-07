@@ -8,8 +8,8 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 
 const getRazorpayClient = () => {
-  const keyId = appConfig.razorpay.keyId;
-  const keySecret = appConfig.razorpay.keySecret;
+  const keyId = String(appConfig.razorpay.keyId || "").trim();
+  const keySecret = String(appConfig.razorpay.keySecret || "").trim();
 
   if (!keyId || !keySecret) {
     throw new ApiError(503, "Razorpay is not configured. Manual admin payments can still be used.", "RAZORPAY_CONFIG_MISSING");
