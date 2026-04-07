@@ -1,6 +1,8 @@
 import { MetadataRoute } from 'next';
 import { siteConfig } from '../config/seo';
 
+export const dynamic = "force-static";
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     '',
@@ -8,7 +10,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Add additional public routes later (e.g. '/features/ocr', '/blog')
   ].map((route) => ({
     url: `${siteConfig.url}${route}`,
-    lastModified: new Date().toISOString(),
     changeFrequency: 'weekly' as const,
     priority: route === '' ? 1 : 0.8,
   }));
