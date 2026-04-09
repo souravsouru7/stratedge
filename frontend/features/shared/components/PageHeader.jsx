@@ -36,7 +36,7 @@ export default function PageHeader({
       <header style={{
         position: "sticky", top: 0, zIndex: 1000,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 28px", height: 60,
+        padding: "0 20px", height: 60,
         background: "rgba(255,255,255,0.92)",
         backdropFilter: "blur(16px)",
         borderBottom: "1px solid #E8EDF2",
@@ -102,8 +102,8 @@ export default function PageHeader({
         {/* Mobile hamburger */}
         <button className="hdr-mobile"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          style={{ background: "none", border: "none", padding: 8, cursor: "pointer", color: "#4A5568" }}>
-          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: "#4A5568", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44 }}>
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </header>
 
@@ -170,11 +170,11 @@ export default function PageHeader({
           border-color: rgba(214,59,59,0.3) !important;
           background: rgba(214,59,59,0.05) !important;
         }
-        @media (max-width: 1024px) {
+        @media (max-width: 768px) {
           .hdr-desktop { display: none !important; }
           .hdr-mobile  { display: flex !important; }
         }
-        @media (min-width: 1025px) {
+        @media (min-width: 769px) {
           .hdr-mobile { display: none !important; }
         }
       `}</style>

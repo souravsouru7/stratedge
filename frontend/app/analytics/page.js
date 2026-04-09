@@ -12,6 +12,7 @@ import ListItem              from "@/features/analytics/components/ListItem";
 import CalendarPnL           from "@/features/analytics/components/CalendarPnL";
 import InsightTag            from "@/features/analytics/components/InsightTag";
 import { useAnalytics }      from "@/features/analytics/hooks/useAnalytics";
+import { Skeleton }          from "@/features/shared";
 
 const C = { bull: "#0D9E6E", bear: "#D63B3B", gold: "#B8860B", purple: "#8B5CF6", primary: "#0F1923", muted: "#94A3B8" };
 
@@ -146,7 +147,7 @@ function AnalyticsContent() {
           </div>
 
           {/* ── Row 1: Core KPIs ───────────────────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 16 }}>
+          <div className="analytics-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
             {[
               { label: "Total Trades",  value: has ? String(summary.totalTrades)  : "—", sub: "trades logged",        color: C.primary },
               { label: "Win Rate",      value: has ? `${summary.winRate}%`          : "—", sub: "of trades profitable", color: summary?.winRate >= 50 ? C.bull : C.bear },
@@ -157,7 +158,7 @@ function AnalyticsContent() {
           </div>
 
           {/* ── Row 2: Risk & Performance KPIs ─────────────────── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 24 }}>
+          <div className="analytics-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
             {[
               {
                 label: "Profit Factor",
@@ -181,10 +182,39 @@ function AnalyticsContent() {
             ].map((s, i) => <StatCard key={s.label} {...s} loading={loading} delay={i * 0.05} />)}
           </div>
 
+          {loading && (
+            <>
+              {/* ── Skeleton section rows ─────────────────────────── */}
+              {[
+                { cols: 3, heights: [180, 160, 160] },
+                { cols: 3, heights: [160, 140, 140] },
+                { cols: 1, heights: [200] },
+                { cols: 2, heights: [220, 180] },
+              ].map((row, ri) => (
+                <div key={ri} style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(280px, 1fr))`, gap: 16, marginBottom: 24 }}>
+                  {row.heights.map((h, ci) => (
+                    <div key={ci} style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", overflow: "hidden", boxShadow: "0 2px 12px rgba(15,25,35,0.05)" }}>
+                      <div style={{ height: 3, background: "#EDF2F7" }} />
+                      <div style={{ padding: "16px 20px", borderBottom: "1px solid #E2E8F0" }}>
+                        <Skeleton width="120px" height="14px" style={{ marginBottom: 6 }} />
+                        <Skeleton width="80px" height="10px" />
+                      </div>
+                      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+                        {[...Array(Math.round(h / 28))].map((_, li) => (
+                          <Skeleton key={li} width={`${100 - li * 8}%`} height="16px" />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+
           {!loading && (
             <>
               {/* ── Distribution + Strategy + Pairs ──────────────── */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 24 }}>
+              <div className="analytics-section-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 20 }}>
 
                 {/* Long vs Short */}
                 <SectionCard title="Trade Direction" subtitle="LONG VS SHORT" delay={0.2} accentColor={C.bull}>
@@ -227,7 +257,7 @@ function AnalyticsContent() {
               </div>
 
               {/* ── R:R Analysis ──────────────────────────────────── */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 24 }}>
+              <div className="analytics-section-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 20 }}>
                 <SectionCard title="Risk / Reward" subtitle="RR DISTRIBUTION" delay={0.35} accentColor={C.bear}>
                   {riskReward ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -287,7 +317,7 @@ function AnalyticsContent() {
                   <SectionCard title="Psychology & Discipline" subtitle="EMOTIONAL TRADING ANALYSIS" delay={0.55} accentColor={C.purple}>
 
                     {/* Top scores */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 20 }}>
+                    <div className="analytics-psych-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
                       {[
                         // FIX: was psychology.disciplineScore (doesn't exist) → now psychologyScore
                         { label: "Discipline Score", value: `${disciplineScore}%`, color: C.purple },
@@ -305,7 +335,7 @@ function AnalyticsContent() {
                       ))}
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
+                    <div className="analytics-psych-sub" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
 
                       {/* Mood breakdown */}
                       {moodRows.length > 0 && (
@@ -400,7 +430,17 @@ function AnalyticsContent() {
       <style jsx global>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; }
-        @media (max-width: 640px) { main { padding: 16px !important; } }
+        @media (max-width: 640px) {
+          main { padding: 14px !important; }
+          .analytics-kpi-grid   { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .analytics-section-grid { grid-template-columns: 1fr !important; }
+          .analytics-psych-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .analytics-psych-sub  { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 360px) {
+          .analytics-kpi-grid { grid-template-columns: 1fr !important; }
+          .analytics-psych-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
     </div>
   );

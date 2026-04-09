@@ -9,6 +9,7 @@ import TradeTable            from "@/features/trade/components/TradeTable";
 import EmptyState            from "@/features/trade/components/EmptyState";
 import DeleteModal           from "@/features/trade/components/DeleteModal";
 import { useTrades }         from "@/features/trade/hooks/useTrades";
+import { Skeleton }          from "@/features/shared";
 
 const FILTER_OPTIONS = ["ALL", "LONG", "SHORT"];
 
@@ -30,31 +31,35 @@ function TradesContent() {
 
         <main style={{ flex: 1, maxWidth: 1200, width: "100%", margin: "0 auto", padding: "28px 24px" }}>
           {/* Page title */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12, opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(-10px)", transition: "all 0.5s" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10, opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(-10px)", transition: "all 0.5s" }}>
             <div>
-              <h1 style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 22, fontWeight: 800, color: "#0F1923", letterSpacing: "-0.02em", marginBottom: 3 }}>Trade Journal</h1>
+              <h1 style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 20, fontWeight: 800, color: "#0F1923", letterSpacing: "-0.02em", marginBottom: 3 }}>Trade Journal</h1>
               <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em" }}>YOUR PERFORMANCE LOG</div>
             </div>
-            <Link href="/upload-trade" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#0D9E6E,#22C78E)", color: "#FFFFFF", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", boxShadow: "0 4px 12px rgba(13,158,110,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+            <Link href="/upload-trade" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#0D9E6E,#22C78E)", color: "#FFFFFF", padding: "10px 18px", minHeight: 44, borderRadius: 10, textDecoration: "none", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", boxShadow: "0 4px 12px rgba(13,158,110,0.3)", fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap" }}>
               + LOG TRADE
             </Link>
           </div>
 
           {/* Summary stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 22, opacity: mounted ? 1 : 0, transition: "all 0.5s 0.1s" }}>
+          <div className="trades-stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18, opacity: mounted ? 1 : 0, transition: "all 0.5s 0.1s" }}>
             {summaryStats.map((s, i) => (
               <div key={s.label} style={{ background: "#FFFFFF", borderRadius: 10, border: "1px solid #E2E8F0", padding: "16px 18px", boxShadow: "0 2px 8px rgba(15,25,35,0.05)", animation: `fadeUp 0.4s ease ${i * 0.06}s both` }}>
                 <div style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.12em", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>{s.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: s.bull ? "#0D9E6E" : "#D63B3B" }}>{s.val}</div>
+                {loading ? (
+                  <Skeleton width="80px" height="22px" style={{ marginTop: 2 }} />
+                ) : (
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: s.bull ? "#0D9E6E" : "#D63B3B" }}>{s.val}</div>
+                )}
               </div>
             ))}
           </div>
 
           {/* Filters */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap", alignItems: "center", opacity: mounted ? 1 : 0, transition: "all 0.5s 0.15s" }}>
-            <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center", opacity: mounted ? 1 : 0, transition: "all 0.5s 0.15s" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {FILTER_OPTIONS.map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 10, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, padding: "7px 14px", borderRadius: 20, border: filter === f ? "1.5px solid rgba(13,158,110,0.5)" : "1px solid #E2E8F0", background: filter === f ? "rgba(13,158,110,0.1)" : "#FFFFFF", color: filter === f ? "#0D9E6E" : "#94A3B8", cursor: "pointer", transition: "all 0.2s" }}>
+                <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 10, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, padding: "9px 14px", minHeight: 38, borderRadius: 20, border: filter === f ? "1.5px solid rgba(13,158,110,0.5)" : "1px solid #E2E8F0", background: filter === f ? "rgba(13,158,110,0.1)" : "#FFFFFF", color: filter === f ? "#0D9E6E" : "#94A3B8", cursor: "pointer", transition: "all 0.2s" }}>
                   {f}
                 </button>
               ))}
@@ -62,7 +67,7 @@ function TradesContent() {
             <input
               type="text" placeholder="Search pair..." value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ flex: 1, minWidth: 160, maxWidth: 260, padding: "8px 14px", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", border: "1px solid #E2E8F0", borderRadius: 8, outline: "none", background: "#FFFFFF", color: "#0F1923" }}
+              style={{ flex: 1, minWidth: 140, padding: "9px 14px", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", border: "1px solid #E2E8F0", borderRadius: 8, outline: "none", background: "#FFFFFF", color: "#0F1923" }}
             />
           </div>
 
@@ -101,6 +106,10 @@ function TradesContent() {
           .hidden-mobile { display:none !important; }
           .show-mobile   { display:block !important; }
           main { padding:16px 12px !important; }
+          .trades-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width:360px) {
+          .trades-stats-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

@@ -47,17 +47,17 @@ function AddTradeContent() {
       <PageHeader showMarketSwitcher showClock clock={clock} />
       <TickerTape />
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "40px 20px", opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(16px)", transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: "28px 20px", opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(16px)", transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 10 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 6 }}>
-              Log New <span style={{ color: isIndianMarket ? '#0D9E6E' : "#0D9E6E" }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
+            <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 6 }}>
+              Log New <span style={{ color: "#0D9E6E" }}>{isIndianMarket ? "Indian Trade" : "Forex Trade"}</span>
             </h1>
             <p style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, ...monoStyle }}>
               {isIndianMarket ? "NSE / BSE / F&O MARKET ENTRY" : "GLOBAL CURRENCY MARKET ENTRY"}
             </p>
           </div>
-          <Link href="/trades" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700, color: "#4A5568", textDecoration: "none", padding: "8px 12px", background: "#FFF", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+          <Link href="/trades" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700, color: "#4A5568", textDecoration: "none", padding: "10px 14px", minHeight: 44, background: "#FFF", borderRadius: 8, border: "1px solid #E2E8F0", whiteSpace: "nowrap" }}>
             <ArrowLeft size={14} /> JOURNAL
           </Link>
         </div>
@@ -78,11 +78,11 @@ function AddTradeContent() {
           <SectionCard title="Core Details" accentColor="#0D9E6E">
             <div style={{ display: "grid", gap: 20 }}>
               <FormInput label={isIndianMarket ? "SYMBOL" : "PAIR"} name="pair" value={trade.pair} onChange={handleChange} placeholder={isIndianMarket ? "RELIANCE" : "XAUUSD"} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <FormSelect label="ACTION" name="type" value={trade.type} onChange={handleChange} options={[{v:"BUY",l:"BUY"},{v:"SELL",l:"SELL"}].map(o=>({value:o.v,label:o.l}))} />
                 <FormInput label={isIndianMarket ? "QUANTITY" : "LOT SIZE"} name={isIndianMarket ? "quantity" : "lotSize"} value={isIndianMarket ? trade.quantity : trade.lotSize} onChange={handleChange} placeholder={isIndianMarket ? "100" : "0.01"} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <FormInput label="ENTRY PRICE" name="entryPrice" value={trade.entryPrice} onChange={handleChange} type="number" step="any" />
                 <FormInput label="EXIT PRICE" name="exitPrice" value={trade.exitPrice} onChange={handleChange} type="number" step="any" />
               </div>
@@ -105,12 +105,12 @@ function AddTradeContent() {
 
           {/* ── Risk Management ── */}
           <SectionCard title="Risk Management" accentColor="#B8860B">
-            <div style={{ display: "grid", gap: 20 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div style={{ display: "grid", gap: 16 }}>
+              <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <FormInput label="STOP LOSS" name="stopLoss" value={trade.stopLoss} onChange={handleChange} type="number" step="any" />
                 <FormInput label="TAKE PROFIT" name="takeProfit" value={trade.takeProfit} onChange={handleChange} type="number" step="any" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <FormSelect
                   label="PLANNED RISK : REWARD"
                   name="riskRewardRatio"
@@ -159,16 +159,16 @@ function AddTradeContent() {
           <SectionCard title="Psychology" accentColor="#8B5CF6">
             <div style={{ marginBottom: 24 }}>
               <label style={labelSt}>EMOTIONAL STATE</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+              <div className="mood-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
                 {MOODS.map(m => (
                   <button key={m.val} type="button" onClick={() => setTrade(p => ({ ...p, mood: p.mood === m.val ? null : m.val }))}
-                    style={{ 
-                      padding: "12px 4px", borderRadius: 14, cursor: "pointer", 
-                      border: trade.mood === m.val ? "2px solid #0D9E6E" : "1px solid #E2E8F0", 
+                    style={{
+                      padding: "10px 4px", borderRadius: 12, cursor: "pointer", minHeight: 72,
+                      border: trade.mood === m.val ? "2px solid #0D9E6E" : "1px solid #E2E8F0",
                       background: trade.mood === m.val ? "rgba(13,158,110,0.08)" : "#FFF",
-                      transition: "all 0.2s"
+                      transition: "all 0.2s", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center"
                     }}>
-                    <div style={{ fontSize: 24, marginBottom: 4 }}>{m.emoji}</div>
+                    <div style={{ fontSize: 22, marginBottom: 4 }}>{m.emoji}</div>
                     <div style={{ fontSize: 9, color: trade.mood === m.val ? "#0D9E6E" : "#94A3B8", fontWeight: 800, letterSpacing: "0.02em" }}>{m.label.toUpperCase()}</div>
                   </button>
                 ))}
@@ -273,7 +273,12 @@ function AddTradeContent() {
 
       <style jsx>{`
         @media (max-width: 640px) {
-          main { padding: 24px 16px !important; }
+          main { padding: 16px !important; }
+          .form-2col { grid-template-columns: 1fr !important; }
+          .mood-grid  { grid-template-columns: repeat(5, 1fr) !important; gap: 6px !important; }
+        }
+        @media (max-width: 400px) {
+          .mood-grid { grid-template-columns: repeat(3, 1fr) !important; }
         }
       `}</style>
     </div>

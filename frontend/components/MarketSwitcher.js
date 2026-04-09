@@ -37,7 +37,7 @@ export default function MarketSwitcher() {
   const currencySymbol = getCurrencySymbol();
 
   return (
-    <div style={{
+    <div className="market-switcher-wrap" style={{
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
@@ -58,8 +58,8 @@ export default function MarketSwitcher() {
           boxShadow: isForex
             ? '0 2px 8px rgba(13, 158, 110, 0.2)'
             : '0 2px 8px rgba(46, 125, 50, 0.2)',
-          minWidth: '140px',
-          height: '40px',
+          minWidth: '120px',
+          height: '36px',
         }}
         title={`Switch to ${isForex ? 'Indian Market' : 'Forex'}`}
       >
@@ -130,17 +130,18 @@ export default function MarketSwitcher() {
 
       {/* Currency Symbol Indicator */}
       <div
+        className="market-currency-badge"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: '36px',
-          height: '36px',
+          width: '34px',
+          height: '34px',
           background: `linear-gradient(135deg, ${isForex ? '#0D9E6E' : '#2E7D32'} 0%, ${isForex ? '#22C78E' : '#43A047'} 100%)`,
           borderRadius: '10px',
           boxShadow: `0 2px 8px ${isForex ? 'rgba(13, 158, 110, 0.3)' : 'rgba(46, 125, 50, 0.3)'}`,
           color: '#FFFFFF',
-          fontSize: '18px',
+          fontSize: '16px',
           fontWeight: '700',
           fontFamily: "'JetBrains Mono', monospace",
           transition: 'all 0.3s ease',
@@ -150,8 +151,9 @@ export default function MarketSwitcher() {
         {currencySymbol}
       </div>
 
-      {/* Market Status Tooltip */}
+      {/* Market Status Label - hidden on mobile */}
       <div
+        className="market-status-label"
         style={{
           fontSize: '10px',
           fontWeight: '600',
@@ -167,6 +169,13 @@ export default function MarketSwitcher() {
       >
         {getMarketLabel()}
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .market-currency-badge { display: none !important; }
+          .market-status-label   { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -166,7 +166,7 @@ function DashboardContent() {
           <div style={{
             display: "flex", alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 24, flexWrap: "wrap", gap: 12,
+            marginBottom: 24, flexWrap: "wrap", gap: 10,
             opacity: mounted ? 1 : 0, transition: "opacity 0.4s",
           }}>
             <div>
@@ -188,9 +188,9 @@ function DashboardContent() {
           </div>
 
           {/* ── KPI stat cards ───────────────────────────────────── */}
-          <div style={{
+          <div className="dash-kpi-grid" style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: 14, marginBottom: 20,
           }}>
             {statCards.map((s, i) => (
@@ -254,9 +254,9 @@ function DashboardContent() {
           </div>
 
           {/* ── Feature cards grid ───────────────────────────────── */}
-          <div style={{
+          <div className="dash-nav-grid" style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
             gap: 14,
           }}>
             {NAV_CARDS.map((c, i) => (
@@ -310,6 +310,11 @@ function DashboardContent() {
         }
         @media (max-width: 640px) {
           main { padding: 16px !important; }
+          .dash-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .dash-nav-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width: 360px) {
+          .dash-kpi-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

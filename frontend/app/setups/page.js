@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchSetups, saveSetups, uploadSetupReferenceImage } from "@/services/setupApi";
 import { useMarket } from "@/context/MarketContext";
+import { Skeleton } from "@/features/shared";
 
 export default function SetupStrategiesPage() {
   const router = useRouter();
@@ -191,7 +192,7 @@ export default function SetupStrategiesPage() {
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <header style={{
-        padding: "12px 20px",
+        padding: "12px 16px",
         borderBottom: "1px solid #E2E8F0",
         background: "rgba(255,255,255,0.95)",
         backdropFilter: "blur(16px)",
@@ -199,14 +200,15 @@ export default function SetupStrategiesPage() {
         alignItems: "center",
         justifyContent: "space-between",
         gap: 10,
+        flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             type="button"
             onClick={() => router.back()}
             style={{
-              width: 30,
-              height: 30,
+              width: 36,
+              height: 36,
               borderRadius: "999px",
               border: "1px solid #E2E8F0",
               display: "flex",
@@ -214,6 +216,7 @@ export default function SetupStrategiesPage() {
               justifyContent: "center",
               background: "#FFFFFF",
               cursor: "pointer",
+              flexShrink: 0,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F1923" strokeWidth="2.2">
@@ -221,14 +224,14 @@ export default function SetupStrategiesPage() {
             </svg>
           </button>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "0.03em" }}>Setup / Strategies</div>
-            <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", marginTop: 2 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.02em" }}>Setup / Strategies</div>
+            <div className="setups-header-sub" style={{ fontSize: 10, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em", marginTop: 2 }}>
               DEFINE STRATEGIES · MANAGE RULES
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#64748B" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div className="setups-market-label" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: "#64748B" }}>
             {getMarketLabel()}
           </div>
           <button
@@ -238,13 +241,15 @@ export default function SetupStrategiesPage() {
             style={{
               fontSize: 11,
               fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: "0.08em",
-              padding: "7px 12px",
+              letterSpacing: "0.06em",
+              padding: "9px 14px",
+              minHeight: 38,
               borderRadius: 999,
               border: "1px solid #0D9E6E55",
               background: saving ? "#E2E8F0" : "linear-gradient(135deg,#0D9E6E,#22C78E)",
               color: saving ? "#64748B" : "#FFFFFF",
               cursor: saving ? "default" : "pointer",
+              whiteSpace: "nowrap",
             }}
           >
             {saving ? "SAVING..." : "SAVE SETUPS"}
@@ -254,19 +259,30 @@ export default function SetupStrategiesPage() {
             style={{
               fontSize: 11,
               fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: "0.08em",
-              padding: "7px 11px",
+              letterSpacing: "0.06em",
+              padding: "9px 12px",
+              minHeight: 38,
               borderRadius: 999,
               border: "1px solid #E2E8F0",
               background: "#F8FAFC",
               color: "#4A5568",
               textDecoration: "none",
+              whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
             }}
           >
-            BACK TO DASHBOARD
+            DASHBOARD
           </Link>
         </div>
       </header>
+
+      <style>{`
+        @media (max-width: 480px) {
+          .setups-header-sub  { display: none !important; }
+          .setups-market-label { display: none !important; }
+        }
+      `}</style>
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "22px 16px 30px" }}>
         {error && (
@@ -280,8 +296,26 @@ export default function SetupStrategiesPage() {
           </div>
         )}
         {loading ? (
-          <div style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: "#64748B" }}>
-            Loading setups...
+          <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", padding: "18px 20px 14px", boxShadow: "0 2px 10px rgba(15,25,35,0.04)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <Skeleton width="120px" height="12px" />
+              <Skeleton width="100px" height="30px" style={{ borderRadius: 999 }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} style={{ borderRadius: 12, border: "1px solid #E2E8F0", padding: "14px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <Skeleton width="160px" height="14px" />
+                    <Skeleton width="40px" height="10px" />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[...Array(3)].map((_, j) => (
+                      <Skeleton key={j} width="100%" height="34px" style={{ borderRadius: 8 }} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
         <div style={{
@@ -399,18 +433,19 @@ export default function SetupStrategiesPage() {
                       />
                     </label>
                     {(strategy.referenceImages?.length || 0) > 0 ? (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
                         {strategy.referenceImages.map((image, imageIdx) => (
-                          <div key={`${strategy.id}-${imageIdx}`} style={{ position: "relative" }}>
+                          <div key={`${strategy.id}-${imageIdx}`} style={{ position: "relative", flexShrink: 0 }}>
                             <img
                               src={image.url}
                               alt={`${strategy.name || "Setup"} reference ${imageIdx + 1}`}
                               style={{
-                                width: 120,
-                                height: 72,
+                                width: 110,
+                                height: 66,
                                 objectFit: "cover",
                                 borderRadius: 10,
                                 border: "1px solid #E2E8F0",
+                                display: "block",
                               }}
                             />
                             <button

@@ -7,6 +7,7 @@ import { fetchSetups } from "@/services/setupApi";
 import { logChecklistEvent } from "@/services/checklistApi";
 import { useMarket } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import { Skeleton } from "@/features/shared";
 
 export default function PreTradeChecklistPage() {
   const router = useRouter();
@@ -197,7 +198,44 @@ export default function PreTradeChecklistPage() {
         )}
 
         {loading ? (
-          <div style={{ padding: "60px 0", textAlign: "center", fontSize: 13, color: "#64748B" }}>Loading setups...</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Strategy selector skeleton */}
+            <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", padding: "14px 16px", boxShadow: "0 2px 10px rgba(15,25,35,0.04)" }}>
+              <Skeleton width="160px" height="10px" style={{ marginBottom: 12 }} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} width={`${70 + i * 20}px`} height="34px" style={{ borderRadius: 999 }} />
+                ))}
+              </div>
+            </div>
+            {/* Rules checklist skeleton */}
+            <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", overflow: "hidden", boxShadow: "0 2px 10px rgba(15,25,35,0.04)" }}>
+              <div style={{ height: 4, background: "#EDF2F7" }} />
+              <div style={{ padding: "16px 18px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <Skeleton width="140px" height="16px" style={{ marginBottom: 6 }} />
+                    <Skeleton width="100px" height="10px" />
+                  </div>
+                  <Skeleton width="70px" height="28px" style={{ borderRadius: 999 }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} width="100%" height="48px" style={{ borderRadius: 12 }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Confidence meter skeleton */}
+            <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", padding: "18px 18px", boxShadow: "0 2px 10px rgba(15,25,35,0.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Skeleton width="120px" height="10px" />
+                <Skeleton width="50px" height="24px" />
+              </div>
+              <Skeleton width="100%" height="12px" style={{ borderRadius: 12, marginBottom: 12 }} />
+              <Skeleton width="100%" height="60px" style={{ borderRadius: 10 }} />
+            </div>
+          </div>
         ) : strategies.length === 0 ? (
           <div style={{
             background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0",
@@ -244,7 +282,7 @@ export default function PreTradeChecklistPage() {
                       style={{
                         fontSize: 12, fontWeight: active ? 800 : 600,
                         fontFamily: "'Plus Jakarta Sans',sans-serif",
-                        padding: "8px 16px", borderRadius: 999,
+                        padding: "10px 16px", minHeight: 42, borderRadius: 999,
                         border: active ? "2px solid #0D9E6E" : "1px solid #E2E8F0",
                         background: active ? "rgba(13,158,110,0.08)" : "#F8FAFC",
                         color: active ? "#0D9E6E" : "#4A5568",
@@ -303,7 +341,7 @@ export default function PreTradeChecklistPage() {
                       background: "#F8FAFC",
                       alignItems: "center",
                     }}>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
                         {selected.referenceImages.slice(0, 5).map((image, idx) => (
                           <img
                             key={`${selected._id || selected.name}-${idx}`}
@@ -311,12 +349,14 @@ export default function PreTradeChecklistPage() {
                             alt={`${selected.name} reference ${idx + 1}`}
                             onClick={() => setPreviewImageUrl(image.url)}
                             style={{
-                              width: 160,
-                              height: 104,
+                              width: "clamp(110px, 28vw, 160px)",
+                              height: "auto",
+                              aspectRatio: "16/10",
                               objectFit: "cover",
                               borderRadius: 10,
                               border: "1px solid #E2E8F0",
                               cursor: "zoom-in",
+                              flexShrink: 0,
                             }}
                           />
                         ))}
@@ -346,9 +386,9 @@ export default function PreTradeChecklistPage() {
                         </div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {[
-                            { value: "yes", label: "YES, VERY SIMILAR", color: "#0D9E6E", bg: "rgba(13,158,110,0.08)", border: "rgba(13,158,110,0.35)" },
+                            { value: "yes", label: "YES", color: "#0D9E6E", bg: "rgba(13,158,110,0.08)", border: "rgba(13,158,110,0.35)" },
                             { value: "partly", label: "PARTLY", color: "#B8860B", bg: "rgba(184,134,11,0.08)", border: "rgba(184,134,11,0.35)" },
-                            { value: "no", label: "NO, NOT REALLY", color: "#D63B3B", bg: "rgba(214,59,59,0.08)", border: "rgba(214,59,59,0.35)" },
+                            { value: "no", label: "NO", color: "#D63B3B", bg: "rgba(214,59,59,0.08)", border: "rgba(214,59,59,0.35)" },
                           ].map((option) => {
                             const active = setupSimilarity === option.value;
                             return (
@@ -357,7 +397,8 @@ export default function PreTradeChecklistPage() {
                                 type="button"
                                 onClick={() => setSetupSimilarity(option.value)}
                                 style={{
-                                  padding: "9px 12px",
+                                  padding: "10px 18px",
+                                  minHeight: 42,
                                   borderRadius: 999,
                                   border: active ? `2px solid ${option.color}` : `1px solid ${option.border}`,
                                   background: active ? option.bg : "#F8FAFC",
@@ -367,6 +408,7 @@ export default function PreTradeChecklistPage() {
                                   fontWeight: 800,
                                   fontFamily: "'JetBrains Mono',monospace",
                                   letterSpacing: "0.04em",
+                                  flex: 1,
                                 }}
                               >
                                 {option.label}
@@ -504,15 +546,15 @@ export default function PreTradeChecklistPage() {
 
             {/* Go / No-Go Decision */}
             {totalRules > 0 && (
-              <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {score >= 80 ? (
                   <button
                     onClick={handleTakeTrade}
                     disabled={isSubmitting}
                     style={{
-                      flex: 1, padding: "16px 20px", borderRadius: 12, border: "none", cursor: isSubmitting ? "not-allowed" : "pointer",
+                      flex: 1, minWidth: 180, padding: "15px 18px", minHeight: 52, borderRadius: 12, border: "none", cursor: isSubmitting ? "not-allowed" : "pointer",
                       background: "linear-gradient(135deg, #0D9E6E, #22C78E)",
-                      color: "#FFFFFF", textDecoration: "none",
+                      color: "#FFFFFF",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                       fontSize: 13, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
                       letterSpacing: "0.06em",
@@ -524,31 +566,31 @@ export default function PreTradeChecklistPage() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
-                    {isSubmitting ? "LOGGING..." : "TAKE THIS TRADE →"}
+                    {isSubmitting ? "LOGGING..." : "TAKE TRADE →"}
                   </button>
                 ) : (
                   <div style={{
-                    flex: 1, padding: "16px 20px", borderRadius: 12,
+                    flex: 1, minWidth: 180, padding: "15px 18px", minHeight: 52, borderRadius: 12,
                     background: score >= 50 ? "rgba(184,134,11,0.08)" : "rgba(214,59,59,0.06)",
                     border: `1px solid ${score >= 50 ? "rgba(184,134,11,0.3)" : "rgba(214,59,59,0.25)"}`,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                    fontSize: 13, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
-                    letterSpacing: "0.06em",
+                    fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
+                    letterSpacing: "0.04em",
                     color: score >= 50 ? "#B8860B" : "#D63B3B",
                   }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <circle cx="12" cy="12" r="10" />
                       <line x1="15" y1="9" x2="9" y2="15" />
                       <line x1="9" y1="9" x2="15" y2="15" />
                     </svg>
-                    {score >= 50 ? "REVIEW RULES BEFORE TRADING" : "SKIP THIS TRADE"}
+                    {score >= 50 ? "REVIEW RULES" : "SKIP TRADE"}
                   </div>
                 )}
 
                 <button
                   onClick={clearAll}
                   style={{
-                    padding: "16px 18px", borderRadius: 12,
+                    padding: "15px 16px", minHeight: 52, borderRadius: 12,
                     background: "#FFFFFF", border: "1px solid #E2E8F0",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                     fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace",

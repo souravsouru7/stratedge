@@ -54,6 +54,7 @@ const BROKER_OPTIONS   = [
 
 const monoStyle = { fontFamily: "'JetBrains Mono',monospace" };
 const labelSt   = { display: "block", fontSize: 10, fontWeight: 600, color: "#4A5568", letterSpacing: "0.1em", marginBottom: 7, ...monoStyle };
+// grid2 inline style — pair with className="form-2col" for mobile collapse
 const grid2     = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
 
 // ── upload / status card ─────────────────────────────────────────────────────
@@ -346,37 +347,37 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
           </div>
         )}
 
-        <div style={{ ...grid2, marginBottom: 16 }}>
+        <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
           <FormInput label={isInd ? "SYMBOL" : "PAIR"} name="pair" value={trade?.pair} onChange={onChange} placeholder={isInd ? "NIFTY 26100 CE" : "EUR/USD"} />
           <FormSelect label="ACTION" name="action" value={trade?.action} onChange={onChange} options={[{ value: "buy", label: "Buy / Long" }, { value: "sell", label: "Sell / Short" }]} />
         </div>
 
         {isInd ? (
           <>
-            <div style={{ ...grid2, marginBottom: 16 }}>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="QUANTITY" name="quantity" value={trade?.quantity} onChange={onChange} placeholder="50" type="number" />
               <FormSelect label="OPTION TYPE" name="optionType" value={trade?.optionType} onChange={onChange} options={[{ value: "CE", label: "CE — Call" }, { value: "PE", label: "PE — Put" }]} />
             </div>
-            <div style={{ ...grid2, marginBottom: 16 }}>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="ENTRY PRICE (₹)" name="entryPrice" value={trade?.entryPrice} onChange={onChange} placeholder="0.00" type="number" />
               <FormInput label="EXIT PRICE (₹)"  name="exitPrice"  value={trade?.exitPrice}  onChange={onChange} placeholder="0.00" type="number" />
             </div>
-            <div style={{ ...grid2, marginBottom: 16 }}>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="P&L (₹)" name="profit" value={trade?.profit} onChange={onChange} placeholder="0.00" type="number" />
               <FormInput label="EXPIRY"  name="expiryDate" value={trade?.expiryDate} onChange={onChange} placeholder="2025-12-26" type="date" />
             </div>
           </>
         ) : (
           <>
-            <div style={{ ...grid2, marginBottom: 16 }}>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="ENTRY PRICE" name="entryPrice" value={trade?.entryPrice} onChange={onChange} placeholder="1.08500" type="number" />
               <FormInput label="EXIT PRICE"  name="exitPrice"  value={trade?.exitPrice}  onChange={onChange} placeholder="1.09200" type="number" />
             </div>
-            <div style={{ ...grid2, marginBottom: 16 }}>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="LOT SIZE" name="lotSize" value={trade?.lotSize} onChange={onChange} placeholder="0.10" type="number" />
               <FormInput label="P&L ($)"  name="profit"  value={trade?.profit}  onChange={onChange} placeholder="0.00" type="number" />
             </div>
-            <div style={{ ...grid2, marginBottom: 16 }}>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="STOP LOSS"   name="stopLoss"   value={trade?.stopLoss}   onChange={onChange} placeholder="1.08000" type="number" />
               <FormInput label="TAKE PROFIT" name="takeProfit" value={trade?.takeProfit} onChange={onChange} placeholder="1.09500" type="number" />
             </div>
@@ -431,12 +432,12 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
         {/* Mood */}
         <div style={{ marginBottom: 24 }}>
           <label style={labelSt}>EMOTIONAL STATE</label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10 }}>
+          <div className="mood-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
             {MOODS.map(m => (
               <button key={m.v} type="button"
                 onClick={() => onChange({ target: { name: "mood", value: trade?.mood === m.v ? null : m.v } })}
-                style={{ padding: "12px 4px", borderRadius: 14, cursor: "pointer", border: trade?.mood === m.v ? "2px solid #8B5CF6" : "1px solid #E2E8F0", background: trade?.mood === m.v ? "rgba(139,92,246,0.08)" : "#FFF", transition: "all 0.2s" }}>
-                <div style={{ fontSize: 24, marginBottom: 4 }}>{m.e}</div>
+                style={{ padding: "10px 4px", borderRadius: 12, cursor: "pointer", minHeight: 70, border: trade?.mood === m.v ? "2px solid #8B5CF6" : "1px solid #E2E8F0", background: trade?.mood === m.v ? "rgba(139,92,246,0.08)" : "#FFF", transition: "all 0.2s", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ fontSize: 22, marginBottom: 4 }}>{m.e}</div>
                 <div style={{ fontSize: 9, color: trade?.mood === m.v ? "#8B5CF6" : "#94A3B8", fontWeight: 800, letterSpacing: "0.02em" }}>{m.label.toUpperCase()}</div>
               </button>
             ))}
@@ -664,7 +665,12 @@ function UploadTradeContent() {
         textarea { resize:vertical; }
         input::placeholder, textarea::placeholder { color:#CBD5E1; font-size:12px; }
         @media (max-width:640px) {
-          main { padding:16px 12px !important; }
+          main { padding:14px 12px !important; }
+          .form-2col  { grid-template-columns: 1fr !important; }
+          .mood-grid  { grid-template-columns: repeat(5,1fr) !important; gap: 6px !important; }
+        }
+        @media (max-width:400px) {
+          .mood-grid  { grid-template-columns: repeat(3,1fr) !important; }
         }
       `}</style>
     </div>
