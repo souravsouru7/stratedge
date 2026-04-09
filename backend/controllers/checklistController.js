@@ -7,7 +7,7 @@ const asyncHandler = require("../utils/asyncHandler");
 // @route   POST /api/checklists/track
 // @access  Private
 const logChecklistResult = asyncHandler(async (req, res) => {
-  const { market, strategyName, totalRules, followedRules, score, isAPlus } = req.body;
+  const { market, strategyName, totalRules, followedRules, score, isAPlus, setupSimilarity } = req.body;
 
   if (!strategyName || totalRules === undefined || followedRules === undefined || score === undefined || isAPlus === undefined) {
     throw new ApiError(400, "All fields are required", "VALIDATION_ERROR");
@@ -21,6 +21,7 @@ const logChecklistResult = asyncHandler(async (req, res) => {
       followedRules,
       score,
       isAPlus,
+      setupSimilarity: typeof setupSimilarity === "string" ? setupSimilarity : "",
     });
 
   res.status(201).json(trackingRecord);

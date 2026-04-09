@@ -105,9 +105,34 @@ function AddTradeContent() {
 
           {/* ── Risk Management ── */}
           <SectionCard title="Risk Management" accentColor="#B8860B">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              <FormInput label="STOP LOSS" name="stopLoss" value={trade.stopLoss} onChange={handleChange} type="number" step="any" />
-              <FormInput label="TAKE PROFIT" name="takeProfit" value={trade.takeProfit} onChange={handleChange} type="number" step="any" />
+            <div style={{ display: "grid", gap: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <FormInput label="STOP LOSS" name="stopLoss" value={trade.stopLoss} onChange={handleChange} type="number" step="any" />
+                <FormInput label="TAKE PROFIT" name="takeProfit" value={trade.takeProfit} onChange={handleChange} type="number" step="any" />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <FormSelect
+                  label="PLANNED RISK : REWARD"
+                  name="riskRewardRatio"
+                  value={trade.riskRewardRatio}
+                  onChange={handleChange}
+                  options={[
+                    { value: "1:1", label: "1 : 1" },
+                    { value: "1:2", label: "1 : 2" },
+                    { value: "1:3", label: "1 : 3" },
+                    { value: "1:4", label: "1 : 4" },
+                    { value: "1:5", label: "1 : 5" },
+                    { value: "custom", label: "Custom" },
+                  ]}
+                />
+                <FormInput
+                  label="R:R INPUT"
+                  name="riskRewardCustom"
+                  value={trade.riskRewardCustom}
+                  onChange={handleChange}
+                  placeholder="e.g. 1:2.5"
+                />
+              </div>
             </div>
           </SectionCard>
 

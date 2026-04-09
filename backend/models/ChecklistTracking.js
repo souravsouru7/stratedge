@@ -32,6 +32,11 @@ const checklistTrackingSchema = new mongoose.Schema(
       type: Boolean,
       required: true,
     },
+    setupSimilarity: {
+      type: String,
+      enum: ["yes", "partly", "no", ""],
+      default: "",
+    },
   },
   {
     timestamps: true,

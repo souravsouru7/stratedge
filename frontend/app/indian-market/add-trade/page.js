@@ -50,8 +50,7 @@ export default function IndianOptionsAddTradePage() {
     sttTaxes: "",
     mood: null,
     confidence: "",
-    emotionalTags: [],
-    wouldRetake: ""
+    emotionalTags: []
   });
   const [loading, setLoading] = useState(false);
   const [strategies, setStrategies] = useState([]);
@@ -170,8 +169,8 @@ export default function IndianOptionsAddTradePage() {
       tradeType: trade.tradeType || "INTRADAY",
       strategy: trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined),
       expiryDate: trade.expiryDate || undefined,
-      riskRewardRatio: trade.riskRewardRatio || "",
-      riskRewardCustom: trade.riskRewardCustom || "",
+      riskRewardRatio: trade.riskRewardCustom?.trim() ? "custom" : (trade.riskRewardRatio || ""),
+      riskRewardCustom: trade.riskRewardCustom?.trim() || "",
       entryBasis: trade.entryBasis || "Plan",
       entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : "",
       notes: trade.notes || undefined,
@@ -182,8 +181,7 @@ export default function IndianOptionsAddTradePage() {
       sttTaxes: trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined,
       mood: trade.mood ?? undefined,
       confidence: trade.confidence || undefined,
-      emotionalTags: Array.isArray(trade.emotionalTags) ? trade.emotionalTags : undefined,
-      wouldRetake: trade.wouldRetake || undefined
+      emotionalTags: Array.isArray(trade.emotionalTags) ? trade.emotionalTags : undefined
     };
 
     const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
@@ -501,15 +499,13 @@ export default function IndianOptionsAddTradePage() {
                 <option value="1:5">1 : 5</option>
                 <option value="custom">Custom</option>
               </select>
-              {trade.riskRewardRatio === "custom" && (
-                <input
-                  name="riskRewardCustom"
-                  placeholder="e.g. 1:2.5"
-                  value={trade.riskRewardCustom}
-                  onChange={handleChange}
-                  style={{ marginTop: 8, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 13 }}
-                />
-              )}
+              <input
+                name="riskRewardCustom"
+                placeholder="e.g. 1:2.5"
+                value={trade.riskRewardCustom}
+                onChange={handleChange}
+                style={{ marginTop: 8, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 13 }}
+              />
             </div>
 
             <div>
@@ -662,7 +658,7 @@ export default function IndianOptionsAddTradePage() {
                 </div>
               </div>
 
-              <div>
+              <div style={{ display: "none" }}>
                 <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>WOULD YOU TAKE THIS TRADE AGAIN?</label>
                 <div style={{ display: "flex", gap: 10 }}>
                   {[

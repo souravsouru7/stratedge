@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getAdminProfile } from "@/services/adminApi";
+import { clearAdminSession, getAdminProfile } from "@/services/adminApi";
 
 /**
  * Admin Layout – Route Protection
@@ -29,6 +29,7 @@ export default function AdminLayout({ children }) {
         const role = localStorage.getItem("adminRole");
 
         if (!token || role !== "admin") {
+          clearAdminSession();
           router.replace("/admin/login");
           return;
         }
@@ -39,16 +40,12 @@ export default function AdminLayout({ children }) {
           setIsVerified(true);
         } else {
           // Token invalid or not admin
-          localStorage.removeItem("adminToken");
-          localStorage.removeItem("adminRole");
-          localStorage.removeItem("adminName");
+          clearAdminSession();
           router.replace("/admin/login");
         }
       } catch (error) {
         // Token expired or invalid
-        localStorage.removeItem("adminToken");
-        localStorage.removeItem("adminRole");
-        localStorage.removeItem("adminName");
+        clearAdminSession();
         router.replace("/admin/login");
       } finally {
         setIsLoading(false);

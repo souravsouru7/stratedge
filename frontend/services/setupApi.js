@@ -9,3 +9,14 @@ export const saveSetups = async (strategies, marketType = "Forex") => {
   const params = new URLSearchParams({ marketType });
   return await apiClient.put(`/setups?${params.toString()}`, { strategies });
 };
+
+export const uploadSetupReferenceImage = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  return await apiClient.post(`/setups/image`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};

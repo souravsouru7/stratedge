@@ -164,12 +164,11 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-  if (!user) {
-    throw new ApiError(404, "User not found", "NOT_FOUND");
-  }
 
-  if (user.authProvider === "google") {
-    throw new ApiError(400, "This account uses Google sign-in. Please use Google to login.", "AUTH_PROVIDER_MISMATCH");
+  // Always return the same response regardless of whether the email exists
+  // to prevent user enumeration attacks
+  if (!user || user.authProvider === "google") {
+    return res.json({ message: "If that email is registered, an OTP has been sent." });
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -180,7 +179,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   await user.save();
 
   await sendOTPEmail(email, otp);
-  res.json({ message: "OTP sent to your email" });
+  res.json({ message: "If that email is registered, an OTP has been sent." });
 });
 
 exports.verifyOTP = asyncHandler(async (req, res) => {

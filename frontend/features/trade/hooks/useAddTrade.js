@@ -55,10 +55,8 @@ export function useAddTrade(marketType, isIndianMarket) {
     emotionalTags: [],
     mistakeTag: "",
     lesson: "",
-    wouldRetake: "",
   });
 
-  const [showCustomRR, setShowCustomRR] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [setupRules, setSetupRules] = useState([]);
@@ -121,7 +119,6 @@ export function useAddTrade(marketType, isIndianMarket) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "riskRewardRatio") setShowCustomRR(value === "custom");
     setTrade(prev => ({ ...prev, [name]: value }));
   };
 
@@ -180,6 +177,8 @@ export function useAddTrade(marketType, isIndianMarket) {
       lotSize: !isIndianMarket ? parseFloat(trade.lotSize) : undefined,
       quantity: isIndianMarket ? parseFloat(trade.quantity) : undefined,
       strategy: trade.strategy === "Custom" ? trade.strategyCustom : trade.strategy,
+      riskRewardRatio: trade.riskRewardCustom?.trim() ? "custom" : (trade.riskRewardRatio || ""),
+      riskRewardCustom: trade.riskRewardCustom?.trim() || "",
     };
 
     const activeRules = setupRules.filter(r => r.label?.trim());
@@ -192,7 +191,7 @@ export function useAddTrade(marketType, isIndianMarket) {
   return {
     trade, setTrade, handleChange, handleStrategyChange, handleScreenshotChange,
     setupRules, toggleSetupRule, updateSetupRuleLabel, addSetupRule, clearSetupRules,
-    handleSubmit, screenshotPreview, uploading, setupsLoading, strategies, mounted, showCustomRR,
+    handleSubmit, screenshotPreview, uploading, setupsLoading, strategies, mounted,
     isSaving: createTradeMutation.isPending
   };
 }

@@ -10,6 +10,7 @@ const {
   parseTradesFromOCR,
   parseForexTradesFromOCR,
 } = require("./parsingService");
+const cloudinary = require("../config/cloudinary");
 const {
   cleanOcrText,
   detectBrokerPattern,
@@ -18,46 +19,12 @@ const {
   validateIndianTrades,
   calculateConfidenceScore,
   calculateIndianConfidenceScore,
+  isTradeRelatedContent,
 } = require("./extractionQualityService");
 const { logger } = require("../utils/logger");
 const { appConfig } = require("../config");
-const { TIMEOUT_CONFIG } = require("../middleware/timeout");
 
 const PROCESSING_TIMEOUT_MS = appConfig.timeouts.processingTimeoutMs;
-
-/**
- * Enhanced timeout wrapper with proper error handling and cleanup
- */
-function enhancedTimeout(promise, operationName, timeoutMs = PROCESSING_TIMEOUT_MS) {
-  const startTime = Date.now();
-  let completed = false;
-  
-  return Promise.race([
-    promise.then((result) => {
-      completed = true;
-      return result;
-    }),
-    new Promise((_, reject) => {
-      setTimeout(() => {
-        if (!completed) {
-          const duration = Date.now() - startTime;
-          const error = new Error(`${operationName} timed out after ${duration}ms (limit: ${timeoutMs}ms)`);
-          error.name = 'TimeoutError';
-          error.code = 'ETIMEDOUT';
-          error.duration = duration;
-          
-          logger.error(`${operationName} timeout`, {
-            operation: operationName,
-            duration: `${duration}ms`,
-            timeout: `${timeoutMs}ms`,
-          });
-          
-          reject(error);
-        }
-      }, timeoutMs);
-    }),
-  ]);
-}
 
 function logExtractedTrades({ tradeId, stage, parsedTrade, parsedTrades }) {
   const multiTrades = Array.isArray(parsedTrades) ? parsedTrades.filter(Boolean) : [];
@@ -103,6 +70,53 @@ function withTimeout(promise, message, timeoutMs = PROCESSING_TIMEOUT_MS) {
 function isWeakOcrText(text) {
   const cleaned = cleanOcrText(text);
   return !cleaned || cleaned.length < 20;
+}
+
+/**
+ * Extracts a Cloudinary public_id from a secure_url.
+ * e.g. https://res.cloudinary.com/cloud/image/upload/v123/trades/abc.jpg → trades/abc
+ */
+function extractCloudinaryPublicId(url) {
+  try {
+    const match = String(url || "").match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^./]+)?$/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Marks a trade as failed with NOT_A_TRADE_IMAGE and deletes its Cloudinary image.
+ * Called when we're confident the uploaded image is not a broker screenshot.
+ */
+async function rejectNonTradeImage(tradeId, trade, userMessage) {
+  await Trade.findByIdAndUpdate(tradeId, {
+    status: "failed",
+    error: userMessage,
+    processedAt: new Date(),
+  });
+
+  // Delete from Cloudinary so it doesn't consume storage
+  const imageUrl = trade.imageUrl || trade.screenshot;
+  const publicId = extractCloudinaryPublicId(imageUrl);
+  if (publicId) {
+    await cloudinary.uploader.destroy(publicId, { resource_type: "image" }).catch((err) => {
+      logger.warn("Failed to delete non-trade image from Cloudinary", { publicId, error: err.message });
+    });
+  }
+
+  await logExtraction({
+    trade,
+    extractedText: "",
+    parsedTrade: null,
+    parsedTrades: [],
+    aiUsed: false,
+    errorMessage: userMessage,
+  });
+
+  await clearUserCache(trade.user);
+
+  logger.warn("Non-trade image rejected and deleted", { tradeId, publicId, userMessage });
 }
 
 function safeParseTrade(text) {
@@ -439,11 +453,20 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       broker,
       weakOcr: weakOcr,
     });
-    
+
     if (cleanedText.length < 1000) {
       logger.debug(`OCR text preview | tradeId=${tradeId}`, { text: cleanedText });
     } else {
       logger.debug(`OCR text preview | tradeId=${tradeId}`, { text: cleanedText.slice(0, 1000) });
+    }
+
+    // Early rejection: if OCR produced text but it contains zero trading signals,
+    // this is almost certainly not a trade screenshot. Skip AI (saves API credits)
+    // and reject immediately with a clear error.
+    if (!ocrSkipped && !isTradeRelatedContent(cleanedText, marketType)) {
+      logger.warn(`Non-trade image detected (no trading keywords) | tradeId=${tradeId}`, { tradeId, textLength: cleanedText.length });
+      await rejectNonTradeImage(tradeId, trade, "Image does not appear to be a trade screenshot. Please upload a screenshot from your broker platform.");
+      return { tradeId, status: "failed", reason: "NOT_A_TRADE_IMAGE" };
     }
 
     let aiData = null;
@@ -580,6 +603,15 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       });
     }
 
+    // Post-pipeline rejection: if confidence is still near-zero after both OCR + AI,
+    // the image is very likely unrelated to trading (e.g. AI also couldn't find anything).
+    // Distinct from needsReview (score 10–60) which is a blurry/partial trade screenshot.
+    if (quality.score < 10) {
+      logger.warn(`Near-zero confidence after full pipeline | tradeId=${tradeId} | score=${quality.score}`, { tradeId, score: quality.score });
+      await rejectNonTradeImage(tradeId, trade, "Could not extract any trade data from this image. Please upload a clear screenshot from your broker platform.");
+      return { tradeId, status: "failed", reason: "NOT_A_TRADE_IMAGE" };
+    }
+
     const needsReview =
       !finalValidation.isValid ||
       quality.isLowConfidence ||
@@ -637,7 +669,7 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         needsReview,
         validationFailures: finalValidation.failures,
       });
-      await Trade.findByIdAndUpdate(tradeId, update, { new: true, runValidators: true });
+      await Trade.findByIdAndUpdate(tradeId, update, { returnDocument: "after", runValidators: true });
     }
 
     await logExtraction({ trade, extractedText: cleanedText, parsedTrade, parsedTrades, aiUsed: !!aiData });
@@ -661,7 +693,7 @@ async function failTradeProcessing(tradeId, error) {
       error: failureMessage,
       processedAt: null,
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (trade) {

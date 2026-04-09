@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { adminLogin } from "@/services/adminApi";
+import { adminLogin, clearAdminSession, getAdminProfile } from "@/services/adminApi";
 import { useRouter } from "next/navigation";
 
 /* ─────────────────────────────────────────
@@ -133,12 +133,36 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setMounted(true);
-    const token = localStorage.getItem("adminToken");
-    const role = localStorage.getItem("adminRole");
-    if (token && role === "admin") {
-      router.push("/admin/dashboard");
-    }
+    let isActive = true;
+
+    const restoreAdminSession = async () => {
+      setMounted(true);
+
+      const token = localStorage.getItem("adminToken");
+      const role = localStorage.getItem("adminRole");
+
+      if (!token || role !== "admin") {
+        clearAdminSession();
+        return;
+      }
+
+      try {
+        const profile = await getAdminProfile();
+        if (isActive && profile?.role === "admin") {
+          router.replace("/admin/dashboard");
+        }
+      } catch {
+        if (isActive) {
+          clearAdminSession();
+        }
+      }
+    };
+
+    restoreAdminSession();
+
+    return () => {
+      isActive = false;
+    };
   }, [router]);
 
   const handleChange = (e) => {
@@ -151,18 +175,20 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError("");
     try {
+      clearAdminSession();
       const data = await adminLogin(form);
       if (data.token) {
         localStorage.setItem("adminToken", data.token);
         localStorage.setItem("adminRole", data.role);
         localStorage.setItem("adminName", data.name);
-        router.push("/admin/dashboard");
+        router.replace("/admin/dashboard");
       } else {
         setShake(true);
         setTimeout(() => setShake(false), 600);
         setError(data.message || "Login failed");
       }
     } catch (err) {
+      clearAdminSession();
       setShake(true);
       setTimeout(() => setShake(false), 600);
       setError(err.message || "Login failed. Please try again.");

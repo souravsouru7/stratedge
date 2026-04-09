@@ -1,26 +1,40 @@
 const multer = require("multer");
 const path = require("path");
+const { PassThrough } = require("stream");
 const cloudinary = require("../config/cloudinary");
 const { appConfig } = require("../config");
 const { logger } = require("../utils/logger");
 
-const ALLOWED_IMAGE_TYPES = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-};
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+// Magic byte signatures for allowed image types.
+// Checks the actual file content — not the client-supplied filename or Content-Type header.
+const MAGIC_BYTES = [
+  { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
+  { mime: "image/png",  bytes: [0x89, 0x50, 0x4e, 0x47] },
+  { mime: "image/webp", bytes: null, check: (buf) => buf.length >= 12 && buf.slice(0, 4).toString() === "RIFF" && buf.slice(8, 12).toString() === "WEBP" },
+];
+
+function detectMagicBytes(buffer) {
+  for (const sig of MAGIC_BYTES) {
+    if (sig.check) {
+      if (sig.check(buffer)) return sig.mime;
+    } else if (buffer.length >= sig.bytes.length) {
+      if (sig.bytes.every((b, i) => buffer[i] === b)) return sig.mime;
+    }
+  }
+  return null;
+}
 
 function isAllowedImage(file) {
   const ext = path.extname(file.originalname || "").toLowerCase();
-  const expectedMimeType = ALLOWED_IMAGE_TYPES[ext];
-
-  return Boolean(expectedMimeType && file.mimetype === expectedMimeType);
+  const hasAllowedExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext);
+  return hasAllowedExt && ALLOWED_MIME_TYPES.has(file.mimetype);
 }
 
 function createCloudinaryStorage(folderName) {
   return {
-    _handleFile(req, file, cb) {
+    _handleFile(_req, file, cb) {
       if (!isAllowedImage(file)) {
         return cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
       }
@@ -31,6 +45,39 @@ function createCloudinaryStorage(folderName) {
         settled = true;
         cb(error, payload);
       };
+
+      // Buffer the first 12 bytes to verify magic bytes before streaming the rest to Cloudinary.
+      const chunks = [];
+      let headerChecked = false;
+      const passThrough = new PassThrough();
+
+      file.stream.on("data", (chunk) => {
+        if (!headerChecked) {
+          chunks.push(chunk);
+          const combined = Buffer.concat(chunks);
+          if (combined.length >= 12) {
+            headerChecked = true;
+            const detectedMime = detectMagicBytes(combined);
+            if (!detectedMime) {
+              file.stream.destroy();
+              return done(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
+            }
+            passThrough.write(combined);
+          }
+        } else {
+          passThrough.write(chunk);
+        }
+      });
+
+      file.stream.on("end", () => {
+        if (!headerChecked) {
+          // File was smaller than 12 bytes — definitely not a valid image
+          return done(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
+        }
+        passThrough.end();
+      });
+
+      file.stream.on("error", (error) => passThrough.destroy(error));
 
       const uploadStream = cloudinary.uploader.upload_stream(
         {
@@ -57,18 +104,18 @@ function createCloudinaryStorage(folderName) {
         }
       );
 
-      file.stream.once("limit", () => {
+      passThrough.once("limit", () => {
         uploadStream.destroy(new multer.MulterError("LIMIT_FILE_SIZE", file.fieldname));
       });
 
-      file.stream.once("error", (error) => uploadStream.destroy(error));
+      passThrough.once("error", (error) => uploadStream.destroy(error));
       uploadStream.once("error", (error) => done(error));
 
-      file.stream.pipe(uploadStream);
+      passThrough.pipe(uploadStream);
       return undefined;
     },
 
-    _removeFile(req, file, cb) {
+    _removeFile(_req, file, cb) {
       if (!file.publicId) {
         cb(null);
         return;
@@ -90,7 +137,7 @@ function createCloudinaryUpload(folderName) {
       fields: 20,
       parts: 25,
     },
-    fileFilter: (req, file, cb) => {
+    fileFilter: (_req, file, cb) => {
       if (!isAllowedImage(file)) {
         return cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname));
       }
@@ -170,8 +217,15 @@ const uploadFeedbackScreenshot = createUploadMiddleware({
   required: false,
 });
 
+const uploadSetupReferenceImage = createUploadMiddleware({
+  fieldName: "image",
+  folderName: "setup-references",
+  required: true,
+});
+
 module.exports = {
   createUploadMiddleware,
   uploadFeedbackScreenshot,
+  uploadSetupReferenceImage,
   uploadTradeImage,
 };

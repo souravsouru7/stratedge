@@ -9,14 +9,29 @@ const { processTradeUpload, failTradeProcessing } = require("../services/tradePr
 const { logger } = require("../utils/logger");
 const { jobFailureTracker } = require("../utils/jobFailureTracker");
 
-connectDB();
-connectRedis();
+let workerInstance = null;
+let shutdownHandlersBound = false;
 
-const worker = new Worker(
-  OCR_QUEUE_NAME,
-  async (job) => {
+function bindShutdownHandlers() {
+  if (shutdownHandlersBound) return;
+
+  const shutdown = async () => {
+    if (workerInstance) {
+      await workerInstance.close();
+      workerInstance = null;
+    }
+    process.exit(0);
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+  shutdownHandlersBound = true;
+}
+
+function createProcessor() {
+  return async (job) => {
     const { tradeId, imageUrl, imagePath, userId } = job.data;
-    
+
     logger.info(`Job started | id=${job.id} | tradeId=${tradeId}`, {
       jobId: job.id,
       tradeId,
@@ -44,18 +59,17 @@ const worker = new Worker(
         stage: "completed",
         attempt: job.attemptsMade + 1,
       });
-      
+
       logger.info(`Job completed successfully | id=${job.id} | tradeId=${tradeId}`, {
         jobId: job.id,
         tradeId,
         timestamp: new Date().toISOString(),
       });
-      
+
       return result;
     } catch (error) {
-      // Track job failures
       jobFailureTracker.recordFailure(job.id, error, tradeId);
-      
+
       try {
         await failTradeProcessing(tradeId, error);
       } catch (updateError) {
@@ -69,7 +83,7 @@ const worker = new Worker(
           }
         );
       }
-      
+
       logger.error(`Job failed | id=${job.id} | tradeId=${tradeId}`,
         {
           jobId: job.id,
@@ -81,50 +95,75 @@ const worker = new Worker(
       );
       throw error;
     }
-  },
-  {
-    connection: bullmqConnection,
-    concurrency: appConfig.ocrWorker.concurrency,
-    lockDuration: appConfig.ocrWorker.lockDurationMs,
+  };
+}
+
+async function startOcrWorker({ initializeConnections = true, mode = "standalone" } = {}) {
+  if (workerInstance) {
+    return workerInstance;
   }
-);
 
-worker.on("completed", (job) => {
-  logger.info(`Job completed event fired | id=${job.id} | tradeId=${job.data.tradeId}`, {
-    jobId: job.id,
-    tradeId: job.data.tradeId,
-    timestamp: new Date().toISOString(),
-  });
-});
+  if (initializeConnections) {
+    await connectDB();
+    await connectRedis();
+  }
 
-worker.on("failed", (job, error) => {
-  logger.error(`Job failed event fired | id=${job?.id} | tradeId=${job?.data?.tradeId}`,
+  workerInstance = new Worker(
+    OCR_QUEUE_NAME,
+    createProcessor(),
     {
-      jobId: job?.id,
-      tradeId: job?.data?.tradeId,
-      error: error?.message,
-      stack: error?.stack,
-      timestamp: new Date().toISOString(),
+      connection: bullmqConnection,
+      concurrency: appConfig.ocrWorker.concurrency,
+      lockDuration: appConfig.ocrWorker.lockDurationMs,
     }
   );
-});
 
-process.on("SIGINT", async () => {
-  await worker.close();
-  process.exit(0);
-});
+  workerInstance.on("completed", (job) => {
+    logger.info(`Job completed event fired | id=${job.id} | tradeId=${job.data.tradeId}`, {
+      jobId: job.id,
+      tradeId: job.data.tradeId,
+      timestamp: new Date().toISOString(),
+    });
+  });
 
-process.on("SIGTERM", async () => {
-  await worker.close();
-  process.exit(0);
-});
+  workerInstance.on("failed", (job, error) => {
+    logger.error(`Job failed event fired | id=${job?.id} | tradeId=${job?.data?.tradeId}`,
+      {
+        jobId: job?.id,
+        tradeId: job?.data?.tradeId,
+        error: error?.message,
+        stack: error?.stack,
+        timestamp: new Date().toISOString(),
+      }
+    );
+  });
 
-logger.info("OCR worker started successfully", {
-  timestamp: new Date().toISOString(),
-  pid: process.pid,
-  queueName: OCR_QUEUE_NAME,
-  concurrency: appConfig.ocrWorker.concurrency,
-  lockDurationMs: appConfig.ocrWorker.lockDurationMs,
-});
+  bindShutdownHandlers();
 
-console.log("OCR worker running. Start with: node workers/ocrWorker.js");
+  logger.info("OCR worker started successfully", {
+    timestamp: new Date().toISOString(),
+    pid: process.pid,
+    queueName: OCR_QUEUE_NAME,
+    concurrency: appConfig.ocrWorker.concurrency,
+    lockDurationMs: appConfig.ocrWorker.lockDurationMs,
+    mode,
+  });
+
+  console.log(`OCR worker running (${mode}).`);
+
+  return workerInstance;
+}
+
+if (require.main === module) {
+  startOcrWorker({ initializeConnections: true, mode: "standalone" }).catch((error) => {
+    logger.error("Failed to start OCR worker", {
+      error: error.message,
+      stack: error.stack,
+    });
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  startOcrWorker,
+};

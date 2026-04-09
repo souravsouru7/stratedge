@@ -6,6 +6,20 @@ const getSetups = asyncHandler(async (req, res) => {
   res.json(strategies);
 });
 
+const uploadSetupReferenceImage = asyncHandler(async (req, res) => {
+  if (!req.uploadedImage?.imageUrl) {
+    res.status(400).json({ message: "Image file is required." });
+    return;
+  }
+
+  res.json({
+    imageUrl: req.uploadedImage.imageUrl,
+    publicId: req.uploadedImage.publicId,
+    bytes: req.uploadedImage.bytes,
+    format: req.uploadedImage.format,
+  });
+});
+
 const saveSetups = asyncHandler(async (req, res) => {
   const created = await setupService.saveSetups(
     req.user.id,
@@ -18,4 +32,5 @@ const saveSetups = asyncHandler(async (req, res) => {
 module.exports = {
   getSetups,
   saveSetups,
+  uploadSetupReferenceImage,
 };

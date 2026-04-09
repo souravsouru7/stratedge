@@ -4,6 +4,19 @@ dns.setDefaultResultOrder("ipv4first");
 // Load .env before any module that reads process.env at require-time (e.g. config/cloudinary via jobs/dataCleanupCron).
 require("dotenv").config();
 
+// Sentry must be initialized before any other require so it can instrument all modules.
+const Sentry = require("@sentry/node");
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || "development",
+    // Capture 100% of transactions in production; lower this (e.g. 0.2) once traffic grows.
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.2 : 1.0,
+    // Don't send events in test/development unless DSN is explicitly set.
+    enabled: !!process.env.SENTRY_DSN,
+  });
+}
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -24,9 +37,21 @@ const { timeoutMiddleware } = require("./middleware/timeout");
 const { connectRedis } = require("./config/redis");
 const { startWeeklyReportsCron } = require("./jobs/weeklyReportsCron");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
+const { startOcrWorker } = require("./workers/ocrWorker");
 
 connectDB();
 connectRedis();
+
+// In local/dev environments, start the OCR worker in-process so uploads do not
+// remain stuck in "processing" when only the API server is running.
+if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !== "false") {
+  startOcrWorker({ initializeConnections: false, mode: "embedded" }).catch((error) => {
+    logger.error("Failed to start embedded OCR worker", {
+      error: error.message,
+      stack: error.stack,
+    });
+  });
+}
 
 // Start scheduled cron jobs
 startWeeklyReportsCron();
@@ -142,14 +167,19 @@ app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/indian/trades", require("./routes/indianMarketRoutes"));
 app.use("/api/indian/analytics", require("./routes/indianAnalyticsRoutes"));
 
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.send("Trading Journal API Running - Forex & Indian Markets");
 });
 
 // Fallback 404 for unknown routes
-app.use((req, res) => {
+app.use((_req, res) => {
   res.status(404).json({ message: "Endpoint not found" });
 });
+
+// Sentry error handler must come before your own error handler
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.expressErrorHandler());
+}
 
 // Central error handler (must be last)
 app.use(errorHandler);
@@ -160,4 +190,3 @@ app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`, { port: PORT, env: appConfig.env });
   console.log(`Server running on port ${PORT}`);
 });
-

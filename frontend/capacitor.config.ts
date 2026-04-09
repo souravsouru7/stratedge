@@ -4,9 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.edgecpline',
   appName: 'Edgecipline',
   webDir: 'out',
-  server: {
-    cleartext: true
-  },
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],

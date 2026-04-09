@@ -1,13 +1,20 @@
-require("dotenv").config({ path: "../.env" }); // Assuming path could be relative if run from scripts, but dotenv defaults to PWD. Better use path.join
-const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "../.env") });
+const dns = require("dns");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const User = require("../models/Users");
+const { appConfig } = require("../config");
 
 async function seedAdmin() {
   try {
-    await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/trading_db");
+    if (appConfig.mongoDnsServers.length > 0) {
+      dns.setServers(appConfig.mongoDnsServers);
+      console.log(`Using custom MongoDB DNS servers: ${appConfig.mongoDnsServers.join(", ")}`);
+    }
+
+    await mongoose.connect(appConfig.mongoUri, {
+      serverSelectionTimeoutMS: 10000,
+      family: 4,
+    });
     console.log("Connected to MongoDB.");
 
     const adminEmail = "admin@stratedge.com";

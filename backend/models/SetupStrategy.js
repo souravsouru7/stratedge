@@ -18,6 +18,20 @@ const setupStrategySchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    referenceImages: [
+      {
+        url: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+        publicId: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+      },
+    ],
     rules: [
       {
         label: {

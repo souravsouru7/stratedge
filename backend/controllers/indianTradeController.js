@@ -82,7 +82,7 @@ exports.updateTrade = asyncHandler(async (req, res) => {
       { _id: req.params.id, user: req.user._id },
       { ...req.body, ...(type && { type: type.toUpperCase() }) },
       {
-        new: true,
+        returnDocument: "after",
         // Allow "save after OCR" to upsert the first trade (jobId is an OCR id,
         // not an existing IndianTrade _id yet).
         upsert: true,

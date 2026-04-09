@@ -10,7 +10,7 @@ import { inputBase, labelStyle, onFocusGreen, onBlurReset } from "./FormInput";
  * @param {Function} onChange - Change handler
  * @param {Array}    options  - Array of { value, label } objects
  */
-export function FormSelect({ label, name, value, onChange, options }) {
+export function FormSelect({ label, name, value, onChange, options, style, ...props }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
@@ -18,9 +18,10 @@ export function FormSelect({ label, name, value, onChange, options }) {
         name={name}
         value={value || ""}
         onChange={onChange}
-        style={{ ...inputBase, cursor: "pointer" }}
+        style={{ ...inputBase, cursor: "pointer", ...style }}
         onFocus={onFocusGreen}
         onBlur={onBlurReset}
+        {...props}
       >
         <option value="">Select...</option>
         {options.map(o => (

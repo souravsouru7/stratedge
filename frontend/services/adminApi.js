@@ -1,8 +1,18 @@
 import { API_URL as BASE_URL } from "@/config/api";
 
+export const clearAdminSession = () => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("adminToken");
+  localStorage.removeItem("adminRole");
+  localStorage.removeItem("adminName");
+};
+
 const handleResponse = async (res) => {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) {
+      clearAdminSession();
+    }
     throw new Error(data.message || `Request failed with status ${res.status}`);
   }
   return res.json();

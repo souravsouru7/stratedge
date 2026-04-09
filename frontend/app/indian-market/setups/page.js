@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchSetups, saveSetups } from "@/services/setupApi";
+import { fetchSetups, saveSetups, uploadSetupReferenceImage } from "@/services/setupApi";
 import { MARKETS } from "@/context/MarketContext";
 
 export default function IndianSetupStrategiesPage() {
@@ -31,12 +31,13 @@ export default function IndianSetupStrategiesPage() {
             id: sIdx + 1,
             name: s.name || "",
             rules: Array.isArray(s.rules)
-              ? s.rules.map((r, rIdx) => ({
-                  id: rIdx + 1,
-                  label: r.label || "",
-                  followed: false,
-                }))
-              : [],
+                ? s.rules.map((r, rIdx) => ({
+                    id: rIdx + 1,
+                    label: r.label || "",
+                    followed: false,
+                  }))
+                : [],
+            referenceImages: Array.isArray(s.referenceImages) ? s.referenceImages.slice(0, 5) : [],
           }));
           setStrategies(mapped);
         } else {
@@ -62,6 +63,7 @@ export default function IndianSetupStrategiesPage() {
           id: nextId,
           name: "",
           rules: [],
+          referenceImages: [],
         },
       ];
     });
@@ -145,6 +147,46 @@ export default function IndianSetupStrategiesPage() {
     );
   };
 
+  const handleReferenceImageChange = async (strategyId, file) => {
+    if (!file) return;
+
+    try {
+      setSaving(true);
+      setError("");
+      const uploaded = await uploadSetupReferenceImage(file);
+      setStrategies(prev =>
+        prev.map(s =>
+          s.id === strategyId
+            ? {
+                ...s,
+                referenceImages: [
+                  ...(Array.isArray(s.referenceImages) ? s.referenceImages : []),
+                  { url: uploaded.imageUrl || "", publicId: uploaded.publicId || "" },
+                ].filter((image) => image.url).slice(0, 5),
+              }
+            : s
+        )
+      );
+    } catch (e) {
+      setError(e.message || "Failed to upload setup image");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeReferenceImage = (strategyId, imageIdx) => {
+    setStrategies(prev =>
+      prev.map(s =>
+        s.id === strategyId
+          ? {
+              ...s,
+              referenceImages: (s.referenceImages || []).filter((_, idx) => idx !== imageIdx),
+            }
+          : s
+      )
+    );
+  };
+
   if (!mounted) return null;
 
   return (
@@ -202,6 +244,7 @@ export default function IndianSetupStrategiesPage() {
                 setError("");
                 const payload = strategies.map(s => ({
                   name: s.name,
+                  referenceImages: Array.isArray(s.referenceImages) ? s.referenceImages.slice(0, 5) : [],
                   rules: (s.rules || []).map(r => ({ label: r.label })),
                 }));
                 await saveSetups(payload, MARKETS.INDIAN_MARKET);
@@ -347,6 +390,78 @@ export default function IndianSetupStrategiesPage() {
                     </div>
                   </div>
 
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>
+                      REFERENCE SCREENSHOT
+                    </div>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <label
+                        style={{
+                          fontSize: 10,
+                          fontFamily: "'JetBrains Mono',monospace",
+                          letterSpacing: "0.08em",
+                          padding: "7px 11px",
+                          borderRadius: 999,
+                          border: "1px solid #0D9E6E33",
+                          background: "rgba(13,158,110,0.04)",
+                          color: "#0D9E6E",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {(strategy.referenceImages?.length || 0) >= 5 ? "MAX 5 IMAGES" : "+ ADD IMAGE"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          disabled={(strategy.referenceImages?.length || 0) >= 5}
+                          onChange={e => handleReferenceImageChange(strategy.id, e.target.files?.[0])}
+                        />
+                      </label>
+                      {(strategy.referenceImages?.length || 0) > 0 ? (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {strategy.referenceImages.map((image, imageIdx) => (
+                            <div key={`${strategy.id}-${imageIdx}`} style={{ position: "relative" }}>
+                              <img
+                                src={image.url}
+                                alt={`${strategy.name || "Setup"} reference ${imageIdx + 1}`}
+                                style={{
+                                  width: 120,
+                                  height: 72,
+                                  objectFit: "cover",
+                                  borderRadius: 10,
+                                  border: "1px solid #E2E8F0",
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeReferenceImage(strategy.id, imageIdx)}
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  right: 6,
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(255,255,255,0.7)",
+                                  background: "rgba(15,25,35,0.7)",
+                                  color: "#FFFFFF",
+                                  cursor: "pointer",
+                                  fontSize: 11,
+                                }}
+                              >
+                                x
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: "#64748B" }}>
+                          Save up to 5 ideal options setup screenshots here for future comparison.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
                     <button
                       type="button"
@@ -487,4 +602,3 @@ export default function IndianSetupStrategiesPage() {
     </div>
   );
 }
-

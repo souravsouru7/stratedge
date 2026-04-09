@@ -28,7 +28,7 @@ export const onBlurReset = e => {
 /**
  * FormInput — labelled text/number/date input field.
  */
-export function FormInput({ label, name, value, onChange, placeholder, type = "text" }) {
+export function FormInput({ label, name, value, onChange, placeholder, type = "text", style, ...props }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
@@ -37,9 +37,10 @@ export function FormInput({ label, name, value, onChange, placeholder, type = "t
         placeholder={placeholder}
         value={value || ""}
         onChange={onChange}
-        style={inputBase}
+        style={{ ...inputBase, ...style }}
         onFocus={onFocusGreen}
         onBlur={onBlurReset}
+        {...props}
       />
     </div>
   );

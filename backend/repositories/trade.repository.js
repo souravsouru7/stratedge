@@ -91,7 +91,7 @@ async function updateForexTradeByUser(tradeId, userId, update, options = {}) {
   return Trade.findOneAndUpdate(
     { _id: tradeId, user: userId, marketType: "Forex" },
     update,
-    { new: true, lean: true, ...options }
+    { returnDocument: "after", lean: true, ...options }
   );
 }
 
@@ -104,7 +104,7 @@ async function deleteForexTradeByUser(tradeId, userId) {
 }
 
 async function updateTradeById(tradeId, update, options = {}) {
-  return Trade.findByIdAndUpdate(tradeId, update, { new: true, ...options });
+  return Trade.findByIdAndUpdate(tradeId, update, { returnDocument: "after", ...options });
 }
 
 async function findTradeByIdAndUser(tradeId, userId) {

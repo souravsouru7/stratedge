@@ -45,6 +45,12 @@ const isCapacitorApp = () => {
   return typeof window !== "undefined" && !!window.Capacitor;
 };
 
+const hasNativeGooglePlugin = () => {
+  if (!isCapacitorApp()) return false;
+  const plugins = window?.Capacitor?.Plugins || {};
+  return Boolean(plugins.GoogleAuth);
+};
+
 const signInWithNativeGoogle = async () => {
   const auth = await getFirebaseAuth();
   const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
@@ -81,8 +87,19 @@ const signInWithWebGoogle = async () => {
 };
 
 export const signInWithFirebaseGoogle = async () => {
-  if (isCapacitorApp()) {
-    return signInWithNativeGoogle();
+  if (isCapacitorApp() && hasNativeGooglePlugin()) {
+    try {
+      return await signInWithNativeGoogle();
+    } catch (error) {
+      const msg = String(error?.message || "");
+      const pluginMissing =
+        /plugin is not implemented|not implemented on android|googleauth/i.test(msg);
+      if (!pluginMissing) {
+        throw error;
+      }
+      // Fall through to web sign-in when native plugin is unavailable on a build.
+      console.warn("Native GoogleAuth plugin unavailable, falling back to web sign-in.");
+    }
   }
 
   return signInWithWebGoogle();

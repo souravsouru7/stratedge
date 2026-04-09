@@ -61,21 +61,26 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
       throw new ApiError(400, "Image file is required.", "VALIDATION_ERROR");
     }
 
-    const marketType = String(body.marketType || query.marketType || "Forex").trim();
+    const ALLOWED_MARKET_TYPES = new Set(["Forex", "Indian_Market"]);
+    const rawMarketType = String(body.marketType || query.marketType || "Forex").trim();
+    if (!ALLOWED_MARKET_TYPES.has(rawMarketType)) {
+      throw new ApiError(400, "Invalid marketType. Allowed: Forex, Indian_Market", "VALIDATION_ERROR");
+    }
+    const marketType = rawMarketType;
+
     const brokerOverrideRaw = String(body.broker || query.broker || "").trim();
     const brokerOverride =
       brokerOverrideRaw && brokerOverrideRaw.toUpperCase() !== "AUTO"
         ? brokerOverrideRaw
         : null;
 
-    console.log(
-      "File received:",
-      uploadedImage.originalName || file?.originalname,
-      uploadedImage.mimeType || file?.mimetype,
-      uploadedImage.bytes || file?.size,
-      "| market:",
-      marketType
-    );
+    logger.info("File received for processing", {
+      originalName: uploadedImage.originalName || file?.originalname,
+      mimeType: uploadedImage.mimeType || file?.mimetype,
+      bytes: uploadedImage.bytes || file?.size,
+      marketType,
+      userId: user._id,
+    });
 
     const trade = await tradeRepository.createTrade({
       user: user._id,
@@ -136,6 +141,29 @@ async function getUploadJobStatus(userId, tradeId) {
 
   const queueState = await getOcrJobSnapshot(trade.ocrJobId || trade._id.toString());
 
+  // Only expose safe fields — never return rawOCRText, aiRawResponse, parsedData, etc.
+  const tradeData = trade.status === "completed" ? {
+    _id: trade._id,
+    pair: trade.pair,
+    type: trade.type,
+    entryPrice: trade.entryPrice,
+    exitPrice: trade.exitPrice,
+    stopLoss: trade.stopLoss,
+    takeProfit: trade.takeProfit,
+    profit: trade.profit,
+    commission: trade.commission,
+    swap: trade.swap,
+    lotSize: trade.lotSize,
+    strategy: trade.strategy,
+    session: trade.session,
+    marketType: trade.marketType,
+    broker: trade.broker,
+    imageUrl: trade.imageUrl,
+    extractionConfidence: trade.extractionConfidence,
+    needsReview: trade.needsReview,
+    createdAt: trade.createdAt,
+  } : null;
+
   return {
     jobId: trade.ocrJobId || trade._id.toString(),
     status: trade.status,
@@ -145,7 +173,7 @@ async function getUploadJobStatus(userId, tradeId) {
     queuedAt: trade.queuedAt,
     processingStartedAt: trade.processingStartedAt,
     processedAt: trade.processedAt,
-    data: trade.status === "completed" ? trade : null,
+    data: tradeData,
   };
 }
 

@@ -28,6 +28,15 @@ function readNumber(name, fallback) {
   return parsed;
 }
 
+function readList(name) {
+  const value = process.env[name];
+  if (value == null || value === "") return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function requireEnv(name) {
   const value = process.env[name];
   if (value == null || String(value).trim() === "") {
@@ -36,11 +45,23 @@ function requireEnv(name) {
   return value;
 }
 
+function normalizeMongoUri(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    throw new Error("Missing required env var: MONGO_URI");
+  }
+  if (raw.startsWith("mongodb://") || raw.startsWith("mongodb+srv://")) {
+    return raw;
+  }
+  return `mongodb://${raw.replace(/^\/+/, "")}`;
+}
+
 const appConfig = {
   env: process.env.NODE_ENV || "development",
   port: readNumber("PORT", 5000),
   logLevel: process.env.LOG_LEVEL || "warn",
-  mongoUri: requireEnv("MONGO_URI"),
+  mongoUri: normalizeMongoUri(requireEnv("MONGO_URI")),
+  mongoDnsServers: readList("MONGO_DNS_SERVERS"),
   jwt: {
     secret: requireEnv("JWT_SECRET"),
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",

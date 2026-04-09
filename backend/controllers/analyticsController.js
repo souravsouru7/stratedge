@@ -25,7 +25,11 @@ const getAnalyticsLocalDate = (dateLike) => {
 exports.getSummary = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query).sort({ createdAt: -1 });
+    const trades = await Trade.find(query)
+      .sort({ createdAt: -1 })
+      .select("profit commission swap setupScore")
+      .lean()
+      .limit(10000);
 
     const totalTrades = trades.length;
     const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
@@ -74,7 +78,10 @@ exports.getSummary = async (req, res) => {
 exports.getWeeklyStats = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query);
+    const trades = await Trade.find(query)
+      .select("profit createdAt")
+      .lean()
+      .limit(10000);
     const weekly = {};
 
     trades.forEach(trade => {
@@ -98,7 +105,10 @@ exports.getWeeklyStats = async (req, res) => {
 exports.getRiskRewardAnalysis = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query);
+    const trades = await Trade.find(query)
+      .select("profit stopLoss takeProfit entryPrice riskRewardRatio riskRewardCustom")
+      .lean()
+      .limit(10000);
 
     const tradesWithRR = trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice);
 
@@ -217,7 +227,10 @@ exports.getRiskRewardAnalysis = async (req, res) => {
 exports.getTradeDistribution = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query);
+    const trades = await Trade.find(query)
+      .select("profit pair type strategy session createdAt")
+      .lean()
+      .limit(10000);
 
     // By Currency Pair
     const byPair = {};
@@ -301,7 +314,11 @@ exports.getTradeDistribution = async (req, res) => {
 exports.getPerformanceMetrics = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query).sort({ createdAt: 1 });
+    const trades = await Trade.find(query)
+      .sort({ createdAt: 1 })
+      .select("profit createdAt lotSize")
+      .lean()
+      .limit(10000);
 
     const winningTrades = trades.filter(t => t.profit > 0);
     const losingTrades = trades.filter(t => t.profit < 0);
@@ -350,7 +367,10 @@ exports.getPerformanceMetrics = async (req, res) => {
 exports.getTimeAnalysis = async (req, res) => {
   try {
     const query = forexQuery(req);
-    let trades = await Trade.find(forexQuery(req));
+    let trades = await Trade.find(query)
+      .select("profit createdAt session")
+      .lean()
+      .limit(10000);
 
     // Optional date range filter for "byDay/byHour" style widgets.
     // range=all (default) | range=thisWeek
@@ -580,7 +600,10 @@ exports.getTimeAnalysis = async (req, res) => {
 exports.getTradeQuality = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query);
+    const trades = await Trade.find(query)
+      .select("profit commission swap stopLoss takeProfit entryPrice riskRewardRatio riskRewardCustom setupScore")
+      .lean()
+      .limit(10000);
 
     const rrRanges = [
       { label: "0-0.5R", min: 0, max: 0.5, trades: [] },
@@ -649,7 +672,11 @@ exports.getTradeQuality = async (req, res) => {
 exports.getDrawdownAnalysis = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query).sort({ createdAt: 1 });
+    const trades = await Trade.find(query)
+      .sort({ createdAt: 1 })
+      .select("profit createdAt")
+      .lean()
+      .limit(10000);
 
     if (trades.length === 0) {
       return res.json({ currentDrawdown: 0, maxDrawdown: 0, maxDrawdownPercent: 0, recoveryFactor: 0, avgDrawdown: 0, drawdownDuration: 0, equityCurve: [] });
@@ -710,7 +737,10 @@ exports.getDrawdownAnalysis = async (req, res) => {
 exports.getAIInsights = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query).lean(); // Use .lean() for faster queries
+    const trades = await Trade.find(query)
+      .select("profit entryPrice stopLoss takeProfit session pair createdAt entryBasis strategy riskRewardRatio riskRewardCustom lotSize")
+      .lean()
+      .limit(10000);
 
     if (trades.length < 5) {
       return res.json({
@@ -1005,7 +1035,11 @@ exports.getAIInsights = async (req, res) => {
 exports.getAdvancedAnalytics = async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query).sort({ createdAt: 1 }).lean(); // Use .lean()
+    const trades = await Trade.find(query)
+      .sort({ createdAt: 1 })
+      .select("profit commission swap entryPrice stopLoss takeProfit riskRewardRatio pair type createdAt balance")
+      .lean()
+      .limit(10000);
 
     if (!trades.length) {
       return res.json({ totalTrades: 0, totalProfit: "0.00", netProfit: "0.00", winRate: "0.0", avgWin: "0.00", avgLoss: "0.00", avgRR: "0.00", actualRR: "0.00", profitFactor: "0.00", maxWinStreak: 0, maxLossStreak: 0, maxDrawdown: "0.00", totalCosts: "0.00", aiScore: "0", recentTrades: [] });

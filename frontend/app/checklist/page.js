@@ -17,8 +17,10 @@ export default function PreTradeChecklistPage() {
   const [error, setError] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [checked, setChecked] = useState({});
+  const [setupSimilarity, setSetupSimilarity] = useState("");
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -32,6 +34,7 @@ export default function PreTradeChecklistPage() {
           setStrategies(data);
           setSelectedIdx(0);
           setChecked({});
+          setSetupSimilarity("");
         } else {
           setStrategies([]);
         }
@@ -71,6 +74,8 @@ export default function PreTradeChecklistPage() {
   const handleSelectStrategy = (idx) => {
     setSelectedIdx(idx);
     setChecked({});
+    setSetupSimilarity("");
+    setPreviewImageUrl("");
   };
 
   const handleTakeTrade = async () => {
@@ -86,6 +91,7 @@ export default function PreTradeChecklistPage() {
         followedRules: checkedCount,
         score,
         isAPlus: score >= 80,
+        setupSimilarity,
       });
       
       // Show happy dialog
@@ -284,6 +290,93 @@ export default function PreTradeChecklistPage() {
                       RESET ALL
                     </button>
                   </div>
+
+                  {Array.isArray(selected.referenceImages) && selected.referenceImages.length > 0 && (
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr",
+                      gap: 14,
+                      padding: "12px",
+                      marginBottom: 14,
+                      borderRadius: 12,
+                      border: "1px solid #E2E8F0",
+                      background: "#F8FAFC",
+                      alignItems: "center",
+                    }}>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {selected.referenceImages.slice(0, 5).map((image, idx) => (
+                          <img
+                            key={`${selected._id || selected.name}-${idx}`}
+                            src={image.url}
+                            alt={`${selected.name} reference ${idx + 1}`}
+                            onClick={() => setPreviewImageUrl(image.url)}
+                            style={{
+                              width: 160,
+                              height: 104,
+                              objectFit: "cover",
+                              borderRadius: 10,
+                              border: "1px solid #E2E8F0",
+                              cursor: "zoom-in",
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>
+                          SETUP REFERENCES
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                          Compare the live chart with your saved ideal setup examples
+                        </div>
+                        <div style={{ fontSize: 12, color: "#64748B" }}>
+                          Use these screenshots as your visual benchmark before you commit to the trade.
+                        </div>
+                      </div>
+                      <div style={{
+                        padding: "12px",
+                        borderRadius: 12,
+                        border: "1px solid #E2E8F0",
+                        background: "#FFFFFF",
+                      }}>
+                        <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 8 }}>
+                          VISUAL MATCH CHECK
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                          Is the current chart setup similar to these reference images?
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {[
+                            { value: "yes", label: "YES, VERY SIMILAR", color: "#0D9E6E", bg: "rgba(13,158,110,0.08)", border: "rgba(13,158,110,0.35)" },
+                            { value: "partly", label: "PARTLY", color: "#B8860B", bg: "rgba(184,134,11,0.08)", border: "rgba(184,134,11,0.35)" },
+                            { value: "no", label: "NO, NOT REALLY", color: "#D63B3B", bg: "rgba(214,59,59,0.08)", border: "rgba(214,59,59,0.35)" },
+                          ].map((option) => {
+                            const active = setupSimilarity === option.value;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setSetupSimilarity(option.value)}
+                                style={{
+                                  padding: "9px 12px",
+                                  borderRadius: 999,
+                                  border: active ? `2px solid ${option.color}` : `1px solid ${option.border}`,
+                                  background: active ? option.bg : "#F8FAFC",
+                                  color: option.color,
+                                  cursor: "pointer",
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  fontFamily: "'JetBrains Mono',monospace",
+                                  letterSpacing: "0.04em",
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {rules.length === 0 ? (
                     <div style={{ fontSize: 12, color: "#94A3B8", padding: "20px 0", textAlign: "center" }}>
@@ -507,6 +600,68 @@ export default function PreTradeChecklistPage() {
                   Tracking saved. Redirecting to journal...
                 </span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {previewImageUrl && (
+          <div
+            onClick={() => setPreviewImageUrl("")}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1000,
+              background: "rgba(15,25,35,0.72)",
+              backdropFilter: "blur(10px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "24px",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "relative",
+                maxWidth: "min(1100px, 96vw)",
+                maxHeight: "90vh",
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewImageUrl("")}
+                style={{
+                  alignSelf: "flex-end",
+                  width: 38,
+                  height: 38,
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#FFFFFF",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  fontWeight: 700,
+                }}
+              >
+                x
+              </button>
+              <img
+                src={previewImageUrl}
+                alt="Setup reference preview"
+                style={{
+                  width: "100%",
+                  maxHeight: "calc(90vh - 56px)",
+                  objectFit: "contain",
+                  borderRadius: 18,
+                  background: "#FFFFFF",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  boxShadow: "0 24px 60px rgba(0,0,0,0.28)",
+                }}
+              />
             </div>
           </div>
         )}

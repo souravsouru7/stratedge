@@ -159,6 +159,33 @@ function calculateIndianConfidenceScore({ parsedTrade = {}, parsedTrades = [], o
   };
 }
 
+// Keywords that strongly indicate a trading screenshot.
+// Intentionally broad — covers Forex, Indian equities, options, and broker UIs.
+const FOREX_KEYWORDS = ["buy", "sell", "profit", "loss", "pnl", "p&l", "pip", "lot", "entry", "exit", "trade", "order", "position", "balance", "equity", "margin", "swap", "commission", "eurusd", "gbpusd", "usdjpy", "xauusd", "usdcad", "audusd", "usdchf", "gbpjpy", "gold", "forex", "spread", "drawdown"];
+const INDIAN_KEYWORDS = ["nifty", "banknifty", "finnifty", "sensex", "bankex", "ce", "pe", "fut", "nse", "bse", "qty", "ltp", "avg", "strike", "premium", "expiry", "zerodha", "upstox", "kite", "groww", "dhan", "fyers", "icici", "kotak", "intraday", "delivery", "options", "futures"];
+
+/**
+ * Returns true if the OCR text looks like it came from a trading screenshot.
+ * Requires BOTH a price-like number AND at least one trading keyword.
+ * A selfie, meme, or random document will have neither.
+ */
+function isTradeRelatedContent(text, marketType = "Forex") {
+  if (!text || text.trim().length < 5) return false;
+
+  const lower = text.toLowerCase();
+  const keywords = marketType === "Indian_Market"
+    ? [...INDIAN_KEYWORDS, ...FOREX_KEYWORDS]
+    : [...FOREX_KEYWORDS, ...INDIAN_KEYWORDS];
+
+  const hasTradeKeyword = keywords.some((kw) => lower.includes(kw));
+
+  // Must have at least one number that looks like a price or P&L value
+  // (e.g. 1.23456, 18500, -250.50, +1200)
+  const hasPriceNumber = /[+-]?\d{1,6}\.?\d{0,5}/.test(text);
+
+  return hasTradeKeyword && hasPriceNumber;
+}
+
 module.exports = {
   cleanOcrText,
   detectBrokerPattern,
@@ -169,4 +196,5 @@ module.exports = {
   validateIndianTrades,
   calculateConfidenceScore,
   calculateIndianConfidenceScore,
+  isTradeRelatedContent,
 };

@@ -19,12 +19,12 @@ async function upsertRollingWeeklyReport(userId, marketType, weekStart, weekEnd,
       $setOnInsert: { user: userId, marketType, periodType: "rolling7d", weekStart, weekEnd },
       $set: { snapshot },
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 }
 
 async function updateWeeklyReportById(reportId, update) {
-  return WeeklyReport.findByIdAndUpdate(reportId, update, { new: true });
+  return WeeklyReport.findByIdAndUpdate(reportId, update, { returnDocument: "after" });
 }
 
 async function findRecentlyGeneratedWeeklyReport(userId, marketType, since) {
