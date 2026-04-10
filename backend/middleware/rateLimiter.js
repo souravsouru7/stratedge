@@ -121,18 +121,15 @@ function createRedisRateLimiter({
 
       return next();
     } catch (error) {
-      logger.error("Redis rate limiter unavailable", {
+      logger.error("Redis rate limiter unavailable — failing open", {
         scope,
         path: req.originalUrl,
         method: req.method,
         error: error.message,
       });
 
-      res.setHeader("Retry-After", "5");
-      return res.status(503).json({
-        status: "error",
-        message: "Rate limiter temporarily unavailable. Please try again later.",
-      });
+      // Fail open: allow the request through rather than blocking all users
+      return next();
     }
   };
 }

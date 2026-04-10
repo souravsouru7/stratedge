@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { fetchSetups, saveSetups, uploadSetupReferenceImage } from "@/services/setupApi";
 import { useMarket } from "@/context/MarketContext";
@@ -60,20 +61,13 @@ export default function SetupStrategiesPage() {
       const nextId = (prev[prev.length - 1]?.id || 0) + 1;
       return [
         ...prev,
-        {
-          id: nextId,
-          name: "",
-          rules: [],
-          referenceImages: [],
-        },
+        { id: nextId, name: "", rules: [], referenceImages: [] },
       ];
     });
   };
 
   const updateStrategyName = (id, name) => {
-    setStrategies(prev =>
-      prev.map(s => (s.id === id ? { ...s, name } : s))
-    );
+    setStrategies(prev => prev.map(s => (s.id === id ? { ...s, name } : s)));
   };
 
   const addRuleToStrategy = (strategyId) => {
@@ -81,13 +75,7 @@ export default function SetupStrategiesPage() {
       prev.map(s => {
         if (s.id !== strategyId) return s;
         const nextRuleId = (s.rules[s.rules.length - 1]?.id || 0) + 1;
-        return {
-          ...s,
-          rules: [
-            ...s.rules,
-            { id: nextRuleId, label: "" },
-          ],
-        };
+        return { ...s, rules: [...s.rules, { id: nextRuleId, label: "" }] };
       })
     );
   };
@@ -96,12 +84,7 @@ export default function SetupStrategiesPage() {
     setStrategies(prev =>
       prev.map(s => {
         if (s.id !== strategyId) return s;
-        return {
-          ...s,
-          rules: s.rules.map(r =>
-            r.id === ruleId ? { ...r, label } : r
-          ),
-        };
+        return { ...s, rules: s.rules.map(r => (r.id === ruleId ? { ...r, label } : r)) };
       })
     );
   };
@@ -114,17 +97,13 @@ export default function SetupStrategiesPage() {
     setStrategies(prev =>
       prev.map(s => {
         if (s.id !== strategyId) return s;
-        return {
-          ...s,
-          rules: s.rules.filter(r => r.id !== ruleId),
-        };
+        return { ...s, rules: s.rules.filter(r => r.id !== ruleId) };
       })
     );
   };
 
   const handleReferenceImageChange = async (strategyId, file) => {
     if (!file) return;
-
     try {
       setSaving(true);
       setError("");
@@ -137,7 +116,7 @@ export default function SetupStrategiesPage() {
                 referenceImages: [
                   ...(Array.isArray(s.referenceImages) ? s.referenceImages : []),
                   { url: uploaded.imageUrl || "", publicId: uploaded.publicId || "" },
-                ].filter((image) => image.url).slice(0, 5),
+                ].filter(img => img.url).slice(0, 5),
               }
             : s
         )
@@ -171,10 +150,7 @@ export default function SetupStrategiesPage() {
     setStrategies(prev =>
       prev.map(s =>
         s.id === strategyId
-          ? {
-              ...s,
-              referenceImages: (s.referenceImages || []).filter((_, idx) => idx !== imageIdx),
-            }
+          ? { ...s, referenceImages: (s.referenceImages || []).filter((_, idx) => idx !== imageIdx) }
           : s
       )
     );
@@ -183,412 +159,656 @@ export default function SetupStrategiesPage() {
   if (!mounted) return null;
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#F0EEE9",
-      fontFamily: "'Plus Jakarta Sans',sans-serif",
-      color: "#0F1923",
-    }}>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-      <header style={{
-        padding: "12px 16px",
-        borderBottom: "1px solid #E2E8F0",
-        background: "rgba(255,255,255,0.95)",
-        backdropFilter: "blur(16px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 10,
-        flexWrap: "wrap",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "999px",
-              border: "1px solid #E2E8F0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#FFFFFF",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F1923" strokeWidth="2.2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.02em" }}>Setup / Strategies</div>
-            <div className="setups-header-sub" style={{ fontSize: 10, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em", marginTop: 2 }}>
-              DEFINE STRATEGIES · MANAGE RULES
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <div className="setups-market-label" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: "#64748B" }}>
-            {getMarketLabel()}
-          </div>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              fontSize: 11,
-              fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: "0.06em",
-              padding: "9px 14px",
-              minHeight: 38,
-              borderRadius: 999,
-              border: "1px solid #0D9E6E55",
-              background: saving ? "#E2E8F0" : "linear-gradient(135deg,#0D9E6E,#22C78E)",
-              color: saving ? "#64748B" : "#FFFFFF",
-              cursor: saving ? "default" : "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {saving ? "SAVING..." : "SAVE SETUPS"}
-          </button>
-          <Link
-            href="/dashboard"
-            style={{
-              fontSize: 11,
-              fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: "0.06em",
-              padding: "9px 12px",
-              minHeight: 38,
-              borderRadius: 999,
-              border: "1px solid #E2E8F0",
-              background: "#F8FAFC",
-              color: "#4A5568",
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            DASHBOARD
-          </Link>
-        </div>
-      </header>
-
+    <div className="sp-root">
       <style>{`
-        @media (max-width: 480px) {
-          .setups-header-sub  { display: none !important; }
-          .setups-market-label { display: none !important; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        * { box-sizing: border-box; }
+
+        .sp-root {
+          min-height: 100vh;
+          background: #F4F6F9;
+          font-family: 'Inter', sans-serif;
+          color: #0F1923;
+        }
+
+        /* ── Header ── */
+        .sp-header {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: #FFFFFF;
+          border-bottom: 1px solid #E8ECF0;
+          padding: 0 16px;
+          height: 56px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .sp-header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .sp-back-btn {
+          flex-shrink: 0;
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          border: 1px solid #E8ECF0;
+          background: #F8FAFB;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .sp-back-btn:hover { background: #EEF1F4; }
+        .sp-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #0F1923;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .sp-market-chip {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background: #EEF9F4;
+          border: 1px solid #C6EEE0;
+          font-size: 10px;
+          font-family: 'JetBrains Mono', monospace;
+          color: #0D9E6E;
+          font-weight: 600;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .sp-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .sp-btn-dashboard {
+          height: 36px;
+          padding: 0 14px;
+          border-radius: 10px;
+          border: 1px solid #E8ECF0;
+          background: #F8FAFB;
+          color: #4A5568;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.15s;
+        }
+        .sp-btn-dashboard:hover { background: #EEF1F4; }
+        .sp-btn-save {
+          height: 36px;
+          padding: 0 16px;
+          border-radius: 10px;
+          border: none;
+          background: linear-gradient(135deg, #0D9E6E, #0BB866);
+          color: #FFFFFF;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: opacity 0.15s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .sp-btn-save:disabled { opacity: 0.55; cursor: default; }
+
+        /* ── Main ── */
+        .sp-main {
+          max-width: 720px;
+          margin: 0 auto;
+          padding: 20px 16px 40px;
+        }
+
+        /* ── Alert ── */
+        .sp-alert-error {
+          padding: 10px 14px;
+          border-radius: 10px;
+          background: #FEF2F2;
+          border: 1px solid #FECACA;
+          font-size: 13px;
+          color: #DC2626;
+          margin-bottom: 14px;
+        }
+        .sp-alert-success {
+          padding: 10px 14px;
+          border-radius: 10px;
+          background: #F0FDF4;
+          border: 1px solid #BBF7D0;
+          font-size: 13px;
+          color: #16A34A;
+          margin-bottom: 14px;
+        }
+
+        /* ── Section header ── */
+        .sp-section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+          gap: 12px;
+        }
+        .sp-section-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #0F1923;
+        }
+        .sp-section-sub {
+          font-size: 12px;
+          color: #8A97A6;
+          margin-top: 2px;
+        }
+        .sp-btn-add-strategy {
+          flex-shrink: 0;
+          height: 34px;
+          padding: 0 14px;
+          border-radius: 10px;
+          border: 1.5px dashed #0D9E6E;
+          background: transparent;
+          color: #0D9E6E;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          transition: background 0.15s;
+        }
+        .sp-btn-add-strategy:hover { background: #EEF9F4; }
+
+        /* ── Strategy card ── */
+        .sp-card {
+          background: #FFFFFF;
+          border-radius: 14px;
+          border: 1px solid #E8ECF0;
+          overflow: hidden;
+          margin-bottom: 14px;
+          box-shadow: 0 1px 4px rgba(15,25,35,0.05);
+        }
+        .sp-card-header {
+          padding: 14px 16px 12px;
+          border-bottom: 1px solid #F1F4F8;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .sp-card-name-wrap {
+          flex: 1;
+          min-width: 0;
+        }
+        .sp-field-label {
+          font-size: 10px;
+          font-family: 'JetBrains Mono', monospace;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          color: #A0AEC0;
+          margin-bottom: 5px;
+        }
+        .sp-name-input {
+          width: 100%;
+          border: 1px solid #E8ECF0;
+          border-radius: 8px;
+          padding: 8px 11px;
+          font-size: 13px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          color: #0F1923;
+          background: #F8FAFB;
+          outline: none;
+          transition: border-color 0.15s, background 0.15s;
+        }
+        .sp-name-input:focus { border-color: #0D9E6E; background: #FFFFFF; }
+        .sp-rules-badge {
+          flex-shrink: 0;
+          padding: 4px 10px;
+          border-radius: 20px;
+          background: #F1F4F8;
+          font-size: 11px;
+          font-family: 'JetBrains Mono', monospace;
+          font-weight: 600;
+          color: #64748B;
+          white-space: nowrap;
+        }
+
+        /* ── Images section ── */
+        .sp-images-section {
+          padding: 12px 16px;
+          border-bottom: 1px solid #F1F4F8;
+        }
+        .sp-images-row {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          align-items: center;
+          margin-top: 6px;
+        }
+        .sp-img-upload-btn {
+          height: 60px;
+          padding: 0 14px;
+          border-radius: 10px;
+          border: 1.5px dashed #CBD5E0;
+          background: #F8FAFB;
+          color: #64748B;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          transition: border-color 0.15s, background 0.15s;
+          white-space: nowrap;
+        }
+        .sp-img-upload-btn:hover { border-color: #0D9E6E; background: #EEF9F4; color: #0D9E6E; }
+        .sp-img-thumb {
+          position: relative;
+          flex-shrink: 0;
+        }
+        .sp-img-thumb img, .sp-img-thumb span {
+          border-radius: 10px;
+          display: block;
+        }
+        .sp-img-remove {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          border: 2px solid #FFFFFF;
+          background: #EF4444;
+          color: #FFFFFF;
+          font-size: 9px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+        }
+        .sp-img-hint {
+          font-size: 11px;
+          color: #A0AEC0;
+        }
+
+        /* ── Rules section ── */
+        .sp-rules-section {
+          padding: 12px 16px;
+        }
+        .sp-rules-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 10px;
+        }
+        .sp-btn-add-rule {
+          height: 30px;
+          padding: 0 12px;
+          border-radius: 8px;
+          border: 1px solid #C6EEE0;
+          background: #EEF9F4;
+          color: #0D9E6E;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          transition: background 0.15s;
+        }
+        .sp-btn-add-rule:hover { background: #D5F5E9; }
+        .sp-btn-delete-setup {
+          height: 30px;
+          padding: 0 12px;
+          border-radius: 8px;
+          border: 1px solid #FECACA;
+          background: #FEF2F2;
+          color: #DC2626;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          transition: background 0.15s;
+        }
+        .sp-btn-delete-setup:hover { background: #FEE2E2; }
+
+        .sp-rule-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
+          border-radius: 9px;
+          border: 1px solid #F1F4F8;
+          background: #FAFBFC;
+          margin-bottom: 6px;
+          transition: border-color 0.15s;
+        }
+        .sp-rule-row:focus-within {
+          border-color: #0D9E6E;
+          background: #FFFFFF;
+        }
+        .sp-rule-num {
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
+          background: #E8ECF0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-family: 'JetBrains Mono', monospace;
+          font-weight: 700;
+          color: #64748B;
+          flex-shrink: 0;
+        }
+        .sp-rule-input {
+          flex: 1;
+          border: none;
+          outline: none;
+          background: transparent;
+          font-size: 13px;
+          font-family: 'Inter', sans-serif;
+          color: #0F1923;
+          min-width: 0;
+        }
+        .sp-rule-input::placeholder { color: #CBD5E0; }
+        .sp-rule-del {
+          width: 24px;
+          height: 24px;
+          border-radius: 6px;
+          border: 1px solid #FECACA;
+          background: #FEF2F2;
+          color: #DC2626;
+          font-size: 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: background 0.15s;
+          line-height: 1;
+        }
+        .sp-rule-del:hover { background: #FEE2E2; }
+
+        .sp-no-rules {
+          font-size: 12px;
+          color: #A0AEC0;
+          text-align: center;
+          padding: 12px 0 4px;
+        }
+
+        /* ── Empty state ── */
+        .sp-empty {
+          text-align: center;
+          padding: 48px 20px;
+          background: #FFFFFF;
+          border-radius: 14px;
+          border: 1.5px dashed #DDE2E8;
+        }
+        .sp-empty-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: #EEF9F4;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 12px;
+        }
+        .sp-empty-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: #0F1923;
+          margin-bottom: 6px;
+        }
+        .sp-empty-sub {
+          font-size: 12px;
+          color: #8A97A6;
+          margin-bottom: 18px;
+        }
+        .sp-empty-btn {
+          height: 38px;
+          padding: 0 20px;
+          border-radius: 10px;
+          border: none;
+          background: linear-gradient(135deg, #0D9E6E, #0BB866);
+          color: #FFFFFF;
+          font-size: 13px;
+          font-weight: 600;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer;
+        }
+
+        /* ── Skeleton ── */
+        .sp-skel-card {
+          background: #FFFFFF;
+          border-radius: 14px;
+          border: 1px solid #E8ECF0;
+          padding: 16px;
+          margin-bottom: 14px;
         }
       `}</style>
 
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "22px 16px 30px" }}>
-        {error && (
-          <div style={{ marginBottom: 12, padding: "8px 10px", borderRadius: 8, background: "#FEF2F2", border: "1px solid #FCA5A5", fontSize: 12, color: "#B91C1C" }}>
-            {error}
-          </div>
-        )}
-        {savedAt && !error && (
-          <div style={{ marginBottom: 12, padding: "6px 10px", borderRadius: 8, background: "#ECFDF5", border: "1px solid #A7F3D0", fontSize: 11, color: "#047857" }}>
-            Saved setups at {savedAt.toLocaleTimeString()}
-          </div>
-        )}
-        {loading ? (
-          <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0", padding: "18px 20px 14px", boxShadow: "0 2px 10px rgba(15,25,35,0.04)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <Skeleton width="120px" height="12px" />
-              <Skeleton width="100px" height="30px" style={{ borderRadius: 999 }} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[...Array(3)].map((_, i) => (
-                <div key={i} style={{ borderRadius: 12, border: "1px solid #E2E8F0", padding: "14px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <Skeleton width="160px" height="14px" />
-                    <Skeleton width="40px" height="10px" />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {[...Array(3)].map((_, j) => (
-                      <Skeleton key={j} width="100%" height="34px" style={{ borderRadius: 8 }} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-        <div style={{
-          background: "#FFFFFF",
-          borderRadius: 14,
-          border: "1px solid #E2E8F0",
-          padding: "18px 20px 14px",
-          boxShadow: "0 2px 10px rgba(15,25,35,0.04)",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-                YOUR STRATEGIES
-              </div>
-              <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
-                Create each strategy once, then add the exact rules you want to follow for that setup.
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={addStrategy}
-              style={{
-                fontSize: 10,
-                fontFamily: "'JetBrains Mono',monospace",
-                letterSpacing: "0.08em",
-                padding: "7px 11px",
-                borderRadius: 999,
-                border: "1px solid #0D9E6E33",
-                background: "rgba(13,158,110,0.04)",
-                color: "#0D9E6E",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              + ADD STRATEGY
-            </button>
-          </div>
-
-          {strategies.length === 0 && (
-            <div style={{
-              padding: "32px 0",
-              textAlign: "center",
-              color: "#94A3B8",
-              fontSize: 12,
-              fontFamily: "'JetBrains Mono',monospace",
-            }}>
-              No strategies yet — click <span style={{ color: "#0D9E6E", fontWeight: 700 }}>+ ADD STRATEGY</span> to get started.
-            </div>
+      {/* Header */}
+      <header className="sp-header">
+        <div className="sp-header-left">
+          <button type="button" className="sp-back-btn" onClick={() => router.back()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F1923" strokeWidth="2.5">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span className="sp-title">Setup / Strategies</span>
+          {getMarketLabel() && (
+            <span className="sp-market-chip">{getMarketLabel()}</span>
           )}
+        </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {strategies.map(strategy => (
-              <div
-                key={strategy.id}
-                style={{
-                  borderRadius: 12,
-                  border: "1px solid #E2E8F0",
-                  padding: "10px 12px 10px",
-                  background: "linear-gradient(135deg,rgba(248,250,252,0.9),#FFFFFF)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                      STRATEGY NAME
-                    </label>
-                    <input
-                      type="text"
-                      value={strategy.name}
-                      onChange={e => updateStrategyName(strategy.id, e.target.value)}
-                      placeholder="e.g. London Breakout, NY Reversal..."
-                      style={{
-                        borderRadius: 8,
-                        border: "1px solid #E2E8F0",
-                        padding: "7px 10px",
-                        fontSize: 12,
-                        fontFamily: "'Plus Jakarta Sans',sans-serif",
-                        outline: "none",
-                        width: "100%",
-                      }}
-                    />
-                  </div>
-                  <div style={{ textAlign: "right", minWidth: 70 }}>
-                    <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                      {strategy.rules.filter(r => r.label && r.label.trim().length > 0).length} rule{strategy.rules.filter(r => r.label && r.label.trim().length > 0).length === 1 ? "" : "s"}
-                    </div>
-                  </div>
-                </div>
+        <div className="sp-header-actions">
+          <Link href="/dashboard" className="sp-btn-dashboard">Dashboard</Link>
+          <button
+            type="button"
+            className="sp-btn-save"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                Saving…
+              </>
+            ) : (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <polyline points="17 21 17 13 7 13 7 21" />
+                  <polyline points="7 3 7 8 15 8" />
+                </svg>
+                Save Setups
+              </>
+            )}
+          </button>
+        </div>
+      </header>
 
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>
-                    REFERENCE SCREENSHOT
-                  </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <label
-                      style={{
-                        fontSize: 10,
-                        fontFamily: "'JetBrains Mono',monospace",
-                        letterSpacing: "0.08em",
-                        padding: "7px 11px",
-                        borderRadius: 999,
-                        border: "1px solid #0D9E6E33",
-                        background: "rgba(13,158,110,0.04)",
-                        color: "#0D9E6E",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {(strategy.referenceImages?.length || 0) >= 5 ? "MAX 5 IMAGES" : "+ ADD IMAGE"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        disabled={(strategy.referenceImages?.length || 0) >= 5}
-                        onChange={e => handleReferenceImageChange(strategy.id, e.target.files?.[0])}
-                      />
-                    </label>
-                    {(strategy.referenceImages?.length || 0) > 0 ? (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
-                        {strategy.referenceImages.map((image, imageIdx) => (
-                          <div key={`${strategy.id}-${imageIdx}`} style={{ position: "relative", flexShrink: 0 }}>
-                            <img
-                              src={image.url}
-                              alt={`${strategy.name || "Setup"} reference ${imageIdx + 1}`}
-                              style={{
-                                width: 110,
-                                height: 66,
-                                objectFit: "cover",
-                                borderRadius: 10,
-                                border: "1px solid #E2E8F0",
-                                display: "block",
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeReferenceImage(strategy.id, imageIdx)}
-                              style={{
-                                position: "absolute",
-                                top: 6,
-                                right: 6,
-                                width: 22,
-                                height: 22,
-                                borderRadius: 999,
-                                border: "1px solid rgba(255,255,255,0.7)",
-                                background: "rgba(15,25,35,0.7)",
-                                color: "#FFFFFF",
-                                cursor: "pointer",
-                                fontSize: 11,
-                              }}
-                            >
-                              x
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 11, color: "#64748B" }}>
-                        Add up to 5 ideal setup screenshots so you can compare them before entering next time.
-                      </div>
-                    )}
-                  </div>
-                </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => addRuleToStrategy(strategy.id)}
-                    style={{
-                      fontSize: 9,
-                      fontFamily: "'JetBrains Mono',monospace",
-                      letterSpacing: "0.08em",
-                      padding: "5px 9px",
-                      borderRadius: 999,
-                      border: "1px solid #0D9E6E33",
-                      background: "rgba(13,158,110,0.04)",
-                      color: "#0D9E6E",
-                      cursor: "pointer",
-                    }}
-                  >
-                    + ADD RULE
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteStrategy(strategy.id)}
-                    style={{
-                      fontSize: 9,
-                      fontFamily: "'JetBrains Mono',monospace",
-                      letterSpacing: "0.08em",
-                      padding: "5px 9px",
-                      borderRadius: 999,
-                      border: "1px solid #FCA5A5",
-                      background: "#FEF2F2",
-                      color: "#B91C1C",
-                      cursor: "pointer",
-                    }}
-                  >
-                    DELETE SETUP
-                  </button>
-                </div>
+      <main className="sp-main">
+        {error && <div className="sp-alert-error">{error}</div>}
+        {savedAt && !error && (
+          <div className="sp-alert-success">
+            Setups saved successfully at {savedAt.toLocaleTimeString()}
+          </div>
+        )}
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {strategy.rules.map(rule => (
-                    <div
-                      key={rule.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "5px 8px",
-                        borderRadius: 9,
-                        border: "1px solid #E2E8F0",
-                      }}
-                    >
-                      {/* Rule number badge */}
-                      <div style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 6,
-                        background: "#F1F5F9",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 9,
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontWeight: 700,
-                        color: "#64748B",
-                        flexShrink: 0,
-                      }}>
-                        {strategy.rules.indexOf(rule) + 1}
-                      </div>
-                      <input
-                        type="text"
-                        value={rule.label}
-                        onChange={e => updateRuleLabel(strategy.id, rule.id, e.target.value)}
-                        placeholder="Add rule for this strategy..."
-                        style={{
-                          flex: 1,
-                          border: "none",
-                          outline: "none",
-                          background: "transparent",
-                          fontSize: 12,
-                          fontFamily: "'Plus Jakarta Sans',sans-serif",
-                          color: "#0F1923",
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => deleteRule(strategy.id, rule.id)}
-                        style={{
-                          fontSize: 9,
-                          fontFamily: "'JetBrains Mono',monospace",
-                          padding: "3px 6px",
-                          borderRadius: 999,
-                          border: "1px solid #FCA5A5",
-                          background: "#FEF2F2",
-                          color: "#B91C1C",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {strategy.rules.length === 0 && (
-                    <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
-                      No rules yet — add your first rule for this strategy.
-                    </div>
-                  )}
-                </div>
+        {loading ? (
+          <>
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="sp-skel-card">
+                <Skeleton width="140px" height="13px" style={{ marginBottom: 12 }} />
+                <Skeleton width="100%" height="38px" style={{ borderRadius: 8, marginBottom: 10 }} />
+                {[...Array(3)].map((_, j) => (
+                  <Skeleton key={j} width="100%" height="34px" style={{ borderRadius: 8, marginBottom: 6 }} />
+                ))}
               </div>
             ))}
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="sp-section-header">
+              <div>
+                <div className="sp-section-title">Your Strategies</div>
+                <div className="sp-section-sub">Define rules for each setup to follow before entering a trade.</div>
+              </div>
+              <button type="button" className="sp-btn-add-strategy" onClick={addStrategy}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add Strategy
+              </button>
+            </div>
+
+            {strategies.length === 0 ? (
+              <div className="sp-empty">
+                <div className="sp-empty-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D9E6E" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <line x1="9" y1="9" x2="15" y2="9" /><line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="15" x2="12" y2="15" />
+                  </svg>
+                </div>
+                <div className="sp-empty-title">No strategies yet</div>
+                <div className="sp-empty-sub">Create your first setup with rules to keep your trading disciplined.</div>
+                <button type="button" className="sp-empty-btn" onClick={addStrategy}>+ Add Strategy</button>
+              </div>
+            ) : (
+              strategies.map(strategy => {
+                const filledRules = strategy.rules.filter(r => r.label?.trim().length > 0).length;
+                return (
+                  <div key={strategy.id} className="sp-card">
+                    {/* Card header – name */}
+                    <div className="sp-card-header">
+                      <div className="sp-card-name-wrap">
+                        <div className="sp-field-label">STRATEGY NAME</div>
+                        <input
+                          type="text"
+                          className="sp-name-input"
+                          value={strategy.name}
+                          onChange={e => updateStrategyName(strategy.id, e.target.value)}
+                          placeholder="e.g. London Breakout, NY Reversal…"
+                        />
+                      </div>
+                      <div className="sp-rules-badge">
+                        {filledRules} {filledRules === 1 ? "rule" : "rules"}
+                      </div>
+                    </div>
+
+                    {/* Reference images */}
+                    <div className="sp-images-section">
+                      <div className="sp-field-label">REFERENCE SCREENSHOTS</div>
+                      <div className="sp-images-row">
+                        {(strategy.referenceImages?.length || 0) < 5 && (
+                          <label className="sp-img-upload-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                              <circle cx="8.5" cy="8.5" r="1.5" />
+                              <polyline points="21 15 16 10 5 21" />
+                            </svg>
+                            Add Image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: "none" }}
+                              onChange={e => handleReferenceImageChange(strategy.id, e.target.files?.[0])}
+                            />
+                          </label>
+                        )}
+                        {(strategy.referenceImages || []).map((image, imageIdx) => (
+                          <div key={`${strategy.id}-${imageIdx}`} className="sp-img-thumb">
+                            <Image src={image.url} alt={`ref ${imageIdx + 1}`} width={80} height={60} style={{ objectFit: "cover", borderRadius: 10, border: "1px solid #E8ECF0", display: "block" }} unoptimized />
+                            <button
+                              type="button"
+                              className="sp-img-remove"
+                              onClick={() => removeReferenceImage(strategy.id, imageIdx)}
+                            >✕</button>
+                          </div>
+                        ))}
+                        {(strategy.referenceImages?.length || 0) === 0 && (
+                          <span className="sp-img-hint">Add up to 5 reference screenshots</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Rules */}
+                    <div className="sp-rules-section">
+                      <div className="sp-rules-top">
+                        <div className="sp-field-label" style={{ margin: 0 }}>RULES CHECKLIST</div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button type="button" className="sp-btn-add-rule" onClick={() => addRuleToStrategy(strategy.id)}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Add Rule
+                          </button>
+                          <button type="button" className="sp-btn-delete-setup" onClick={() => deleteStrategy(strategy.id)}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6l-1 14H6L5 6" />
+                              <path d="M10 11v6M14 11v6" />
+                              <path d="M9 6V4h6v2" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      {strategy.rules.length === 0 ? (
+                        <div className="sp-no-rules">No rules yet — click Add Rule to get started.</div>
+                      ) : (
+                        strategy.rules.map(rule => (
+                          <div key={rule.id} className="sp-rule-row">
+                            <div className="sp-rule-num">{strategy.rules.indexOf(rule) + 1}</div>
+                            <input
+                              type="text"
+                              className="sp-rule-input"
+                              value={rule.label}
+                              onChange={e => updateRuleLabel(strategy.id, rule.id, e.target.value)}
+                              placeholder="Describe this rule…"
+                            />
+                            <button type="button" className="sp-rule-del" onClick={() => deleteRule(strategy.id, rule.id)}>✕</button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </>
         )}
       </main>
     </div>
