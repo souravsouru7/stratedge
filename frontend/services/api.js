@@ -50,3 +50,12 @@ export const testConnection = async () => {
   // Can just ping the server base URL
   return await apiClient.get('/');
 };
+
+// ── Welcome guide preference ──────────────────────────────────────────────────
+export const getWelcomeGuideSeen = async () => {
+  return await apiClient.get('/auth/me/preferences');
+};
+
+export const markWelcomeGuideSeen = async () => {
+  return await apiClient.patch('/auth/me/preferences', { hasSeenWelcomeGuide: true });
+};

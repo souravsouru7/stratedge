@@ -24,6 +24,47 @@ async function verifyFirebaseToken(firebaseIdToken) {
   }
 }
 
+async function verifyGoogleIdToken(googleIdToken) {
+  let response;
+
+  try {
+    response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(googleIdToken)}`
+    );
+  } catch (error) {
+    throw new ApiError(502, "Unable to reach Google token verification service", "GOOGLE_AUTH_UNAVAILABLE");
+  }
+
+  if (!response.ok) {
+    throw new ApiError(401, "Google authentication failed", "AUTH_FAILED");
+  }
+
+  const payload = await response.json();
+  const issuer = payload.iss;
+  const emailVerified =
+    payload.email_verified === true ||
+    payload.email_verified === "true";
+
+  if (!["accounts.google.com", "https://accounts.google.com"].includes(issuer)) {
+    throw new ApiError(401, "Invalid Google token issuer", "AUTH_FAILED");
+  }
+
+  if (!payload.email || !emailVerified) {
+    throw new ApiError(401, "Google email not verified", "AUTH_FAILED");
+  }
+
+  return {
+    email: payload.email,
+    email_verified: true,
+    name: payload.name,
+    given_name: payload.given_name,
+    family_name: payload.family_name,
+    picture: payload.picture,
+    sub: payload.sub,
+    provider: "google.com",
+  };
+}
+
 exports.registerUser = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -81,18 +122,33 @@ exports.loginUser = asyncHandler(async (req, res) => {
 
 exports.googleLogin = asyncHandler(async (req, res) => {
   const { idToken, credential } = req.body || {};
-  const firebaseIdToken = idToken || credential;
+  const authToken = idToken || credential;
 
-  if (!firebaseIdToken) {
-    throw new ApiError(400, "Missing Firebase ID token", "VALIDATION_ERROR");
+  if (!authToken) {
+    throw new ApiError(400, "Missing Google or Firebase ID token", "VALIDATION_ERROR");
   }
 
-  const decodedToken = await verifyFirebaseToken(firebaseIdToken);
+  let decodedToken;
+  let identities = {};
+  let signInProvider;
+  let email;
+  let emailVerified;
+  let googleId;
 
-  const identities = decodedToken.firebase?.identities || {};
-  const signInProvider = decodedToken.firebase?.sign_in_provider;
-  const email = decodedToken.email;
-  const emailVerified = decodedToken.email_verified;
+  try {
+    decodedToken = await verifyFirebaseToken(authToken);
+    identities = decodedToken.firebase?.identities || {};
+    signInProvider = decodedToken.firebase?.sign_in_provider;
+    email = decodedToken.email;
+    emailVerified = decodedToken.email_verified;
+    googleId = identities["google.com"]?.[0] || decodedToken.uid;
+  } catch (firebaseError) {
+    decodedToken = await verifyGoogleIdToken(authToken);
+    signInProvider = decodedToken.provider;
+    email = decodedToken.email;
+    emailVerified = decodedToken.email_verified;
+    googleId = decodedToken.sub;
+  }
 
   if (!email || !emailVerified) {
     throw new ApiError(401, "Google email not verified", "AUTH_FAILED");
@@ -102,7 +158,6 @@ exports.googleLogin = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unsupported Firebase sign-in provider", "AUTH_FAILED");
   }
 
-  const googleId = identities["google.com"]?.[0] || decodedToken.uid;
   const name =
     decodedToken.name ||
     (decodedToken.given_name ? `${decodedToken.given_name} ${decodedToken.family_name || ""}`.trim() : "Trader");
@@ -154,6 +209,42 @@ exports.getMe = asyncHandler(async (req, res) => {
     email: req.user.email,
     role: req.user.role,
     createdAt: req.user.createdAt,
+  });
+});
+
+exports.getMyPreferences = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw new ApiError(401, "Not authorized", "AUTH_FAILED");
+  }
+
+  res.json({
+    hasSeenWelcomeGuide: Boolean(req.user.hasSeenWelcomeGuide),
+  });
+});
+
+exports.updateMyPreferences = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw new ApiError(401, "Not authorized", "AUTH_FAILED");
+  }
+
+  const updates = {};
+
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, "hasSeenWelcomeGuide")) {
+    updates.hasSeenWelcomeGuide = Boolean(req.body.hasSeenWelcomeGuide);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new ApiError(400, "No valid preferences provided", "VALIDATION_ERROR");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updates },
+    { new: true, runValidators: true }
+  );
+
+  res.json({
+    hasSeenWelcomeGuide: Boolean(user?.hasSeenWelcomeGuide),
   });
 });
 

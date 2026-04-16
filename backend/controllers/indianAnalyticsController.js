@@ -322,7 +322,31 @@ exports.getTradeDistribution = async (req, res) => {
     });
     Object.keys(byUnderlying).forEach(k => (byUnderlying[k].winRate = byUnderlying[k].total ? ((byUnderlying[k].wins / byUnderlying[k].total) * 100).toFixed(1) : 0));
 
-    res.json({ byPair, byType, byStrategy, bySession, byTradeType, byEntryBasis, byMistakeTag, byUnderlying });
+    // By option type (CE / PE)
+    const byOptionType = {};
+    trades.forEach(t => {
+      const key = t.optionType && t.optionType.trim() ? t.optionType.trim().toUpperCase() : "Unspecified";
+      if (!byOptionType[key]) byOptionType[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      byOptionType[key].total++;
+      if (t.profit > 0) byOptionType[key].wins++;
+      else if (t.profit < 0) byOptionType[key].losses++;
+      byOptionType[key].profit += t.profit || 0;
+    });
+    Object.keys(byOptionType).forEach(k => (byOptionType[k].winRate = byOptionType[k].total ? ((byOptionType[k].wins / byOptionType[k].total) * 100).toFixed(1) : 0));
+
+    // By direction: BUY vs SELL (from type field)
+    const byDirection = {};
+    trades.forEach(t => {
+      const key = t.type ? t.type.trim().toUpperCase() : "Unspecified";
+      if (!byDirection[key]) byDirection[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      byDirection[key].total++;
+      if (t.profit > 0) byDirection[key].wins++;
+      else if (t.profit < 0) byDirection[key].losses++;
+      byDirection[key].profit += t.profit || 0;
+    });
+    Object.keys(byDirection).forEach(k => (byDirection[k].winRate = byDirection[k].total ? ((byDirection[k].wins / byDirection[k].total) * 100).toFixed(1) : 0));
+
+    res.json({ byPair, byType, byDirection, byStrategy, bySession, byTradeType, byEntryBasis, byMistakeTag, byUnderlying, byOptionType });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

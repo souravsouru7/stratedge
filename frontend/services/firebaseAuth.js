@@ -37,7 +37,11 @@ const getFirebaseApp = () => {
 
 const getFirebaseAuth = async () => {
   const auth = getAuth(getFirebaseApp());
-  await setPersistence(auth, browserLocalPersistence);
+
+  if (!isCapacitorApp()) {
+    await setPersistence(auth, browserLocalPersistence);
+  }
+
   return auth;
 };
 
@@ -45,35 +49,135 @@ const isCapacitorApp = () => {
   return typeof window !== "undefined" && !!window.Capacitor;
 };
 
-const hasNativeGooglePlugin = () => {
-  if (!isCapacitorApp()) return false;
-  const plugins = window?.Capacitor?.Plugins || {};
-  return Boolean(plugins.GoogleAuth);
+const isCapacitorAndroid = () => {
+  return isCapacitorApp() && window.Capacitor?.getPlatform?.() === "android";
+};
+
+const getNativeGoogleAuth = async () => {
+  try {
+    const plugin = await import("@codetrix-studio/capacitor-google-auth");
+    if (plugin?.GoogleAuth?.signIn) {
+      return plugin.GoogleAuth;
+    }
+  } catch (error) {
+    console.warn("GoogleAuth plugin import failed.", error);
+  }
+
+  return null;
+};
+
+const withTimeout = async (promise, ms, message) => {
+  let timeoutId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 const signInWithNativeGoogle = async () => {
-  const auth = await getFirebaseAuth();
-  const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
+  const GoogleAuth = await getNativeGoogleAuth();
 
-  await GoogleAuth.initialize({
-    clientId:
-      process.env.NEXT_PUBLIC_FIREBASE_WEB_CLIENT_ID ||
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+  if (!GoogleAuth) {
+    throw new Error("GoogleAuth native plugin is unavailable.");
+  }
+
+  // The plugin's loadSignInClient() passes clientId directly into both
+  // requestIdToken(clientId) and requestServerAuthCode(clientId).
+  // Both calls require the WEB client ID — never the Android OAuth client ID.
+  // Always set clientId explicitly here so it overrides whatever androidClientId
+  // the plugin would otherwise read from capacitor.config.ts.
+  const webClientId =
+    process.env.NEXT_PUBLIC_FIREBASE_WEB_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  if (!webClientId) {
+    throw new Error("Missing NEXT_PUBLIC_FIREBASE_WEB_CLIENT_ID or NEXT_PUBLIC_GOOGLE_CLIENT_ID.");
+  }
+
+  const initOptions = {
+    clientId: webClientId,
     scopes: ["profile", "email"],
-    grantOfflineAccess: true,
-  });
+    // Do NOT set grantOfflineAccess:true — that maps to requestServerAuthCode(clientId, true)
+    // on Android, which forces a re-consent screen on every sign-in and causes the flow to hang.
+    // We only need the idToken, which comes from requestIdToken(clientId) alone.
+    grantOfflineAccess: false,
+  };
 
-  const googleUser = await GoogleAuth.signIn();
+  try {
+    await withTimeout(
+      GoogleAuth.initialize(initOptions),
+      10000,
+      "Google Sign-In initialization timed out."
+    );
+  } catch (err) {
+    console.error("[GoogleAuth] initialize() failed:", err?.message ?? err);
+    throw err;
+  }
+
+  let googleUser;
+  try {
+    // 120 s: enough time for the user to pick an account + complete the OAuth redirect.
+    googleUser = await withTimeout(
+      GoogleAuth.signIn(),
+      120000,
+      "Google Sign-In timed out after 120 s. " +
+        "Check: (1) SHA-1 fingerprint matches Firebase Console, " +
+        "(2) androidClientId in capacitor.config.ts matches google-services.json client_type 1, " +
+        "(3) google-services.json is up-to-date."
+    );
+  } catch (err) {
+    console.error("[GoogleAuth] signIn() failed:", err?.message ?? err);
+    throw err;
+  }
+
   const idToken = googleUser?.authentication?.idToken;
 
   if (!idToken) {
-    throw new Error("Google sign-in did not return an ID token.");
+    const authObj = JSON.stringify(googleUser?.authentication ?? {});
+    const err = new Error(
+      `Google sign-in succeeded but returned no ID token. authentication=${authObj}`
+    );
+    console.error("[GoogleAuth]", err.message);
+    throw err;
   }
 
-  const credential = GoogleAuthProvider.credential(idToken);
-  const result = await signInWithCredential(auth, credential);
+  // Exchange the Google ID token for a Firebase ID token on ALL platforms so the
+  // backend always receives a Firebase token that Firebase Admin can verify directly.
+  let firebaseResult;
+  try {
+    const auth = await getFirebaseAuth();
+    const credential = GoogleAuthProvider.credential(idToken);
+    firebaseResult = await withTimeout(
+      signInWithCredential(auth, credential),
+      20000,
+      "Firebase credential exchange timed out. Verify the Firebase web config values."
+    );
+  } catch (err) {
+    console.error(
+      "[GoogleAuth] Firebase signInWithCredential failed — falling back to raw Google token:",
+      err?.message ?? err
+    );
+    // Fall back to the raw Google ID token so the backend can still verify it
+    // via the Google tokeninfo endpoint.
+    return idToken;
+  }
 
-  return result.user.getIdToken();
+  try {
+    return await withTimeout(
+      firebaseResult.user.getIdToken(),
+      10000,
+      "Fetching Firebase ID token timed out."
+    );
+  } catch (err) {
+    console.error("[GoogleAuth] getIdToken() failed:", err?.message ?? err);
+    throw err;
+  }
 };
 
 const signInWithWebGoogle = async () => {
@@ -87,17 +191,37 @@ const signInWithWebGoogle = async () => {
 };
 
 export const signInWithFirebaseGoogle = async () => {
-  if (isCapacitorApp() && hasNativeGooglePlugin()) {
+  if (isCapacitorAndroid()) {
     try {
       return await signInWithNativeGoogle();
     } catch (error) {
       const msg = String(error?.message || "");
       const pluginMissing =
-        /plugin is not implemented|not implemented on android|googleauth/i.test(msg);
+        /plugin is not implemented|not implemented on android|googleauth native plugin is unavailable|googleauth/i.test(msg);
+
+      if (pluginMissing) {
+        throw new Error(
+          "Google Sign-In is not configured for this Android build. " +
+            "Please sync the Capacitor app, rebuild Android, and verify Firebase SHA keys/google-services.json."
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  if (isCapacitorApp()) {
+    try {
+      return await signInWithNativeGoogle();
+    } catch (error) {
+      const msg = String(error?.message || "");
+      const pluginMissing =
+        /plugin is not implemented|not implemented on android|googleauth native plugin is unavailable|googleauth/i.test(msg);
+
       if (!pluginMissing) {
         throw error;
       }
-      // Fall through to web sign-in when native plugin is unavailable on a build.
+
       console.warn("Native GoogleAuth plugin unavailable, falling back to web sign-in.");
     }
   }

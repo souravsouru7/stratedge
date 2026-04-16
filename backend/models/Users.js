@@ -61,6 +61,10 @@ const userSchema = new mongoose.Schema(
     freeUploadUsed: {
       type: Boolean,
       default: false
+    },
+    hasSeenWelcomeGuide: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

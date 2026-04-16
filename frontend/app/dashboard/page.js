@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen, BarChart2, Cpu, CheckSquare, Target, FileText,
@@ -322,5 +322,15 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  if (!hydrated) {
+    return null;
+  }
+
   return <Suspense><DashboardContent /></Suspense>;
 }

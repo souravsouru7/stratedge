@@ -326,6 +326,22 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
 
   return (
     <div style={{ marginBottom: isMulti ? 20 : 0 }}>
+      {/* Remove entry button — multi-trade only, unsaved only */}
+      {isMulti && !saved && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+          <button
+            type="button"
+            onClick={() => state.deleteTrade(tradeIdx)}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#D63B3B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#FEE2E2"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#FEF2F2"; }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            REMOVE ENTRY
+          </button>
+        </div>
+      )}
+
       {/* Screenshot preview — only show on single trade */}
       {!isMulti && trade?.screenshot && (
         <SectionCard accentColor="#94A3B8" title="Extracted Screenshot" delay={0.08}>
@@ -366,6 +382,27 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
               <FormInput label="P&L (₹)" name="profit" value={trade?.profit} onChange={onChange} placeholder="0.00" type="number" />
               <FormInput label="EXPIRY"  name="expiryDate" value={trade?.expiryDate} onChange={onChange} placeholder="2025-12-26" type="date" />
             </div>
+            <div style={{ marginBottom: 14 }}>
+              <FormSelect
+                label="PLANNED R:R"
+                name="riskRewardRatio"
+                value={trade?.riskRewardRatio || ""}
+                onChange={onChange}
+                options={[
+                  { value: "1:1", label: "1 : 1" },
+                  { value: "1:2", label: "1 : 2" },
+                  { value: "1:3", label: "1 : 3" },
+                  { value: "1:4", label: "1 : 4" },
+                  { value: "1:5", label: "1 : 5" },
+                  { value: "custom", label: "Custom" },
+                ]}
+              />
+              {trade?.riskRewardRatio === "custom" && (
+                <div style={{ marginTop: 12 }}>
+                  <FormInput label="CUSTOM R:R" name="riskRewardCustom" value={trade?.riskRewardCustom || ""} onChange={onChange} placeholder="e.g. 1:2.5" />
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <>
@@ -380,6 +417,27 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
             <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="STOP LOSS"   name="stopLoss"   value={trade?.stopLoss}   onChange={onChange} placeholder="1.08000" type="number" />
               <FormInput label="TAKE PROFIT" name="takeProfit" value={trade?.takeProfit} onChange={onChange} placeholder="1.09500" type="number" />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <FormSelect
+                label="PLANNED R:R"
+                name="riskRewardRatio"
+                value={trade?.riskRewardRatio || ""}
+                onChange={onChange}
+                options={[
+                  { value: "1:1", label: "1 : 1" },
+                  { value: "1:2", label: "1 : 2" },
+                  { value: "1:3", label: "1 : 3" },
+                  { value: "1:4", label: "1 : 4" },
+                  { value: "1:5", label: "1 : 5" },
+                  { value: "custom", label: "Custom" },
+                ]}
+              />
+              {trade?.riskRewardRatio === "custom" && (
+                <div style={{ marginTop: 12 }}>
+                  <FormInput label="CUSTOM R:R" name="riskRewardCustom" value={trade?.riskRewardCustom || ""} onChange={onChange} placeholder="e.g. 1:2.5" />
+                </div>
+              )}
             </div>
           </>
         )}
@@ -533,6 +591,7 @@ function UploadTradeContent() {
   const clock   = useClock();
   const router  = useRouter();
   const { isInd, mounted, loading, processingStatus, trade, trades, savedTrades, savingAll, saveAllTrades, tradeCount } = state;
+  const visibleTradeCount = trades.length > 1 ? trades.length : tradeCount;
 
   // Auto-scroll to psychology section when extraction completes
   const psychologyRef = useRef(null);
@@ -587,14 +646,14 @@ function UploadTradeContent() {
           )}
 
           {/* Trade count banner — shown after extraction */}
-          {!loading && tradeCount > 0 && (
+          {!loading && visibleTradeCount > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", background: "#ECFDF5", border: "1.5px solid #A7F3D0", borderRadius: 10, marginBottom: 4 }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#0D9E6E", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", ...monoStyle }}>{tradeCount}</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", ...monoStyle }}>{visibleTradeCount}</span>
               </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#065F46" }}>
-                  {tradeCount === 1 ? "1 trade extracted" : `${tradeCount} trades extracted`}
+                  {visibleTradeCount === 1 ? "1 trade extracted" : `${visibleTradeCount} trades extracted`}
                 </div>
                 <div style={{ fontSize: 11, color: "#6EE7B7", ...monoStyle }}>
                   Review the details below and save to your journal
@@ -628,8 +687,40 @@ function UploadTradeContent() {
                 </div>
               </SectionCard>
 
-              {/* Individual trade cards */}
-              {trades.map((_, i) => <TradeFormCard key={i} state={state} tradeIdx={i} />)}
+              {/* Individual trade cards — collapse to a saved chip once saved */}
+              {trades.map((t, i) => {
+                if (savedTrades[i]) {
+                  const bull = parseFloat(String(t?.profit || 0).replace(/,/g, "")) >= 0;
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 18px",
+                        background: "#ECFDF5",
+                        border: "1.5px solid #A7F3D0",
+                        borderRadius: 12,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#0D9E6E", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>
+                          Trade #{i + 1} — {t?.pair || "Saved"}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6EE7B7", fontFamily: "'JetBrains Mono',monospace" }}>
+                          {bull ? "+" : ""}{isInd ? "₹" : "$"}{Math.abs(parseFloat(String(t?.profit || 0).replace(/,/g, ""))).toFixed(2)} · Saved to journal
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return <TradeFormCard key={i} state={state} tradeIdx={i} />;
+              })}
 
               {/* Save all */}
               {savedTrades.some(s => !s) && (

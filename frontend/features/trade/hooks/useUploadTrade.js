@@ -420,5 +420,9 @@ export function useUploadTrade() {
     updateSetupRuleLabelMulti: (tIdx, rId, v) => setTrades(p => p.map((t, i) => i !== tIdx ? t : { ...t, setupRules: t.setupRules.map(r => r.id === rId ? { ...r, label: v } : r) })),
     addSetupRuleMulti: (tIdx) => setTrades(p => p.map((t, i) => i !== tIdx ? t : { ...t, setupRules: [...(t.setupRules || []), { id: Date.now(), label: "", followed: false }] })),
     clearSetupRulesMulti: (tIdx) => setTrades(p => p.map((t, i) => i !== tIdx ? t : { ...t, setupRules: t.setupRules.map(r => ({ ...r, followed: false })) })),
+    deleteTrade: (idx) => {
+      setTrades(prev => prev.filter((_, i) => i !== idx));
+      setSavedTrades(prev => prev.filter((_, i) => i !== idx));
+    },
   };
 }

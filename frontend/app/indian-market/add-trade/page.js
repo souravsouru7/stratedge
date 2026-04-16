@@ -499,13 +499,15 @@ export default function IndianOptionsAddTradePage() {
                 <option value="1:5">1 : 5</option>
                 <option value="custom">Custom</option>
               </select>
-              <input
-                name="riskRewardCustom"
-                placeholder="e.g. 1:2.5"
-                value={trade.riskRewardCustom}
-                onChange={handleChange}
-                style={{ marginTop: 8, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 13 }}
-              />
+              {trade.riskRewardRatio === "custom" && (
+                <input
+                  name="riskRewardCustom"
+                  placeholder="e.g. 1:2.5"
+                  value={trade.riskRewardCustom}
+                  onChange={handleChange}
+                  style={{ marginTop: 8, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 13 }}
+                />
+              )}
             </div>
 
             <div>

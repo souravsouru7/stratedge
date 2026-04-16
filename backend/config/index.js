@@ -72,9 +72,7 @@ const appConfig = {
     apiSecret: requireEnv("CLOUD_API_SECRET"),
   },
   redis: {
-    url: process.env.REDIS_URL || "",
-    upstashRestUrl: process.env.UPSTASH_REDIS_REST_URL || "",
-    upstashRestToken: process.env.UPSTASH_REDIS_REST_TOKEN || "",
+    url: process.env.REDIS_URL || "redis://localhost:6379",
   },
   ocrQueue: {
     attempts: readNumber("OCR_JOB_ATTEMPTS", 3),
@@ -189,7 +187,7 @@ function getMaskedConfigSnapshot() {
     mongoUri: maskSecret(appConfig.mongoUri, 12, 6),
     cloudinaryCloudName: appConfig.cloudinary.cloudName,
     cloudinaryApiKey: maskSecret(appConfig.cloudinary.apiKey),
-    redisConfigured: Boolean(appConfig.redis.url || (appConfig.redis.upstashRestUrl && appConfig.redis.upstashRestToken)),
+    redisConfigured: Boolean(appConfig.redis.url),
     firebaseProjectId: appConfig.firebase.projectId || "[missing]",
     firebaseClientEmail: appConfig.firebase.clientEmail || "[missing]",
     googleVisionProjectId: appConfig.googleVision.projectId || "[missing]",

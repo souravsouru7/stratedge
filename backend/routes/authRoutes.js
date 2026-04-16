@@ -6,6 +6,8 @@ const {
   loginUser,
   googleLogin,
   getMe,
+  getMyPreferences,
+  updateMyPreferences,
   forgotPassword,
   verifyOTP,
   resetPassword
@@ -22,5 +24,7 @@ router.post("/reset-password", resetPassword);
 
 // Basic profile for logged-in user
 router.get("/me", protect, getMe);
+router.get("/me/preferences", protect, getMyPreferences);
+router.patch("/me/preferences", protect, updateMyPreferences);
 
 module.exports = router;

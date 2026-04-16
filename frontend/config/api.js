@@ -1,15 +1,30 @@
+ const DEFAULT_REMOTE_API_BASE_URL = "https://api.stratedge.live";
+// const DEFAULT_REMOTE_API_BASE_URL = "http://localhost:5000";
+
+const isCapacitorRuntime = () => {
+  return typeof window !== "undefined" && !!window.Capacitor;
+};
+
+const isLocalhostUrl = (value) => {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(value);
+};
+
 function normalizeApiBaseUrl(value) {
   const raw = String(value || "").trim();
 
   if (!raw) {
-    return "https://api.stratedge.live";
+    return DEFAULT_REMOTE_API_BASE_URL;
   }
 
-  if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    return raw.replace(/\/+$/, "");
+  const normalized = raw.startsWith("http://") || raw.startsWith("https://")
+    ? raw.replace(/\/+$/, "")
+    : `http://${raw.replace(/^\/+/, "").replace(/\/+$/, "")}`;
+
+  if (isCapacitorRuntime() && isLocalhostUrl(normalized)) {
+    return DEFAULT_REMOTE_API_BASE_URL;
   }
 
-  return `http://${raw.replace(/^\/+/, "").replace(/\/+$/, "")}`;
+  return normalized;
 }
 
 export const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);

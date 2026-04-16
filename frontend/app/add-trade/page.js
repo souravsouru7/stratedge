@@ -110,7 +110,7 @@ function AddTradeContent() {
                 <FormInput label="STOP LOSS" name="stopLoss" value={trade.stopLoss} onChange={handleChange} type="number" step="any" />
                 <FormInput label="TAKE PROFIT" name="takeProfit" value={trade.takeProfit} onChange={handleChange} type="number" step="any" />
               </div>
-              <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ display: "grid", gap: 12 }}>
                 <FormSelect
                   label="PLANNED RISK : REWARD"
                   name="riskRewardRatio"
@@ -125,13 +125,15 @@ function AddTradeContent() {
                     { value: "custom", label: "Custom" },
                   ]}
                 />
-                <FormInput
-                  label="R:R INPUT"
-                  name="riskRewardCustom"
-                  value={trade.riskRewardCustom}
-                  onChange={handleChange}
-                  placeholder="e.g. 1:2.5"
-                />
+                {trade.riskRewardRatio === "custom" && (
+                  <FormInput
+                    label="CUSTOM R:R"
+                    name="riskRewardCustom"
+                    value={trade.riskRewardCustom}
+                    onChange={handleChange}
+                    placeholder="e.g. 1:2.5"
+                  />
+                )}
               </div>
             </div>
           </SectionCard>

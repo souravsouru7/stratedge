@@ -218,19 +218,30 @@ function AnalyticsContent() {
 
                 {/* Long vs Short */}
                 <SectionCard title="Trade Direction" subtitle="LONG VS SHORT" delay={0.2} accentColor={C.bull}>
-                  {distribution ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <ProgressBar label={`Long  (${distribution.longTrades || 0})`}  value={distribution.longTrades  || 0} max={summary?.totalTrades || 1} color={C.bull} />
-                      <ProgressBar label={`Short (${distribution.shortTrades || 0})`} value={distribution.shortTrades || 0} max={summary?.totalTrades || 1} color={C.bear} />
-                      {distribution.longWinRate !== undefined && (
-                        <>
-                          <div style={{ height: 1, background: "#E2E8F0", margin: "4px 0" }} />
-                          <ProgressBar label={`Long Win Rate  ${distribution.longWinRate}%`}  value={distribution.longWinRate}  showPercent={false} color={C.bull} />
-                          <ProgressBar label={`Short Win Rate ${distribution.shortWinRate}%`} value={distribution.shortWinRate} showPercent={false} color={C.bear} />
-                        </>
-                      )}
-                    </div>
-                  ) : <p style={{ color: C.muted, fontSize: 12 }}>No data yet.</p>}
+                  {(() => {
+                    // Derive long/short from byType.BUY / byType.SELL if top-level fields are missing
+                    const longT  = distribution?.longTrades  ?? distribution?.byType?.BUY?.total  ?? 0;
+                    const shortT = distribution?.shortTrades ?? distribution?.byType?.SELL?.total ?? 0;
+                    const longWR  = distribution?.longWinRate  ?? distribution?.byType?.BUY?.winRate  ?? "0.0";
+                    const shortWR = distribution?.shortWinRate ?? distribution?.byType?.SELL?.winRate ?? "0.0";
+                    const longP   = parseFloat(distribution?.longProfit  ?? distribution?.byType?.BUY?.profit  ?? 0);
+                    const shortP  = parseFloat(distribution?.shortProfit ?? distribution?.byType?.SELL?.profit ?? 0);
+                    const total   = (longT + shortT) || 1;
+                    const hasData = longT > 0 || shortT > 0;
+                    return hasData ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <ProgressBar label={`Long (${longT})`}  value={longT}  max={total} color={C.bull} />
+                        <ProgressBar label={`Short (${shortT})`} value={shortT} max={total} color={C.bear} />
+                        <div style={{ height: 1, background: "#E2E8F0", margin: "4px 0" }} />
+                        <ProgressBar label={`Long Win Rate  ${longWR}%`}  value={parseFloat(longWR)}  showPercent={false} color={C.bull} />
+                        <ProgressBar label={`Short Win Rate ${shortWR}%`} value={parseFloat(shortWR)} showPercent={false} color={C.bear} />
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                          <span style={{ fontSize: 10, color: C.bull, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>Long P&L: {longP >= 0 ? "+" : ""}${Math.abs(longP).toFixed(2)}</span>
+                          <span style={{ fontSize: 10, color: C.bear, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>Short P&L: {shortP >= 0 ? "+" : ""}${Math.abs(shortP).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    ) : <p style={{ color: C.muted, fontSize: 12 }}>No trade direction data yet.</p>;
+                  })()}
                 </SectionCard>
 
                 {/* Strategy Breakdown — FIX: was quality?.byStrategy (doesn't exist), now using distribution.byStrategy */}

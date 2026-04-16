@@ -183,12 +183,37 @@ export default function PreTradeChecklistPage() {
 
         {/* Page title */}
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
-            Pre-Trade <span style={{ color: "#0D9E6E" }}>Checklist</span>
-          </h1>
-          <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>
-            TRADE WITH PLAN · NOT WITH EMOTION — {getMarketLabel()}
-          </p>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
+                Pre-Trade <span style={{ color: "#0D9E6E" }}>Checklist</span>
+              </h1>
+              <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>
+                TRADE WITH PLAN · NOT WITH EMOTION — {getMarketLabel()}
+              </p>
+            </div>
+            <Link
+              href="/checklist/psychology"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 10,
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: "0.08em",
+                fontWeight: 700,
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: "1px solid rgba(214,59,59,0.3)",
+                background: "rgba(214,59,59,0.06)",
+                color: "#D63B3B",
+                textDecoration: "none",
+                flexShrink: 0,
+              }}
+            >
+              🧠 PSYCHOLOGY GUIDE
+            </Link>
+          </div>
         </div>
 
         {error && (

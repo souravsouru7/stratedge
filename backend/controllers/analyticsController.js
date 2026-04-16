@@ -304,7 +304,19 @@ exports.getTradeDistribution = async (req, res) => {
       bySession[session].winRate = bySession[session].total ? ((bySession[session].wins / bySession[session].total) * 100).toFixed(1) : 0;
     });
 
-    res.json({ byPair, byType, byStrategy, bySession });
+    // Derive Long/Short from BUY/SELL for the Trade Direction widget
+    const longData  = byType.BUY  || { total: 0, wins: 0, profit: 0, winRate: "0.0" };
+    const shortData = byType.SELL || { total: 0, wins: 0, profit: 0, winRate: "0.0" };
+
+    res.json({
+      byPair, byType, byStrategy, bySession,
+      longTrades:   longData.total,
+      shortTrades:  shortData.total,
+      longWinRate:  longData.winRate,
+      shortWinRate: shortData.winRate,
+      longProfit:   parseFloat(longData.profit  || 0).toFixed(2),
+      shortProfit:  parseFloat(shortData.profit || 0).toFixed(2),
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -567,9 +579,14 @@ exports.getTimeAnalysis = async (req, res) => {
       }
     }
 
+    // Require at least 3 trades before a session qualifies for "Highest WR".
+    // This prevents a single-trade session (1 win = 100% WR) from dominating.
+    const MIN_WR_TRADES = 3;
+    const wrCandidates = sessionEntries.filter(([_, s]) => s.total >= MIN_WR_TRADES);
+    const wrPool = wrCandidates.length > 0 ? wrCandidates : sessionEntries;
     const bestSessionWR =
-      sessionEntries.length > 1
-        ? sessionEntries.reduce((a, b) =>
+      wrPool.length > 0
+        ? wrPool.reduce((a, b) =>
             parseFloat(a[1].winRate) > parseFloat(b[1].winRate) ? a : b
           )
         : ["0", { winRate: 0, total: 0 }];

@@ -41,10 +41,13 @@ const theme = {
   card: "#FFFFFF"
 };
 
-function StatCard({ label, value, sub, color, delay = 0 }) {
+function StatCard({ label, value, sub, color, delay = 0, tooltip }) {
+  const [showTip, setShowTip] = useState(false);
   return (
     <div
       className="premium-card"
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
       style={{
         background: theme.card,
         borderRadius: 16,
@@ -55,14 +58,38 @@ function StatCard({ label, value, sub, color, delay = 0 }) {
         boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         position: "relative",
-        overflow: "hidden"
+        overflow: "visible"
       }}
     >
-      <div style={{ fontSize: 10, fontWeight: 700, color: theme.muted, letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase" }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: theme.muted, letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
         {label}
+        {tooltip && (
+          <span style={{ width: 13, height: 13, borderRadius: "50%", background: "#E2E8F0", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900, color: "#64748B", cursor: "help", flexShrink: 0 }}>?</span>
+        )}
       </div>
       <div style={{ fontSize: 28, fontWeight: 900, color, letterSpacing: "-0.02em" }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: theme.muted, marginTop: 6, fontWeight: 500 }}>{sub}</div>}
+      {tooltip && showTip && (
+        <div style={{
+          position: "absolute",
+          bottom: "calc(100% + 8px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#0F1923",
+          color: "#E2E8F0",
+          fontSize: 11,
+          padding: "10px 14px",
+          borderRadius: 10,
+          width: 220,
+          zIndex: 200,
+          lineHeight: 1.6,
+          pointerEvents: "none",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)"
+        }}>
+          {tooltip}
+          <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#0F1923", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+        </div>
+      )}
       <style jsx>{`
         .premium-card:hover {
           transform: translateY(-4px);
@@ -70,6 +97,29 @@ function StatCard({ label, value, sub, color, delay = 0 }) {
           border-color: ${theme.secondary}44;
         }
       `}</style>
+    </div>
+  );
+}
+
+function SmallStat({ label, value, color, sub, tooltip }) {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+      style={{ flex: "1 1 140px", background: theme.card, borderRadius: 12, border: `1px solid ${theme.border}`, padding: "14px 16px", position: "relative", cursor: "default" }}
+    >
+      <div style={{ fontSize: 9, fontWeight: 700, color: theme.muted, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+        {label}
+        {tooltip && <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#E2E8F0", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 900, color: "#64748B", cursor: "help", flexShrink: 0 }}>?</span>}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 900, color, letterSpacing: "-0.01em" }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: theme.muted, marginTop: 4 }}>{sub}</div>}
+      {tooltip && showTip && (
+        <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#0F1923", color: "#E2E8F0", fontSize: 10, padding: "8px 12px", borderRadius: 8, width: 200, zIndex: 200, lineHeight: 1.6, pointerEvents: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
@@ -469,6 +519,7 @@ export default function IndianAnalyticsPage() {
                 value={hasAnyTrades ? `${currency}${parseFloat(data.summary?.totalProfit || 0).toLocaleString("en-IN")}` : "—"}
                 color={hasAnyTrades ? (parseFloat(data.summary?.totalProfit || 0) >= 0 ? theme.bull : theme.bear) : theme.secondary}
                 sub={hasAnyTrades ? "Lifetime profit / loss" : "Log trades to compute"}
+                tooltip="Sum of all your trade profits and losses (gross, before brokerage and taxes). Green = net profitable, Red = net loss."
               />
               <StatCard
                 label="NET AFTER COSTS"
@@ -479,12 +530,14 @@ export default function IndianAnalyticsPage() {
                     ? `Brokerage & taxes: ${currency}${parseFloat(data.summary?.totalCosts || 0).toLocaleString("en-IN")}`
                     : "Log trades to compute"
                 }
+                tooltip="Your real take-home P&L after deducting brokerage, STT, GST, and other trading costs. This is what actually hits your account."
               />
               <StatCard
                 label="WIN RATE"
                 value={hasAnyTrades ? `${data.summary?.winRate || 0}%` : "—"}
                 color={hasAnyTrades ? (parseFloat(data.summary?.winRate || 0) >= 50 ? theme.bull : theme.bear) : theme.secondary}
                 sub={hasAnyTrades ? `${data.summary?.winningTrades || 0} Wins / ${data.summary?.losingTrades || 0} Losses` : "Log trades to compute win rate"}
+                tooltip="Percentage of trades that closed in profit. A win rate above 50% is green. Remember: high win rate alone doesn't mean profitability — R:R matters too."
               />
               <StatCard
                 label="AI SCORE"
@@ -495,8 +548,21 @@ export default function IndianAnalyticsPage() {
                 }
                 color={hasEnoughTrades ? theme.gold : theme.muted}
                 sub={hasEnoughTrades ? "Model-based discipline score" : "Unlock after logging 5 trades"}
+                tooltip="AI-computed discipline score (0–100) based on how consistently you follow your plan, manage risk, and avoid emotional trading. Score ≥ 60 is good."
               />
             </div>
+
+            {/* SECONDARY STATS ROW */}
+            {hasAnyTrades && (
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+                <SmallStat label="AVG WIN" value={`${currency}${parseFloat(data.perf?.avgWin || 0).toLocaleString("en-IN")}`} color={theme.bull} tooltip="Average profit per winning trade. Compare this with Avg Loss to understand your R:R in practice." />
+                <SmallStat label="AVG LOSS" value={`${currency}${Math.abs(parseFloat(data.perf?.avgLoss || 0)).toLocaleString("en-IN")}`} color={theme.bear} tooltip="Average loss per losing trade. Ideally Avg Win should be at least 1.5× your Avg Loss." />
+                <SmallStat label="AVG TRADE" value={`${currency}${parseFloat(data.summary?.avgTrade || 0).toFixed(2)}`} color={parseFloat(data.summary?.avgTrade || 0) >= 0 ? theme.bull : theme.bear} tooltip="Average P&L across every trade (wins + losses combined). Must be positive to be consistently profitable." />
+                <SmallStat label="EXPECTANCY" value={`${data.rr?.expectancy || "0.00"} R`} color={parseFloat(data.rr?.expectancy || 0) >= 0 ? theme.bull : theme.bear} tooltip="Expected profit per trade in R units. Formula: (WinRate × AvgWin) − (LossRate × AvgLoss). Positive = you have an edge." />
+                <SmallStat label="SETUP SCORE" value={`${data.summary?.avgSetupScore || "0.0"}/100`} color={theme.gold} tooltip="Average quality score across all your setups (0–100). Higher score = better pre-trade preparation and rule following." />
+                <SmallStat label="COST-HIT TRADES" value={`${data.quality?.costImpactedTrades || 0}`} color={theme.bear} sub="Costs > gross profit" tooltip="Number of winning trades where brokerage + STT/taxes actually exceeded your gross profit. These trades hurt despite showing a 'win'." />
+              </div>
+            )}
 
             {/* P&L BREAKDOWN CHART */}
             <div
@@ -547,6 +613,10 @@ export default function IndianAnalyticsPage() {
                         <stop offset="95%" stopColor={theme.bull} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorLoss" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={theme.bear} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={theme.bear} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorNegProfit" x1="0" y1="1" x2="0" y2="0">
                         <stop offset="5%" stopColor={theme.bear} stopOpacity={0.4} />
                         <stop offset="95%" stopColor={theme.bear} stopOpacity={0} />
                       </linearGradient>
@@ -602,26 +672,80 @@ export default function IndianAnalyticsPage() {
                       }}
                     />
                     <ReferenceLine y={0} stroke={theme.border} strokeWidth={2} strokeDasharray="4 4" />
-                    <Area
-                      type="monotone"
-                      dataKey="profit"
-                      stroke={theme.bull}
-                      strokeWidth={4}
-                      fillOpacity={1}
-                      fill="url(#colorProfit)"
-                      connectNulls
-                      activeDot={{ 
-                        r: 8, 
-                        fill: theme.bull, 
-                        stroke: "#FFF", 
-                        strokeWidth: 3,
-                        style: { filter: `drop-shadow(0 4px 8px ${theme.bull}44)` }
-                      }}
-                    />
+                    {(() => {
+                      const chartData = data.breakdown?.[timeFilter] || [];
+                      const totalPeriodProfit = chartData.reduce((sum, d) => sum + (d.profit || 0), 0);
+                      const isPositive = totalPeriodProfit >= 0;
+                      const lineColor = isPositive ? theme.bull : theme.bear;
+                      const fillId = isPositive ? "colorProfit" : "colorNegProfit";
+                      return (
+                        <Area
+                          type="monotone"
+                          dataKey="profit"
+                          stroke={lineColor}
+                          strokeWidth={4}
+                          fillOpacity={1}
+                          fill={`url(#${fillId})`}
+                          connectNulls
+                          activeDot={{
+                            r: 8,
+                            fill: lineColor,
+                            stroke: "#FFF",
+                            strokeWidth: 3,
+                            style: { filter: `drop-shadow(0 4px 8px ${lineColor}44)` }
+                          }}
+                        />
+                      );
+                    })()}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* EQUITY CURVE */}
+            {Array.isArray(data.drawdown?.equityCurve) && data.drawdown.equityCurve.length > 1 && (
+              <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 24, marginBottom: 24, boxShadow: "0 2px 10px rgba(15,23,42,0.05)" }}>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>Equity Curve</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginTop: 2 }}>Running cumulative P&L from your first trade to the latest — shows the health of your account growth.</div>
+                </div>
+                <div style={{ height: 200 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data.drawdown.equityCurve.map((p, i) => ({ i: i + 1, balance: parseFloat(p.balance) }))} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="eqPos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={theme.bull} stopOpacity={0.35} />
+                          <stop offset="95%" stopColor={theme.bull} stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="eqNeg" x1="0" y1="1" x2="0" y2="0">
+                          <stop offset="5%" stopColor={theme.bear} stopOpacity={0.35} />
+                          <stop offset="95%" stopColor={theme.bear} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="0" vertical={false} stroke="#E2E8F0" strokeOpacity={0.4} />
+                      <XAxis dataKey="i" hide />
+                      <YAxis fontSize={10} tickLine={false} axisLine={false} tick={{ fill: theme.muted }} tickFormatter={v => `₹${Math.abs(v) >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
+                      <ReferenceLine y={0} stroke={theme.border} strokeWidth={2} strokeDasharray="4 4" />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const val = payload[0].value;
+                            return (
+                              <div style={{ background: "#0F1923", color: "#fff", padding: "10px 14px", borderRadius: 10, fontSize: 12 }}>
+                                <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 4 }}>Cumulative P&L</div>
+                                <div style={{ fontWeight: 900, color: val >= 0 ? theme.bull : theme.bear }}>{val >= 0 ? "+" : ""}₹{Math.abs(val).toLocaleString("en-IN")}</div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area type="monotone" dataKey="balance" stroke={parseFloat(data.drawdown.equityCurve[data.drawdown.equityCurve.length - 1]?.balance) >= 0 ? theme.bull : theme.bear} strokeWidth={2.5} fill={parseFloat(data.drawdown.equityCurve[data.drawdown.equityCurve.length - 1]?.balance) >= 0 ? "url(#eqPos)" : "url(#eqNeg)"} connectNulls activeDot={{ r: 5, fill: theme.bull, stroke: "#fff", strokeWidth: 2 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
 
             {/* RISK / REWARD + DRAWDOWN */}
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -639,19 +763,19 @@ export default function IndianAnalyticsPage() {
                   Based on your options trades (planned and realized).
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12 }}>
-                  <div>
+                  <div title="Your planned risk-to-reward ratio. 1:2 means you risk ₹1 to make ₹2. Higher is better — ideally ≥ 1:1.5 for options.">
                     <div style={{ color: theme.muted }}>Average R:R</div>
                     <div style={{ fontWeight: 700 }}>1:{data.rr?.avgRR || "0.0"}</div>
                   </div>
-                  <div>
+                  <div title="What your R:R actually turned out to be after closing trades. Compare this with Average R:R to see if you're hitting your targets.">
                     <div style={{ color: theme.muted }}>Realized R:R</div>
                     <div style={{ fontWeight: 700 }}>1:{data.rr?.actualRR || "0.0"}</div>
                   </div>
-                  <div>
+                  <div title="Expected average profit per trade in R units. Formula: (Win Rate × Avg Win) − (Loss Rate × Avg Loss). Positive expectancy = edge in the market.">
                     <div style={{ color: theme.muted }}>Expectancy</div>
                     <div style={{ fontWeight: 700 }}>{data.rr?.expectancy || "0.00"} R / trade</div>
                   </div>
-                  <div>
+                  <div title="Average amount of capital at risk per trade (distance from entry to stop loss × lot size). Keep this consistent for good risk management.">
                     <div style={{ color: theme.muted }}>Risk / Trade</div>
                     <div style={{ fontWeight: 700 }}>
                       {currency}
@@ -659,7 +783,7 @@ export default function IndianAnalyticsPage() {
                     </div>
                   </div>
                 </div>
-                <div style={{ marginTop: 12, fontSize: 11, color: theme.muted }}>
+                <div style={{ marginTop: 12, fontSize: 11, color: theme.muted }} title="Total net profit divided by total risk taken. Higher positive value = better returns for the risk you accepted.">
                   Risk-adjusted return:{" "}
                   <span style={{ fontWeight: 700, color: parseFloat(data.rr?.riskAdjustedReturn || 0) >= 0 ? theme.bull : theme.bear }}>
                     {data.rr?.riskAdjustedReturn}
@@ -681,14 +805,14 @@ export default function IndianAnalyticsPage() {
                   How deep your options P&L dipped from peak.
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12 }}>
-                  <div>
+                  <div title="The largest peak-to-trough drop in your cumulative P&L. E.g., if you hit ₹10,000 peak then fell to ₹7,000, max drawdown is ₹3,000 (30%). Keep this manageable.">
                     <div style={{ color: theme.muted }}>Max Drawdown</div>
                     <div style={{ fontWeight: 700, color: theme.bear }}>
                       {currency}
                       {parseFloat(data.drawdown?.maxDrawdown || 0).toFixed(2)} ({data.drawdown?.maxDrawdownPercent || "0.0"}%)
                     </div>
                   </div>
-                  <div>
+                  <div title="How far you currently are below your all-time equity peak. If zero, you're at a new high. Any positive value means you're in a drawdown right now.">
                     <div style={{ color: theme.muted }}>Current Drawdown</div>
                     <div style={{ fontWeight: 700, color: theme.bear }}>
                       {currency}
@@ -696,11 +820,11 @@ export default function IndianAnalyticsPage() {
                       {data.drawdown?.currentDrawdownPercent || "0.0"}%)
                     </div>
                   </div>
-                  <div>
+                  <div title="Net profit divided by max drawdown. E.g., if you made ₹5,000 but your max drawdown was ₹2,000, recovery factor = 2.5. Higher means you earn more per unit of risk absorbed.">
                     <div style={{ color: theme.muted }}>Recovery Factor</div>
                     <div style={{ fontWeight: 700 }}>{data.drawdown?.recoveryFactor || "0.00"}</div>
                   </div>
-                  <div>
+                  <div title="Your highest cumulative P&L ever (peak) vs. your current cumulative P&L. If current < peak, you're in a drawdown and working to recover.">
                     <div style={{ color: theme.muted }}>Peak vs Current</div>
                     <div style={{ fontWeight: 700 }}>
                       {currency}
@@ -746,18 +870,21 @@ export default function IndianAnalyticsPage() {
                       : theme.muted
                   }
                   sub={hasRRFields ? "Overall trade quality rating" : "Add RR fields (entry + SL + TP)"}
+                  tooltip="Composite score (0–100) measuring how well you plan and execute trades. Factors in R:R ratios, SL/TP discipline, and entry quality. Score ≥ 70 = good trader."
                 />
                 <StatCard
                   label="BREAKEVEN RATE"
                   value={hasRRFields ? `${data.quality?.breakevenRate || 0}%` : "—"}
                   color={hasRRFields ? (parseFloat(data.quality?.breakevenRate || 0) <= 30 ? theme.bull : theme.bear) : theme.muted}
                   sub={hasRRFields ? "Trades near flat (|P&L| < 5)" : "Need RR trades to calibrate breakeven"}
+                  tooltip="Percentage of trades where P&L is near zero (within ₹5). A lower breakeven rate is better — it means you're letting winners run and cutting losers clean."
                 />
                 <StatCard
                   label="TRADES WITH RR"
                   value={hasRRFields ? data.quality?.tradesWithRR || 0 : "—"}
                   color={hasRRFields ? theme.primary : theme.muted}
                   sub={hasRRFields ? "Has SL/TP + entryPrice" : "No RR-ready trades yet"}
+                  tooltip="Number of trades where you logged entry price, stop loss, and take profit. These trades unlock full R:R quality analytics. Log more for better insights."
                 />
               </div>
 
@@ -812,7 +939,7 @@ export default function IndianAnalyticsPage() {
 
                 {data.time ? (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <div title="The day of the week (Mon–Fri) where your average profit and win rate is highest across all logged trades. Focus more trades on this day." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Day</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.bestDay?.name || "—"}
@@ -826,7 +953,7 @@ export default function IndianAnalyticsPage() {
                       </div>
                     </div>
 
-                    <div style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <div title="The hour of day (IST, 24h) where your average profit and win rate is highest. E.g., '10h' = trades entered between 10:00–10:59 IST performed best." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Hour</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.bestHour?.hour != null ? `${data.time.bestHour.hour}h` : "—"}
@@ -840,7 +967,7 @@ export default function IndianAnalyticsPage() {
                       </div>
                     </div>
 
-                    <div style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <div title="Market session (Opening 9:15–10:30, Midday 10:30–13:00, Closing 13:00–15:30) where you performed best. Helps identify your strongest time window." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Session</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.bestSession?.name || "—"}
@@ -853,7 +980,7 @@ export default function IndianAnalyticsPage() {
                       </div>
                     </div>
 
-                    <div style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <div title="The day of the week where your average profit is lowest / most negative. Consider reducing position size or skipping trades on this day." style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Worst Day</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.bear, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.worstDay?.name || "—"}
@@ -927,7 +1054,7 @@ export default function IndianAnalyticsPage() {
 
                 {data.ai?.behaviorDiscipline?.ruleEmotion && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-                    <div style={{ background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 12 }}>
+                    <div title="% of your trades entered based on a pre-planned setup vs. emotional impulse. Higher plan% = better discipline. Target: ≥ 70% plan-based entries." style={{ background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 12 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em" }}>PLAN VS EMOTION</div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {parseFloat(data.ai.behaviorDiscipline.ruleEmotion.planPct || 0).toFixed(1)}%
@@ -937,7 +1064,7 @@ export default function IndianAnalyticsPage() {
                       </div>
                     </div>
 
-                    <div style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12 }}>
+                    <div title="Number of trades where you increased position size immediately after a loss — a classic revenge trading pattern. Even 1–2 revenge trades can wipe out days of gains." style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em" }}>REVENGE TRADES</div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.ai.behaviorDiscipline.revengeTradesCount || 0}
@@ -983,6 +1110,82 @@ export default function IndianAnalyticsPage() {
               </div>
             </div>
 
+            {/* STRATEGY LEAGUE + SESSION EDGE + PLAN ADHERENCE */}
+            {hasEnoughTrades && (
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+
+                {/* Strategy League */}
+                {Array.isArray(data.ai?.strategyLeague) && data.ai.strategyLeague.filter(s => s.strategy !== "Unspecified").length > 0 && (
+                  <div style={{ flex: "1 1 280px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Strategy League</div>
+                    <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>Your setups ranked by total profit.</div>
+                    {data.ai.strategyLeague.filter(s => s.strategy !== "Unspecified").slice(0, 6).map((s, i) => {
+                      const profit = parseFloat(s.totalProfit);
+                      const color = profit >= 0 ? theme.bull : theme.bear;
+                      return (
+                        <div key={s.strategy} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${theme.border}` }}>
+                          <div style={{ width: 20, height: 20, borderRadius: "50%", background: i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : theme.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 900, color: i < 3 ? "#fff" : theme.muted, flexShrink: 0 }}>#{i + 1}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.strategy}</div>
+                            <div style={{ fontSize: 10, color: theme.muted }}>{s.trades} trades · {s.winRate}% WR</div>
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 800, color, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
+                            {profit >= 0 ? "+" : ""}₹{Math.abs(profit).toLocaleString("en-IN")}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Session Edge */}
+                {Array.isArray(data.ai?.sessionEdge) && data.ai.sessionEdge.length > 0 && (
+                  <div style={{ flex: "1 1 240px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Session Edge</div>
+                    <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>Your P&L split by trading session.</div>
+                    {data.ai.sessionEdge.slice(0, 6).map(s => {
+                      const profit = parseFloat(s.totalProfit);
+                      const color = profit >= 0 ? theme.bull : theme.bear;
+                      return (
+                        <div key={s.session} style={{ padding: "8px 0", borderBottom: `1px solid ${theme.border}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700 }}>{s.session}</span>
+                            <span style={{ fontSize: 12, fontWeight: 800, color, fontFamily: "'JetBrains Mono',monospace" }}>{profit >= 0 ? "+" : ""}₹{Math.abs(profit).toLocaleString("en-IN")}</span>
+                          </div>
+                          <div style={{ fontSize: 10, color: theme.muted }}>{s.trades} trades · {s.winRate}% WR · avg ₹{parseFloat(s.avgProfit).toFixed(0)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Plan Adherence Trend */}
+                {Array.isArray(data.ai?.behaviorDiscipline?.planTimeline) && data.ai.behaviorDiscipline.planTimeline.length > 1 && (
+                  <div style={{ flex: "1 1 240px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Plan Adherence Trend</div>
+                    <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>% of trades entered from a plan — week by week.</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {data.ai.behaviorDiscipline.planTimeline.slice(-8).map(w => {
+                        const pct = parseFloat(w.planAdherencePct || 0);
+                        const color = pct >= 70 ? theme.bull : pct >= 40 ? theme.gold : theme.bear;
+                        return (
+                          <div key={w.week}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                              <span style={{ fontSize: 10, color: theme.muted, fontFamily: "'JetBrains Mono',monospace" }}>{w.week}</span>
+                              <span style={{ fontSize: 10, fontWeight: 800, color }}>{pct}%</span>
+                            </div>
+                            <div style={{ height: 5, background: "#F0EEE9", borderRadius: 3 }}>
+                              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.5s ease" }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* PERFORMANCE DEEP DIVE */}
             <div
               style={{
@@ -996,30 +1199,110 @@ export default function IndianAnalyticsPage() {
             >
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 20 }}>Performance Deep Dive</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 24 }}>
-                <div>
+                <div title="Total winning P&L divided by total losing P&L. Profit Factor > 1 = system earns more than it loses. ≥ 1.5 is solid; ≥ 2.0 is excellent for options.">
                   <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>PROFIT FACTOR</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: theme.gold }}>{data.perf?.profitFactor || "0.00"}</div>
                   <div style={{ fontSize: 10, color: theme.muted }}>Gross Profit / Gross Loss</div>
                 </div>
-                <div>
+                <div title="Your longest back-to-back winning run and back-to-back losing run. High loss streaks signal risk management or strategy issues to investigate.">
                   <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>MAX STREAKS</div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>
                     <span style={{ color: theme.bull }}>{data.perf?.maxWinStreak || 0} Wins</span> / <span style={{ color: theme.bear }}>{data.perf?.maxLossStreak || 0} Losses</span>
                   </div>
                   <div style={{ fontSize: 10, color: theme.muted }}>Consecutive wins vs losses</div>
                 </div>
-                <div>
+                <div title="The single most profitable trade in your journal. Useful to know if your overall profit is driven by one lucky trade or spread across many.">
                   <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>LARGEST WIN</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: theme.bull }}>₹{parseFloat(data.perf?.largestWin || 0).toLocaleString()}</div>
                   <div style={{ fontSize: 10, color: theme.muted }}>Single best trade</div>
                 </div>
-                <div>
+                <div title="The single most damaging trade in your journal. If this is much larger than your average loss, it suggests you didn't respect your stop loss on that trade.">
                   <div style={{ fontSize: 11, color: theme.muted, marginBottom: 4 }}>LARGEST LOSS</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: theme.bear }}>₹{parseFloat(data.perf?.largestLoss || 0).toLocaleString()}</div>
                   <div style={{ fontSize: 10, color: theme.muted }}>Single worst trade</div>
                 </div>
               </div>
             </div>
+
+            {/* DAY OF WEEK + MONTHLY PERFORMANCE */}
+            {data.time && (
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+                {/* Full day-of-week breakdown */}
+                {(() => {
+                  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+                  const dayData = days.map(d => ({ name: d.slice(0, 3), ...((data.time.byDay || {})[d] || { total: 0, profit: 0, winRate: 0 }) })).filter(d => d.total > 0);
+                  if (!dayData.length) return null;
+                  const maxAbs = Math.max(...dayData.map(d => Math.abs(parseFloat(d.profit || 0))), 1);
+                  return (
+                    <div style={{ flex: "1 1 280px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Day of Week Performance</div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>Total P&L and win rate per trading day.</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {dayData.map(d => {
+                          const profit = parseFloat(d.profit || 0);
+                          const wr = parseFloat(d.winRate || 0);
+                          const pct = Math.min(100, (Math.abs(profit) / maxAbs) * 100);
+                          const color = profit >= 0 ? theme.bull : theme.bear;
+                          return (
+                            <div key={d.name} title={`${d.name}: ${d.total} trades · ${wr}% win rate`}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700 }}>{d.name}</span>
+                                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                                  <span style={{ fontSize: 10, color: theme.muted }}>{d.total}T · {wr}%WR</span>
+                                  <span style={{ fontSize: 11, fontWeight: 800, color, fontFamily: "'JetBrains Mono',monospace" }}>{profit >= 0 ? "+" : ""}₹{Math.abs(profit).toFixed(0)}</span>
+                                </div>
+                              </div>
+                              <div style={{ height: 6, background: "#F0EEE9", borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.5s ease" }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Monthly performance table */}
+                {(() => {
+                  const byMonth = data.time.byMonth || {};
+                  const months = Object.entries(byMonth).filter(([, v]) => v.total > 0).sort(([a], [b]) => new Date("1 " + a) - new Date("1 " + b));
+                  if (!months.length) return null;
+                  return (
+                    <div style={{ flex: "1 1 280px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Monthly Performance</div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>P&L, trades, and win rate per calendar month.</div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                              {["Month", "Trades", "W/L", "Win%", "P&L"].map(h => (
+                                <th key={h} style={{ padding: "4px 6px", textAlign: h === "P&L" ? "right" : "left", fontWeight: 700, color: theme.muted, fontSize: 10, letterSpacing: "0.06em" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {months.slice(-8).map(([month, v]) => {
+                              const profit = parseFloat(v.profit || 0);
+                              const color = profit >= 0 ? theme.bull : theme.bear;
+                              return (
+                                <tr key={month} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                                  <td style={{ padding: "6px 6px", fontWeight: 700 }}>{month}</td>
+                                  <td style={{ padding: "6px 6px", color: theme.muted }}>{v.total}</td>
+                                  <td style={{ padding: "6px 6px", color: theme.muted }}>{v.wins}/{v.losses}</td>
+                                  <td style={{ padding: "6px 6px", color: parseFloat(v.winRate) >= 50 ? theme.bull : theme.bear, fontWeight: 700 }}>{v.winRate}%</td>
+                                  <td style={{ padding: "6px 6px", textAlign: "right", fontWeight: 800, color, fontFamily: "'JetBrains Mono',monospace" }}>{profit >= 0 ? "+" : ""}₹{Math.abs(profit).toLocaleString("en-IN")}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Distribution by new Indian form fields */}
             <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, marginTop: 8 }}>Performance by your journal fields</div>
@@ -1054,7 +1337,115 @@ export default function IndianAnalyticsPage() {
                   <DistList title="" data={data.distribution.byMistakeTag} currency={currency} maxItems={6} />
                 </div>
               )}
+              {/* CE vs PE */}
+              {data.distribution?.byOptionType && Object.keys(data.distribution.byOptionType).filter(k => k !== "Unspecified" && data.distribution.byOptionType[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>CE vs PE</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>Which option type you profit from more.</div>
+                  <DistList title="" data={data.distribution.byOptionType} currency={currency} maxItems={4} />
+                </div>
+              )}
+              {/* BUY vs SELL direction */}
+              {data.distribution?.byDirection && Object.keys(data.distribution.byDirection).filter(k => k !== "Unspecified" && data.distribution.byDirection[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>By Direction</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>BUY (long) vs SELL (short) performance.</div>
+                  <DistList title="" data={data.distribution.byDirection} currency={currency} maxItems={4} />
+                </div>
+              )}
+              {/* By Symbol */}
+              {data.distribution?.byPair && Object.keys(data.distribution.byPair).filter(k => data.distribution.byPair[k].total > 0).length > 0 && (
+                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>By Symbol</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>Top performing options symbols in your journal.</div>
+                  <DistList title="" data={data.distribution.byPair} currency={currency} maxItems={6} />
+                </div>
+              )}
             </div>
+
+            {/* BEHAVIORAL PATTERNS */}
+            {hasEnoughTrades && data.ai?.psychologicalPatterns && (
+              <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 24, marginBottom: 24, boxShadow: "0 2px 10px rgba(15,23,42,0.05)" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Behavioral Patterns</div>
+                <div style={{ fontSize: 11, color: theme.muted, marginBottom: 18 }}>How your trading behavior shifts after extreme outcomes — detected from your journal.</div>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+
+                  {/* After Big Win */}
+                  {data.ai.psychologicalPatterns.afterBigWin?.trades > 0 && (
+                    <div style={{ flex: "1 1 180px", background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 16 }} title="Tracks how you perform on the trade immediately following one of your largest winning trades. Overconfidence often leads to worse next-trade results.">
+                      <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em", marginBottom: 8 }}>AFTER BIG WIN</div>
+                      <div style={{ display: "flex", gap: 16 }}>
+                        <div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: parseFloat(data.ai.psychologicalPatterns.afterBigWin.avgProfit) >= 0 ? theme.bull : theme.bear }}>
+                            {parseFloat(data.ai.psychologicalPatterns.afterBigWin.avgProfit) >= 0 ? "+" : ""}₹{Math.abs(parseFloat(data.ai.psychologicalPatterns.afterBigWin.avgProfit)).toFixed(0)}
+                          </div>
+                          <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>avg P&L next trade</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: parseFloat(data.ai.psychologicalPatterns.afterBigWin.winRate) >= 50 ? theme.bull : theme.bear }}>
+                            {data.ai.psychologicalPatterns.afterBigWin.winRate}%
+                          </div>
+                          <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>win rate ({data.ai.psychologicalPatterns.afterBigWin.trades} trades)</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 10, color: theme.muted, lineHeight: 1.5 }}>
+                        {parseFloat(data.ai.psychologicalPatterns.afterBigWin.winRate) < 45
+                          ? "⚠️ You tend to overtrade or oversize after a big win. Take a breath."
+                          : "✓ Good — you stay disciplined after strong wins."}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* After Big Loss */}
+                  {data.ai.psychologicalPatterns.afterBigLoss?.trades > 0 && (
+                    <div style={{ flex: "1 1 180px", background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 16 }} title="Tracks how you perform immediately after one of your biggest losses. Fear or revenge can heavily distort next-trade decisions.">
+                      <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em", marginBottom: 8 }}>AFTER BIG LOSS</div>
+                      <div style={{ display: "flex", gap: 16 }}>
+                        <div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: parseFloat(data.ai.psychologicalPatterns.afterBigLoss.avgProfit) >= 0 ? theme.bull : theme.bear }}>
+                            {parseFloat(data.ai.psychologicalPatterns.afterBigLoss.avgProfit) >= 0 ? "+" : ""}₹{Math.abs(parseFloat(data.ai.psychologicalPatterns.afterBigLoss.avgProfit)).toFixed(0)}
+                          </div>
+                          <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>avg P&L next trade</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: parseFloat(data.ai.psychologicalPatterns.afterBigLoss.winRate) >= 50 ? theme.bull : theme.bear }}>
+                            {data.ai.psychologicalPatterns.afterBigLoss.winRate}%
+                          </div>
+                          <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>win rate ({data.ai.psychologicalPatterns.afterBigLoss.trades} trades)</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 10, color: theme.muted, lineHeight: 1.5 }}>
+                        {parseFloat(data.ai.psychologicalPatterns.afterBigLoss.winRate) < 45
+                          ? "⚠️ You likely revenge trade after big losses. Consider stopping for the day."
+                          : "✓ You stay composed after losses — strong mental resilience."}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tilt Days */}
+                  <div style={{ flex: "1 1 180px", background: data.ai.psychologicalPatterns.tiltDays?.length > 0 ? `${theme.bear}08` : `${theme.bull}08`, border: `1px solid ${data.ai.psychologicalPatterns.tiltDays?.length > 0 ? theme.bear + "44" : theme.bull + "44"}`, borderRadius: 12, padding: 16 }} title="A tilt day is detected when you had 3+ consecutive losses AND kept increasing position size — a classic emotional spiral. Each tilt day logged shows the date, streak length, and total loss.">
+                    <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em", marginBottom: 8 }}>TILT DAYS DETECTED</div>
+                    {data.ai.psychologicalPatterns.tiltDays?.length > 0 ? (
+                      <>
+                        <div style={{ fontSize: 28, fontWeight: 900, color: theme.bear, marginBottom: 4 }}>{data.ai.psychologicalPatterns.tiltDays.length}</div>
+                        <div style={{ fontSize: 10, color: theme.muted, marginBottom: 10 }}>days with emotional spiraling detected</div>
+                        {data.ai.psychologicalPatterns.tiltDays.slice(-3).map((td, i) => (
+                          <div key={i} style={{ fontSize: 10, color: theme.muted, padding: "4px 0", borderTop: `1px solid ${theme.border}` }}>
+                            {td.day} · {td.streakLength} losses · ₹{Math.abs(parseFloat(td.totalLoss)).toFixed(0)} lost
+                          </div>
+                        ))}
+                        <div style={{ marginTop: 8, fontSize: 10, color: theme.bear, fontWeight: 700 }}>Rule: Stop trading after 3 consecutive losses.</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 28, fontWeight: 900, color: theme.bull, marginBottom: 4 }}>0</div>
+                        <div style={{ fontSize: 10, color: theme.muted }}>No emotional spiraling detected — great discipline.</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* PSYCHOLOGY ANALYTICS */}
             <div
@@ -1095,6 +1486,7 @@ export default function IndianAnalyticsPage() {
                             : theme.bear
                       }
                       sub="Composite discipline rating"
+                      tooltip="Overall mental discipline score (0–100) combining plan adherence, emotional control, calm trading frequency, and revenge trade avoidance. Score ≥ 70 = strong mindset."
                     />
                     <StatCard
                       label="PLAN ADHERENCE"
@@ -1102,6 +1494,7 @@ export default function IndianAnalyticsPage() {
                       color={parseFloat(data.psychology.scoreBreakdown?.planAdherencePct || 0) >= 70 ? theme.bull : theme.bear}
                       sub="Trades executed from plan"
                       delay={0}
+                      tooltip="% of trades where your entry was based on a pre-defined plan (not emotion). Higher is better — ideally ≥ 70%. Trades marked as 'Planned' count here."
                     />
                     <StatCard
                       label="CALM TRADING"
@@ -1109,6 +1502,7 @@ export default function IndianAnalyticsPage() {
                       color={parseFloat(data.psychology.scoreBreakdown?.calmTradingPct || 0) >= 50 ? theme.bull : theme.gold}
                       sub="Calm / focused behavior"
                       delay={0}
+                      tooltip="% of trades logged with a calm or focused mood state. Trading calm tends to produce better outcomes. Target ≥ 50% calm sessions."
                     />
                   </div>
 
