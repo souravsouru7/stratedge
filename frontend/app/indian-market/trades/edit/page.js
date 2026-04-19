@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTrade, updateTrade } from "@/services/tradeApi";
@@ -79,7 +79,7 @@ function calculateSetupScore(rules = []) {
   return Math.round((followedCount / activeRules.length) * 100);
 }
 
-export default function IndianEditTradePage() {
+function IndianEditTradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
@@ -204,6 +204,7 @@ export default function IndianEditTradePage() {
       </div>
     );
   }
+
 
   if (!formData) {
     return (
@@ -555,5 +556,17 @@ export default function IndianEditTradePage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function IndianEditTradePage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: C.sans, color: C.muted }}>
+        Loading trade...
+      </div>
+    }>
+      <IndianEditTradeContent />
+    </Suspense>
   );
 }
