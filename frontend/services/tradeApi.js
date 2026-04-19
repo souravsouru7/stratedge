@@ -14,9 +14,12 @@ export const createTrade = async (tradeData, marketType = 'Forex') => {
   return await apiClient.post(`${path}/trades`, tradeData);
 };
 
-export const getTrades = async (marketType = 'Forex') => {
+export const getTrades = async (marketType = 'Forex', options = {}) => {
   const path = getMarketPath(marketType);
-  return await apiClient.get(`${path}/trades`);
+  const params = new URLSearchParams();
+  if (options.period) params.set("period", options.period);
+  const qs = params.toString();
+  return await apiClient.get(`${path}/trades${qs ? `?${qs}` : ""}`);
 };
 
 export const getTrade = async (id, marketType = 'Forex') => {

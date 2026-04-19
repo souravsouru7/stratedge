@@ -41,6 +41,11 @@ const tradeSchema = new mongoose.Schema(
 
     session: String,
 
+    tradeDate: {
+      type: Date,
+      default: null
+    },
+
     notes: String,
 
     riskRewardRatio: {
@@ -234,9 +239,12 @@ const tradeSchema = new mongoose.Schema(
 
 tradeSchema.index({ user: 1 });
 tradeSchema.index({ createdAt: -1 });
+tradeSchema.index({ tradeDate: -1 });
 tradeSchema.index({ strategy: 1 });
 tradeSchema.index({ user: 1, createdAt: -1 });
+tradeSchema.index({ user: 1, tradeDate: -1 });
 tradeSchema.index({ user: 1, marketType: 1, createdAt: -1 });
+tradeSchema.index({ user: 1, marketType: 1, tradeDate: -1 });
 tradeSchema.index({ user: 1, status: 1, createdAt: -1 });
 tradeSchema.index({ user: 1, marketType: 1, status: 1, createdAt: -1 });
 

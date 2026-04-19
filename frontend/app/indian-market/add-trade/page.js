@@ -6,7 +6,13 @@ import { createTrade } from "@/services/tradeApi";
 import Link from "next/link";
 import { MARKETS } from "@/context/MarketContext";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 import { fetchSetups } from "@/services/setupApi";
+
+const getTodayInputValue = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+};
 
 const theme = {
   bull: "#0D9E6E",
@@ -37,6 +43,7 @@ export default function IndianOptionsAddTradePage() {
     tradeType: "INTRADAY",
     strategy: "",
     strategyCustom: "",
+    tradeDate: getTodayInputValue(),
     expiryDate: "",
     riskRewardRatio: "",
     riskRewardCustom: "",
@@ -62,7 +69,7 @@ export default function IndianOptionsAddTradePage() {
     if (!t) router.push("/login");
   }, [router]);
 
-  // Load saved setups/strategies for Indian market
+  // Load saved trading setups for Indian market
   useEffect(() => {
     let cancelled = false;
     const loadSetups = async () => {
@@ -153,6 +160,10 @@ export default function IndianOptionsAddTradePage() {
       alert("Enter profit or loss (₹).");
       return;
     }
+    if (!trade.tradeDate) {
+      alert("Select trade date.");
+      return;
+    }
 
     const pair = `${underlyingLabel.trim()} ${strike} ${trade.optionType}`;
     const tradeData = {
@@ -168,6 +179,7 @@ export default function IndianOptionsAddTradePage() {
       exitPrice: trade.exitPrice ? parseFloat(trade.exitPrice) : undefined,
       tradeType: trade.tradeType || "INTRADAY",
       strategy: trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined),
+      tradeDate: trade.tradeDate,
       expiryDate: trade.expiryDate || undefined,
       riskRewardRatio: trade.riskRewardCustom?.trim() ? "custom" : (trade.riskRewardRatio || ""),
       riskRewardCustom: trade.riskRewardCustom?.trim() || "",
@@ -208,91 +220,7 @@ export default function IndianOptionsAddTradePage() {
 
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.secondary }}>
-      <header style={{
-        position: "sticky", top: 0, zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 24px", minHeight: 60, flexWrap: "wrap", gap: 10,
-        background: theme.card,
-        backdropFilter: "blur(20px)",
-        borderBottom: `1px solid ${theme.border}`,
-        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/indian-market/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 168, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-start" }}><img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} /></div>
-            <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.secondary, lineHeight: 1 }}>
-                {""}
-              </div>
-              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#1B5E20", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                OPTIONS JOURNAL · NSE
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[
-            { href: "/indian-market/trades", label: "Journal" },
-            { href: "/indian-market/add-trade", label: "Log Option" },
-            { href: "/indian-market/analytics", label: "Analytics" },
-            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
-          ].map(n => (
-            <Link
-              key={n.href}
-              href={n.href}
-              style={{
-                fontSize: 13,
-                color: theme.primary,
-                fontWeight: 700,
-                textDecoration: "none",
-                padding: "10px 16px",
-                borderRadius: 999,
-                transition: "all 0.2s",
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                background: "rgba(13,158,110,0.08)",
-                border: "1.5px solid rgba(13,158,110,0.25)",
-                minHeight: "44px",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "rgba(13,158,110,0.18)";
-                e.currentTarget.style.borderColor = "rgba(13,158,110,0.6)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "rgba(13,158,110,0.08)";
-                e.currentTarget.style.borderColor = "rgba(13,158,110,0.25)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <MarketSwitcher currentMarket={MARKETS.INDIAN_MARKET} />
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              router.push("/login");
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(214,59,59,0.1)", border: "1px solid rgba(214,59,59,0.3)",
-              borderRadius: 6, padding: "6px 12px",
-              cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
-              color: theme.bear, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
-              transition: "all 0.2s",
-            }}
-          >
-            LOGOUT
-          </button>
-        </div>
-      </header>
+      <IndianMarketHeader />
 
       <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 24px" }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, color: theme.secondary }}>
@@ -373,8 +301,13 @@ export default function IndianOptionsAddTradePage() {
             </div>
 
             <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Trade Date</label>
+              <input name="tradeDate" type="date" value={trade.tradeDate} onChange={handleChange} required style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+            </div>
+
+            <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>
-                Strategy / Setup{setupsLoading ? " (loading...)" : ""}
+                Trading Setup{setupsLoading ? " (loading...)" : ""}
               </label>
               <select
                 name="strategy"
@@ -393,7 +326,7 @@ export default function IndianOptionsAddTradePage() {
               {trade.strategy === "Custom" && (
                 <input
                   name="strategyCustom"
-                  placeholder="Enter strategy name"
+                  placeholder="Enter trading setup name"
                   value={trade.strategyCustom}
                   onChange={handleChange}
                   style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14, marginTop: 8 }}

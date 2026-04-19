@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { loginUser, googleLogin, testConnection as apiTestConnection } from "@/services/api";
-import { signInWithFirebaseGoogle } from "@/services/firebaseAuth";
+import { signInWithFirebaseGoogle, handleGoogleRedirectResult } from "@/services/firebaseAuth";
 
 /**
  * useLogin
- * Refactored to use TanStack Query mutations for robust authentication handling.
- * Manages form state, animation triggers, and redirection logic.
+ * Manages login form state, terms acceptance gate, and authentication mutations.
  */
 export function useLogin() {
   const router = useRouter();
@@ -22,10 +21,19 @@ export function useLogin() {
   const [mounted, setMounted]         = useState(false);
   const [shake, setShake]             = useState(false);
 
+  // Terms were accepted at registration — login never re-checks them
+
   useEffect(() => {
     setMounted(true);
     const token = typeof window !== "undefined" && localStorage.getItem("token");
-    if (token) router.push("/dashboard");
+    if (token) { router.push("/dashboard"); return; }
+
+    // Pick up the idToken after a mobile redirect Google sign-in
+    handleGoogleRedirectResult()
+      .then(idToken => { if (idToken) return googleLogin(idToken); })
+      .then(data => { if (data) handleAuthSuccess(data); })
+      .catch(err => alert("Google login failed: " + (err?.message || err)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const triggerShake = () => {
@@ -33,46 +41,44 @@ export function useLogin() {
     setTimeout(() => setShake(false), 600);
   };
 
-  // 2. Email/Password Login Mutation
+  /** Shared post-auth redirect: if backend signals terms not yet accepted,
+   *  store the token and go to /accept-terms; otherwise go straight to dashboard. */
+  const handleAuthSuccess = (data) => {
+    if (!data.token) {
+      triggerShake();
+      alert(data.message || "Login failed");
+      return;
+    }
+    localStorage.setItem("token", data.token);
+    queryClient.clear();
+    if (data.requiresTermsAcceptance) {
+      router.push("/accept-terms");
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
+  // 3. Email/Password Login Mutation
   const loginMutation = useMutation({
     mutationFn: (credentials) => loginUser(credentials),
-    onSuccess: (data) => {
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-        // Clear all previous queries to ensure new user starts with fresh data
-        queryClient.clear();
-        router.push("/dashboard");
-      } else {
-        triggerShake();
-        alert(data.message || "Login failed");
-      }
-    },
+    onSuccess: handleAuthSuccess,
     onError: (err) => {
       triggerShake();
-      alert("Manual Login Error: " + (err.message || "Check your credentials."));
-    }
+      alert("Login Error: " + (err.message || "Check your credentials."));
+    },
   });
 
-  // 3. Google Sign-In Mutation
+  // 4. Google Sign-In Mutation
   const googleMutation = useMutation({
     mutationFn: async () => {
       const idToken = await signInWithFirebaseGoogle();
       return googleLogin(idToken);
     },
-    onSuccess: (data) => {
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-        queryClient.clear();
-        router.push("/dashboard");
-      } else {
-        triggerShake();
-        alert(data.message || "Google login failed.");
-      }
-    },
+    onSuccess: handleAuthSuccess,
     onError: (err) => {
       triggerShake();
       alert("Google login failed: " + (err.message || "Could not connect to Google."));
-    }
+    },
   });
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -98,7 +104,7 @@ export function useLogin() {
   return {
     form, handleChange,
     focused, setFocused,
-    loading: loginMutation.isPending, 
+    loading: loginMutation.isPending,
     googleLoading: googleMutation.isPending,
     showPass, setShowPass,
     mounted, shake,

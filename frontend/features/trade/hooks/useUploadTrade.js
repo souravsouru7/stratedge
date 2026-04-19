@@ -10,6 +10,10 @@ import { useSetups } from "./useSetups";
 import { useToast } from "@/features/shared/components/ui/Toast";
 
 const DEFAULT_SETUP_RULES = [];
+const getTodayInputValue = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+};
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +36,7 @@ function buildIndianTradeTemplate(imageUrl, t = {}) {
     strikePrice: strike,
     tradeType: "INTRADAY",
     strategy: "", strategyCustom: "",
+    tradeDate: getTodayInputValue(),
     expiryDate: t.expiryDate || "",
     riskRewardRatio: "", riskRewardCustom: "",
     entryBasis: "Plan", entryBasisCustom: "",
@@ -66,6 +71,7 @@ function buildForexTradeTemplate(imageUrl, t = {}) {
     balance: t.balance != null ? String(t.balance) : "",
     session: t.session || detectSessionFromNow(),
     strategy: "", strategyCustom: "",
+    tradeDate: getTodayInputValue(),
     notes: "", screenshot: imageUrl,
     segment: t.segment || "Equity",
     instrumentType: t.instrumentType || "EQUITY",
@@ -91,6 +97,7 @@ function buildTradePayload(trade, isInd, setupRules) {
     exitPrice: trade.exitPrice ? parseFloat(trade.exitPrice) : undefined,
     profit: trade.profit ? parseFloat(trade.profit) : undefined,
     strategy: trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined),
+    tradeDate: trade.tradeDate,
     entryBasis: trade.entryBasis || "Plan",
     entryBasisCustom: trade.entryBasis === "Custom" ? trade.entryBasisCustom : undefined,
     notes: trade.notes || undefined,
@@ -132,6 +139,18 @@ function buildTradePayload(trade, isInd, setupRules) {
   }
 
   return base;
+}
+
+function getFriendlyUploadError(err) {
+  const status = err?.status;
+  const message = String(err?.message || "").trim();
+  const detail = String(err?.data?.detail || "").trim();
+
+  if (status === 403 && /subscription required/i.test(message)) {
+    return detail || "You have used your free upload. Please subscribe to continue uploading trade screenshots.";
+  }
+
+  return message || "Upload failed. Please try again.";
 }
 
 // ─── hook ─────────────────────────────────────────────────────────────────────
@@ -196,8 +215,9 @@ export function useUploadTrade() {
       setActiveToastId(tid);
     },
     onError: (err) => {
-      setError(err.message || "Upload failed. Please try again.");
-      addToast(err.message || "Upload failed", "error");
+      const friendlyMessage = getFriendlyUploadError(err);
+      setError(friendlyMessage);
+      addToast(friendlyMessage, "error");
     }
   });
 
@@ -287,13 +307,25 @@ export function useUploadTrade() {
       }
       addToast("Trade details extracted successfully!", "success");
     } else if (jobStatusQuery.data?.status === "failed") {
-      setError(jobStatusQuery.data.error || "Processing failed.");
+      const rawError = jobStatusQuery.data.error || "Processing failed.";
+      const isNotTradeImage =
+        rawError.toLowerCase().includes("not appear to be a trade") ||
+        rawError.toLowerCase().includes("could not extract any trade") ||
+        rawError.toLowerCase().includes("not a trade");
+
+      const userMessage = isNotTradeImage
+        ? "This doesn't look like a trade screenshot. Please upload a screenshot directly from your broker platform (MT5, Zerodha Kite, etc.) showing the trade details."
+        : rawError;
+
+      setError(userMessage);
       setJobId("");
+      // Clear the file so the upload zone resets and the user can pick a new one
+      if (isNotTradeImage) setFile(null);
       if (activeToastId) {
         removeToast(activeToastId);
         setActiveToastId(null);
       }
-      addToast(jobStatusQuery.data.error || "AI processing failed", "error");
+      addToast(isNotTradeImage ? "Not a valid trade screenshot — please upload from your broker app" : rawError, "error");
     }
   }, [jobStatusQuery.data]);
 
@@ -394,6 +426,14 @@ export function useUploadTrade() {
 
   const tradeCount = trades.length > 1 ? trades.length : trade ? 1 : 0;
 
+  const canSaveTrade = (tradeToSave) => {
+    if (!tradeToSave?.tradeDate) {
+      addToast("Trade date is required before saving", "info");
+      return false;
+    }
+    return true;
+  };
+
   return {
     file, setFile, trade, setTrade, trades, savedTrades, loading, error, setError,
     extractedText, strategies, setupsLoading, jobId, processingStatus, mounted, saved,
@@ -405,11 +445,19 @@ export function useUploadTrade() {
     handleStrategyChange,
     handleTradeChange,
     handleMultiTradeStrategyChange,
-    saveTrade: () => saveTradeMutation.mutate({ idx: null }),
-    saveIndianTrade: (idx) => saveTradeMutation.mutate({ idx }),
+    saveTrade: () => {
+      if (!canSaveTrade(trade)) return;
+      saveTradeMutation.mutate({ idx: null });
+    },
+    saveIndianTrade: (idx) => {
+      if (!canSaveTrade(trades[idx])) return;
+      saveTradeMutation.mutate({ idx });
+    },
     saveAllTrades: async () => {
       for (let i = 0; i < trades.length; i++) {
-        if (!savedTrades[i]) await saveTradeMutation.mutateAsync({ idx: i });
+        if (!savedTrades[i] && canSaveTrade(trades[i])) {
+          await saveTradeMutation.mutateAsync({ idx: i });
+        }
       }
     },
     toggleSetupRule: id => setSetupRules(p => p.map(r => r.id === id ? { ...r, followed: !r.followed } : r)),

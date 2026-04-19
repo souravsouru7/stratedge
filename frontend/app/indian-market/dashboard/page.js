@@ -11,6 +11,7 @@ import {
 } from "@/services/analyticsApi";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { getTrades } from "@/services/tradeApi";
@@ -284,7 +285,6 @@ export default function IndianMarketDashboard() {
     const [breakdown, setBreakdown] = useState(null);
     const [recentTrades, setRecentTrades] = useState([]);
     const [mounted, setMounted] = useState(false);
-    const [time, setTime] = useState("");
 
     const fetchStats = async () => {
         try {
@@ -318,12 +318,6 @@ export default function IndianMarketDashboard() {
         setMounted(true);
         fetchStats();
 
-        const tick = () => setTime(new Date().toLocaleTimeString("en-IN", {
-            hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "Asia/Kolkata"
-        }));
-        tick();
-        const t = setInterval(tick, 1000);
-        return () => clearInterval(t);
     }, [router, currentMarket, toggleMarket]);
 
     const profitBull = stats ? parseFloat(stats.netProfit ?? stats.totalProfit) >= 0 : true;
@@ -363,124 +357,7 @@ export default function IndianMarketDashboard() {
         }}>
             <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-            {/* ── HEADER ── */}
-            <header style={{
-                position: "relative", zIndex: 20,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 24px", minHeight: 68, flexWrap: "wrap", gap: 10,
-                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 40%, #020617 100%)`,
-                borderBottom: `1px solid rgba(15,23,42,0.4)`,
-                boxShadow: "0 8px 24px rgba(15,23,42,0.45)",
-            }}>
-                {/* Logo */}
-                <Link href="/indian-market/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 168, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
-                        <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} />
-                    </div>
-                    <div>
-                        <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#F9FAFB", lineHeight: 1 }}>
-                            {""}
-                        </div>
-                        <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.gold, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                            OPTIONS JOURNAL · NSE / BSE
-                        </div>
-                    </div>
-                </Link>
-
-                {/* Right side */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <MarketSwitcher />
-
-                    <div style={{
-                        fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
-                        color: "#E5E7EB", letterSpacing: "0.08em",
-                        background: "rgba(15,23,42,0.6)", border: `1px solid rgba(148,163,184,0.5)`,
-                        borderRadius: 6, padding: "4px 10px",
-                    }}>
-                        IST: {time}
-                    </div>
-
-                    <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {[
-                            { href: "/indian-market/trades", label: "Journal" },
-                            { href: "/indian-market/add-trade", label: "Log option" },
-                            { href: "/indian-market/analytics", label: "Analytics" },
-                            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
-                        ].map(n => (
-                            <Link
-                                key={n.href}
-                                href={n.href}
-                                style={{
-                                    fontSize: 13,
-                                    color: "#E5E7EB",
-                                    fontWeight: 700,
-                                    textDecoration: "none",
-                                    padding: "10px 16px",
-                                    borderRadius: 999,
-                                    transition: "all 0.2s",
-                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                    background: "rgba(15,23,42,0.8)",
-                                    border: "1.5px solid rgba(148,163,184,0.6)",
-                                    minHeight: "44px",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center"
-                                }}
-                                onMouseEnter={e => {
-                                    e.currentTarget.style.background = "rgba(184,134,11,0.25)";
-                                    e.currentTarget.style.color = "#0F1923";
-                                    e.currentTarget.style.borderColor = "rgba(184,134,11,0.8)";
-                                    e.currentTarget.style.transform = "translateY(-2px)";
-                                }}
-                                onMouseLeave={e => {
-                                    e.currentTarget.style.background = "rgba(15,23,42,0.8)";
-                                    e.currentTarget.style.color = "#E5E7EB";
-                                    e.currentTarget.style.borderColor = "rgba(148,163,184,0.6)";
-                                    e.currentTarget.style.transform = "translateY(0)";
-                                }}
-                            >
-                                {n.label}
-                            </Link>
-                        ))}
-                    </nav>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <button
-                            onClick={() => {
-                                localStorage.removeItem("token");
-                                router.push("/login");
-                            }}
-                            style={{
-                                display: "flex", alignItems: "center", gap: 6,
-                                background: "rgba(198,40,40,0.1)", border: "1px solid rgba(198,40,40,0.3)",
-                                borderRadius: 6, padding: "6px 12px",
-                                cursor: "pointer", fontSize: 10, letterSpacing: "0.1em",
-                                color: theme.bear, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(198,40,40,0.2)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(198,40,40,0.1)"; }}
-                        >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg>
-                            LOGOUT
-                        </button>
-                        <div style={{
-                            width: 34, height: 34, borderRadius: "50%",
-                            background: theme.primary, border: `2px solid ${theme.border}`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            cursor: "pointer",
-                        }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <IndianMarketHeader />
 
             <TickerTape items={tapeItems} />
 
@@ -552,7 +429,7 @@ export default function IndianMarketDashboard() {
                             <NavCard href="/indian-market/analytics" label="Options analytics" sub="Depth analysis" accentColor={theme.gold} delay={0.5}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>}
                             />
-                            <NavCard href="/indian-market/setups" label="Options setups" sub="Define strategies + rules" accentColor={theme.primary} delay={0.55}
+                            <NavCard href="/indian-market/setups" label="Options setups" sub="Define trading setups + rules" accentColor={theme.primary} delay={0.55}
                                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10" /><path d="M7 12h6" /><path d="M7 16h3" /></svg>}
                             />
                             <NavCard href="/checklist" label="Pre-Trade Checklist" sub="Check rules before trading" accentColor={theme.primary} delay={0.57}

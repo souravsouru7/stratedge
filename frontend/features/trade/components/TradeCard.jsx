@@ -7,6 +7,7 @@ import Link from "next/link";
  */
 export default function TradeCard({ trade, onDelete, idx }) {
   const bull = parseFloat(trade.profit) >= 0;
+  const tradeDate = new Date(trade.tradeDate || trade.createdAt);
   return (
     <div style={{
       background: "#FFFFFF", border: "1px solid #E2E8F0",
@@ -19,6 +20,9 @@ export default function TradeCard({ trade, onDelete, idx }) {
         <div>
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 14, color: "#0F1923", fontWeight: 700, marginBottom: 4 }}>
             {trade.pair}
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#94A3B8", marginBottom: 6 }}>
+            {tradeDate.toLocaleDateString()} · {tradeDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </div>
           {(() => {
             const isLong = trade.type?.toUpperCase() === "BUY" || trade.type?.toUpperCase() === "LONG";

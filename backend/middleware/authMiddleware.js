@@ -21,11 +21,20 @@ const protect = asyncHandler(async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, appConfig.jwt.secret);
-    req.user = await User.findById(decoded.id).select("-password");
+    const dbUser = await User.findById(decoded.id).select("-password");
+    if (dbUser && decoded.tokenVersion !== undefined && decoded.tokenVersion !== dbUser.tokenVersion) {
+      console.warn(`[Security] Stale token (version mismatch) | path=${req.originalUrl} | ip=${req.ip}`);
+      throw Object.assign(new Error("Token invalidated"), { name: "TokenInvalidatedError" });
+    }
+    req.user = dbUser;
   } catch (error) {
     if (error.name === "TokenExpiredError") {
       console.warn(`[Security] Expired token | path=${req.originalUrl} | ip=${req.ip}`);
       throw new ApiError(401, "Token expired, please login again", "TOKEN_EXPIRED");
+    }
+
+    if (error.name === "TokenInvalidatedError") {
+      throw new ApiError(401, "Session expired, please login again", "TOKEN_INVALIDATED");
     }
 
     if (error.name === "JsonWebTokenError" || error.name === "NotBeforeError") {

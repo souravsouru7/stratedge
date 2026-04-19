@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/analytics",                    label: "Analytics" },
   { href: "/checklist",                    label: "Checklist" },
   { href: "/setups",                       label: "Setups"    },
+  { href: "/profile",                      label: "Profile"   },
   { href: "/weekly-reports?market=Forex",  label: "Reports"   },
 ];
 

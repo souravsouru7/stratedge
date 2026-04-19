@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { googleLogin, registerUser, testConnection as apiTestConnection } from "@/services/api";
-import { signInWithFirebaseGoogle } from "@/services/firebaseAuth";
+import { googleLogin, registerUser, acceptTerms as acceptTermsApi, testConnection as apiTestConnection } from "@/services/api";
+import { signInWithFirebaseGoogle, handleGoogleRedirectResult } from "@/services/firebaseAuth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 /* ─────────────────────────────────────────
    LIGHT THEME DESIGN TOKENS
@@ -186,14 +187,24 @@ export default function RegisterPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [strength, setStrength] = useState(0);
   const [mounted, setMounted]   = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError]       = useState("");
 
-  useEffect(() => { 
-    setMounted(true); 
-    // Check if user is already logged in
+  useEffect(() => {
+    setMounted(true);
     const token = localStorage.getItem("token");
-    if (token) {
-      router.push("/dashboard");
-    }
+    if (token) { router.push("/dashboard"); return; }
+
+    // Pick up idToken after mobile redirect Google sign-in on register page
+    handleGoogleRedirectResult()
+      .then(idToken => { if (idToken) return googleLogin(idToken); })
+      .then(data => {
+        if (!data) return;
+        localStorage.setItem("token", data.token);
+        router.push(data.requiresTermsAcceptance ? "/accept-terms" : "/dashboard");
+      })
+      .catch(err => alert("Google login failed: " + (err?.message || err)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const handleChange = (e) => {
@@ -211,12 +222,25 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!termsAccepted) {
+      setTermsError("You must accept the Terms & Privacy Policy to continue");
+      return;
+    }
+    setTermsError("");
     setLoading(true);
     try {
-      const data = await registerUser(form);
+      const data = await registerUser({
+        ...form,
+        acceptedTerms: true,
+        acceptedPrivacy: true,
+      });
       if (data.token) {
         localStorage.setItem("token", data.token);
-        router.push("/dashboard");
+        if (data.requiresTermsAcceptance) {
+          router.push("/accept-terms");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         alert(data.message);
       }
@@ -237,13 +261,22 @@ export default function RegisterPage() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (!termsAccepted) {
+      setTermsError("You must accept the Terms & Privacy Policy to continue");
+      return;
+    }
+    setTermsError("");
     setGoogleLoading(true);
     try {
       const idToken = await signInWithFirebaseGoogle();
       const data = await googleLogin(idToken);
       if (data.token) {
         localStorage.setItem("token", data.token);
-        router.push("/dashboard");
+        if (data.requiresTermsAcceptance) {
+          router.push("/accept-terms");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         alert(data.message || "Google login failed.");
       }
@@ -503,7 +536,7 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={handleGoogleSignIn}
-                    disabled={googleLoading}
+                    disabled={googleLoading || loading}
                     style={{
                       width: "100%",
                       display: "flex",
@@ -513,17 +546,18 @@ export default function RegisterPage() {
                       padding: "11px 16px",
                       border: "1.5px solid #E2E8F0",
                       borderRadius: 8,
-                      background: "#fff",
-                      cursor: googleLoading ? "not-allowed" : "pointer",
+                      background: !termsAccepted ? "#F8FAFC" : "#fff",
+                      cursor: !termsAccepted || googleLoading || loading ? "not-allowed" : "pointer",
                       fontSize: 13,
                       fontWeight: 600,
-                      color: "#0F1923",
+                      color: !termsAccepted ? "#94A3B8" : "#0F1923",
                       fontFamily: "'Plus Jakarta Sans',sans-serif",
                       opacity: googleLoading ? 0.7 : 1,
                       boxShadow: "0 1px 6px rgba(15,25,35,0.08)",
+                      transition: "all 0.2s",
                     }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 48 48">
+                    <svg width="18" height="18" viewBox="0 0 48 48" style={{ opacity: !termsAccepted ? 0.4 : 1 }}>
                       <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.7 0 6.7 5.5 2.7 13.5l7.8 6C12.4 13.2 17.8 9.5 24 9.5z"/>
                       <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.5 2.8-2.2 5.2-4.7 6.8l7.4 5.7c4.3-4 6.8-9.9 6.8-16.5z"/>
                       <path fill="#FBBC05" d="M10.5 28.5c-.5-1.5-.8-3-.8-4.5s.3-3 .8-4.5l-7.8-6C1 16.5 0 20.1 0 24s1 7.5 2.7 10.7l7.8-6.2z"/>
@@ -550,35 +584,81 @@ export default function RegisterPage() {
               {/* Divider */}
               <div style={{ height:1, background:"#F1F5F9", margin:"0 0 18px" }}/>
 
-              {/* Terms */}
-              <p style={{ fontSize:11, color:"#94A3B8", marginBottom:20, lineHeight:1.7, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
-                By joining Edgecipline AI Journal you agree to our{" "}
-                <span style={{ color:"#0D9E6E", cursor:"pointer", fontWeight:600, borderBottom:"1px solid rgba(13,158,110,0.3)" }}>Terms</span>{" "}
-                and{" "}
-                <span style={{ color:"#0D9E6E", cursor:"pointer", fontWeight:600, borderBottom:"1px solid rgba(13,158,110,0.3)" }}>Privacy Policy</span>.
-                {" "}Trading involves risk of loss.
-              </p>
+              {/* ── TERMS CHECKBOX ── */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  cursor: "pointer", userSelect: "none",
+                }}>
+                  <div
+                    onClick={() => setTermsAccepted(v => !v)}
+                    style={{
+                      flexShrink: 0,
+                      width: 18, height: 18, marginTop: 1,
+                      borderRadius: 4,
+                      border: `2px solid ${termsAccepted ? "#0D9E6E" : termsError ? "#D63B3B" : "#CBD5E1"}`,
+                      background: termsAccepted ? "#0D9E6E" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "all 0.15s",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {termsAccepted && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 12, color: "#4A5568", lineHeight: 1.6, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                    I agree to the{" "}
+                    <Link href="/terms" target="_blank" style={{ color: "#0D9E6E", fontWeight: 700, textDecoration: "none", borderBottom: "1px solid rgba(13,158,110,0.35)" }}>
+                      Terms &amp; Conditions
+                    </Link>
+                    {" "}and{" "}
+                    <Link href="/privacy-policy" target="_blank" style={{ color: "#0D9E6E", fontWeight: 700, textDecoration: "none", borderBottom: "1px solid rgba(13,158,110,0.35)" }}>
+                      Privacy Policy
+                    </Link>
+                    . Trading involves risk of loss.
+                  </span>
+                </label>
+                {termsError && (
+                  <div style={{
+                    marginTop: 8, display: "flex", alignItems: "center", gap: 6,
+                    fontSize: 11, color: "#D63B3B",
+                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                    background: "#FEF2F2", border: "1px solid #FECACA",
+                    borderRadius: 6, padding: "6px 10px",
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {termsError}
+                  </div>
+                )}
+              </div>
 
               {/* CTA Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || googleLoading}
                 style={{
                   width:"100%", padding:"13px 0",
                   background: loading
                     ? "#F0FDF9"
-                    : "linear-gradient(135deg,#0D9E6E 0%,#22C78E 100%)",
-                  border: loading ? "1.5px solid #A7F3D0" : "none",
+                    : !termsAccepted
+                      ? "#F1F5F9"
+                      : "linear-gradient(135deg,#0D9E6E 0%,#22C78E 100%)",
+                  border: loading ? "1.5px solid #A7F3D0" : !termsAccepted ? "1.5px solid #E2E8F0" : "none",
                   borderRadius:8,
-                  color: loading ? "#0D9E6E" : "#FFFFFF",
+                  color: loading ? "#0D9E6E" : !termsAccepted ? "#94A3B8" : "#FFFFFF",
                   fontSize:12, fontFamily:"'JetBrains Mono',monospace", fontWeight:700,
-                  letterSpacing:"0.15em", cursor: loading ? "not-allowed" : "pointer",
+                  letterSpacing:"0.15em", cursor: loading || !termsAccepted ? "not-allowed" : "pointer",
                   transition:"all 0.25s",
                   display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                  boxShadow: loading ? "none" : "0 4px 20px rgba(13,158,110,0.35), 0 1px 4px rgba(13,158,110,0.2)",
+                  boxShadow: loading || !termsAccepted ? "none" : "0 4px 20px rgba(13,158,110,0.35), 0 1px 4px rgba(13,158,110,0.2)",
                   position:"relative", overflow:"hidden",
                 }}
-                onMouseEnter={e => { if(!loading) e.currentTarget.style.transform="translateY(-1px)"; }}
+                onMouseEnter={e => { if(!loading && termsAccepted) e.currentTarget.style.transform="translateY(-1px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; }}
               >
                 {/* Shimmer */}

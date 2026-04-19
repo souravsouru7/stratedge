@@ -46,6 +46,10 @@ const indianTradeSchema = new mongoose.Schema(
 
     strategy: String,
     session: String,
+    tradeDate: {
+      type: Date,
+      default: null
+    },
     notes: String,
 
     riskRewardRatio: { type: String, enum: ["1:1", "1:2", "1:3", "1:4", "1:5", "custom", ""], default: "" },
@@ -126,6 +130,7 @@ const indianTradeSchema = new mongoose.Schema(
 );
 
 indianTradeSchema.index({ user: 1, createdAt: -1 });
+indianTradeSchema.index({ user: 1, tradeDate: -1 });
 indianTradeSchema.index({ user: 1, strategy: 1, createdAt: -1 });
 
 module.exports = mongoose.model("IndianTrade", indianTradeSchema);

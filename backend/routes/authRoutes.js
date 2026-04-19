@@ -8,6 +8,7 @@ const {
   getMe,
   getMyPreferences,
   updateMyPreferences,
+  acceptTerms,
   forgotPassword,
   verifyOTP,
   resetPassword
@@ -21,6 +22,9 @@ router.post("/google", googleLogin);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-otp", verifyOTP);
 router.post("/reset-password", resetPassword);
+
+// Terms acceptance (requires valid token — user must be authenticated)
+router.post("/accept-terms", protect, acceptTerms);
 
 // Basic profile for logged-in user
 router.get("/me", protect, getMe);

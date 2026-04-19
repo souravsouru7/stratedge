@@ -248,21 +248,29 @@ exports.getTradeDistribution = async (req, res) => {
     });
     Object.keys(byStrategy).forEach(strat => (byStrategy[strat].winRate = ((byStrategy[strat].wins / byStrategy[strat].total) * 100).toFixed(1)));
 
+    // Indian market sessions in IST (UTC+5:30)
+    // Opening Bell: 9:15–11:00 IST | Mid-Session: 11:00–13:30 IST
+    // Post-Lunch:  13:30–15:00 IST | Closing:      15:00–15:30 IST
     const bySession = {
-      "Asia Session": { total: 0, wins: 0, losses: 0, profit: 0 },
-      "London Session": { total: 0, wins: 0, losses: 0, profit: 0 },
-      "NY Session": { total: 0, wins: 0, losses: 0, profit: 0 },
-      "Other": { total: 0, wins: 0, losses: 0, profit: 0 }
+      "Opening Bell": { total: 0, wins: 0, losses: 0, profit: 0 },
+      "Mid-Session":  { total: 0, wins: 0, losses: 0, profit: 0 },
+      "Post-Lunch":   { total: 0, wins: 0, losses: 0, profit: 0 },
+      "Closing":      { total: 0, wins: 0, losses: 0, profit: 0 },
+      "Outside Market": { total: 0, wins: 0, losses: 0, profit: 0 },
     };
     trades.forEach(t => {
-      const hour = new Date(t.createdAt).getUTCHours();
-      let session = "Other";
-      if (hour >= 0 && hour < 8) session = "Asia Session";
-      else if (hour >= 8 && hour < 16) session = "London Session";
-      else if (hour >= 13 && hour < 21) session = "NY Session";
-      if (t.session) {
+      let session;
+      if (t.session && bySession[t.session]) {
         session = t.session;
-        if (!bySession[session]) bySession[session] = { total: 0, wins: 0, losses: 0, profit: 0 };
+      } else {
+        // Convert UTC timestamp to IST minute-of-day
+        const d = new Date(t.createdAt);
+        const istMinutes = (d.getUTCHours() * 60 + d.getUTCMinutes() + 330) % 1440;
+        if (istMinutes >= 555 && istMinutes < 660)       session = "Opening Bell"; // 9:15–11:00
+        else if (istMinutes >= 660 && istMinutes < 810)  session = "Mid-Session";  // 11:00–13:30
+        else if (istMinutes >= 810 && istMinutes < 900)  session = "Post-Lunch";   // 13:30–15:00
+        else if (istMinutes >= 900 && istMinutes < 930)  session = "Closing";      // 15:00–15:30
+        else                                              session = "Outside Market";
       }
       bySession[session].total++;
       if (t.profit > 0) bySession[session].wins++;
@@ -288,7 +296,7 @@ exports.getTradeDistribution = async (req, res) => {
     // By entry basis (Plan / Emotion / Impulsive / Custom)
     const byEntryBasis = {};
     trades.forEach(t => {
-      const key = t.entryBasis && t.entryBasis.trim() ? t.entryBasis : "Unspecified";
+      const key = t.entryBasis && t.entryBasis.trim() ? t.entryBasis : "Plan";
       if (!byEntryBasis[key]) byEntryBasis[key] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byEntryBasis[key].total++;
       if (t.profit > 0) byEntryBasis[key].wins++;
@@ -369,6 +377,7 @@ exports.getPerformanceMetrics = async (req, res) => {
     trades.forEach(t => {
       if (t.profit > 0) { tempWinStreak++; tempLossStreak = 0; maxWinStreak = Math.max(maxWinStreak, tempWinStreak); }
       else if (t.profit < 0) { tempLossStreak++; tempWinStreak = 0; maxLossStreak = Math.max(maxLossStreak, tempLossStreak); }
+      // breakeven trades (profit === 0) intentionally don't touch either streak
     });
 
     const totalWins = winningTrades.reduce((acc, t) => acc + t.profit, 0);
@@ -377,6 +386,17 @@ exports.getPerformanceMetrics = async (req, res) => {
 
     const winRate = trades.length ? (winningTrades.length / trades.length) * 100 : 0;
     const expectancy = ((avgWin * (winRate / 100)) + (avgLoss * ((100 - winRate) / 100))).toFixed(2);
+
+    // Max drawdown for recovery factor
+    let ddBalance = 0, ddPeak = 0, maxDD = 0;
+    trades.forEach(t => {
+      ddBalance += t.profit || 0;
+      if (ddBalance > ddPeak) ddPeak = ddBalance;
+      const dd = ddPeak - ddBalance;
+      if (dd > maxDD) maxDD = dd;
+    });
+    const netProfit = totalWins - totalLosses;
+    const recoveryFactor = maxDD > 0 ? (netProfit / maxDD).toFixed(2) : netProfit > 0 ? "∞" : "0.00";
 
     res.json({
       largestWin: largestWin.toFixed(2),
@@ -392,7 +412,7 @@ exports.getPerformanceMetrics = async (req, res) => {
       winRate: winRate.toFixed(1),
       losingTradesCount: losingTrades.length,
       winningTradesCount: winningTrades.length,
-      recoveryFactor: "0"
+      recoveryFactor,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -455,14 +475,16 @@ exports.getTimeAnalysis = async (req, res) => {
       byDay[day].avgProfit = byDay[day].total ? (byDay[day].profit / byDay[day].total).toFixed(2) : 0;
     });
 
+    // All hours in IST (UTC+5:30) — Indian market only trades 9:15–15:30 IST
     const byHour = {};
     for (let i = 0; i < 24; i++) byHour[i] = { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 };
     trades.forEach(t => {
-      const hour = new Date(t.createdAt).getHours();
-      byHour[hour].total++;
-      if (t.profit > 0) byHour[hour].wins++;
-      else if (t.profit < 0) byHour[hour].losses++;
-      byHour[hour].profit += t.profit || 0;
+      const d = new Date(t.createdAt);
+      const istHour = Math.floor((d.getUTCHours() * 60 + d.getUTCMinutes() + 330) % 1440 / 60);
+      byHour[istHour].total++;
+      if (t.profit > 0) byHour[istHour].wins++;
+      else if (t.profit < 0) byHour[istHour].losses++;
+      byHour[istHour].profit += t.profit || 0;
     });
     Object.keys(byHour).forEach(hour => {
       byHour[hour].winRate = byHour[hour].total ? ((byHour[hour].wins / byHour[hour].total) * 100).toFixed(1) : 0;
@@ -651,9 +673,11 @@ exports.getDrawdownAnalysis = async (req, res) => {
     });
 
     const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
+    const totalCosts = trades.reduce((acc, t) => acc + (t.brokerage || 0) + (t.sttTaxes || 0), 0);
+    const netProfit = totalProfit - totalCosts;
     const currentDrawdown = peak - balance;
     const currentDrawdownPercent = peak > 0 ? (currentDrawdown / peak) * 100 : 0;
-    const recoveryFactor = maxDrawdown > 0 ? totalProfit / maxDrawdown : 0;
+    const recoveryFactor = maxDrawdown > 0 ? netProfit / maxDrawdown : 0;
 
     res.json({
       currentDrawdown: currentDrawdown.toFixed(2),
@@ -770,10 +794,24 @@ exports.getAIInsights = async (req, res) => {
     }
 
     const behaviorBuckets = { Plan: { count: 0, pnl: 0 }, Emotion: { count: 0, pnl: 0 }, Impulsive: { count: 0, pnl: 0 }, Other: { count: 0, pnl: 0 } };
+    const mistakeTagStats = {};
     trades.forEach(t => {
-      const key = t.entryBasis === "Plan" || t.entryBasis === "Emotion" || t.entryBasis === "Impulsive" ? t.entryBasis : "Other";
+      // Treat missing/empty entryBasis as "Plan" (model default) so legacy trades don't distort the metric
+      const basis = t.entryBasis && t.entryBasis.trim() ? t.entryBasis : "Plan";
+      const key = basis === "Plan" || basis === "Emotion" || basis === "Impulsive" ? basis : "Other";
       behaviorBuckets[key].count += 1;
       behaviorBuckets[key].pnl += t.profit || 0;
+
+      // Mistake tag
+      if (t.mistakeTag && t.mistakeTag.trim()) {
+        const mk = t.mistakeTag.trim();
+        if (!mistakeTagStats[mk]) mistakeTagStats[mk] = { count: 0, pnl: 0, lessons: [] };
+        mistakeTagStats[mk].count++;
+        mistakeTagStats[mk].pnl += t.profit || 0;
+        if (t.lesson && t.lesson.trim() && mistakeTagStats[mk].lessons.length < 3) {
+          mistakeTagStats[mk].lessons.push(t.lesson.trim());
+        }
+      }
     });
     const behaviorTotal = trades.length || 1;
     const behaviorRuleEmotion = {
@@ -789,13 +827,22 @@ exports.getAIInsights = async (req, res) => {
       const year = d.getFullYear();
       const week = Math.ceil(((d - new Date(year, 0, 1)) / 86400000 + d.getDay() + 1) / 7);
       const key = `${year}-W${week}`;
-      if (!weeklyPlan[key]) weeklyPlan[key] = { total: 0, plan: 0 };
+      if (!weeklyPlan[key]) weeklyPlan[key] = { total: 0, plan: 0, pnl: 0 };
       weeklyPlan[key].total += 1;
-      if (t.entryBasis === "Plan") weeklyPlan[key].plan += 1;
+      weeklyPlan[key].pnl += t.profit || 0;
+      const eb = t.entryBasis && t.entryBasis.trim() ? t.entryBasis : "Plan";
+      if (eb === "Plan") weeklyPlan[key].plan += 1;
     });
-    const planTimeline = Object.entries(weeklyPlan)
+    const weeklyDisciplineTrend = Object.entries(weeklyPlan)
       .sort(([a], [b]) => (a > b ? 1 : -1))
-      .map(([week, v]) => ({ week, planAdherencePct: v.total ? ((v.plan / v.total) * 100).toFixed(1) : "0.0" }));
+      .slice(-12)
+      .map(([week, v]) => ({
+        week,
+        planAdherencePct: v.total ? parseFloat(((v.plan / v.total) * 100).toFixed(1)) : 0,
+        pnl: parseFloat(v.pnl.toFixed(2)),
+        total: v.total,
+      }));
+    const planTimeline = weeklyDisciplineTrend.map(w => ({ week: w.week, planAdherencePct: String(w.planAdherencePct) }));
 
     const revengeTrades = [];
     for (let i = 1; i < trades.length; i++) {
@@ -809,7 +856,14 @@ exports.getAIInsights = async (req, res) => {
         revengeTrades.push({ id: curr._id, pair: curr.pair, createdAt: curr.createdAt, prevProfit: prev.profit, currRisk, prevRisk });
       }
     }
-    const behaviorDiscipline = { ruleEmotion: behaviorRuleEmotion, planTimeline, revengeTradesCount: revengeTrades.length, revengeTrades: revengeTrades.slice(-10) };
+    const revengeCostTotal = revengeTrades.reduce((acc, t) => acc + (t.prevProfit || 0), 0);
+
+    const mistakeFeed = Object.entries(mistakeTagStats)
+      .map(([tag, s]) => ({ tag, count: s.count, totalPnl: parseFloat(s.pnl.toFixed(2)), avgPnl: parseFloat((s.pnl / s.count).toFixed(2)), lessons: s.lessons }))
+      .sort((a, b) => a.totalPnl - b.totalPnl)
+      .slice(0, 5);
+
+    const behaviorDiscipline = { ruleEmotion: behaviorRuleEmotion, planTimeline, revengeTradesCount: revengeTrades.length, revengeTrades: revengeTrades.slice(-10), revengeCostTotal: revengeCostTotal.toFixed(2) };
 
     const sessionEdge = sessionEntries.map(([name, s]) => ({
       session: name,
@@ -921,6 +975,8 @@ exports.getAIInsights = async (req, res) => {
       strategyLeague,
       weeklyNarrative,
       nextWeekChecklist,
+      mistakeFeed,
+      weeklyDisciplineTrend,
       topStrategies: [],
       topPairs: pairs.slice(0, 5),
       bestDay: bestDay[0],
@@ -1105,7 +1161,7 @@ exports.getPsychologyAnalytics = async (req, res) => {
 
     // 4) Psychology Score (0–100)
     const totalTrades = trades.length;
-    const planTrades = trades.filter(t => t.entryBasis === "Plan").length;
+    const planTrades = trades.filter(t => !t.entryBasis || !t.entryBasis.trim() || t.entryBasis === "Plan").length;
     const planAdherencePct = totalTrades ? (planTrades / totalTrades) * 100 : 0;
 
     const calmTrades = trades.filter(t =>

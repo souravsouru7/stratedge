@@ -5,15 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchSetups, saveSetups, uploadSetupReferenceImage } from "@/services/setupApi";
 import { MARKETS } from "@/context/MarketContext";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 
 export default function IndianSetupStrategiesPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [strategies, setStrategies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [uploadingByStrategy, setUploadingByStrategy] = useState({});
   const [error, setError] = useState("");
   const [savedAt, setSavedAt] = useState(null);
+  const uploadingCount = Object.values(uploadingByStrategy).reduce((sum, count) => sum + count, 0);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -37,7 +40,7 @@ export default function IndianSetupStrategiesPage() {
                     followed: false,
                   }))
                 : [],
-            referenceImages: Array.isArray(s.referenceImages) ? s.referenceImages.slice(0, 5) : [],
+            referenceImages: Array.isArray(s.referenceImages) ? s.referenceImages : [],
           }));
           setStrategies(mapped);
         } else {
@@ -147,30 +150,64 @@ export default function IndianSetupStrategiesPage() {
     );
   };
 
-  const handleReferenceImageChange = async (strategyId, file) => {
-    if (!file) return;
+  const handleReferenceImageChange = async (strategyId, files) => {
+    const selectedFiles = Array.from(files || []).filter(Boolean);
+    if (selectedFiles.length === 0) return;
 
     try {
-      setSaving(true);
       setError("");
-      const uploaded = await uploadSetupReferenceImage(file);
-      setStrategies(prev =>
-        prev.map(s =>
-          s.id === strategyId
-            ? {
-                ...s,
-                referenceImages: [
-                  ...(Array.isArray(s.referenceImages) ? s.referenceImages : []),
-                  { url: uploaded.imageUrl || "", publicId: uploaded.publicId || "" },
-                ].filter((image) => image.url).slice(0, 5),
-              }
-            : s
-        )
+      setUploadingByStrategy(prev => ({
+        ...prev,
+        [strategyId]: (prev[strategyId] || 0) + selectedFiles.length,
+      }));
+
+      const results = await Promise.allSettled(
+        selectedFiles.map((file) => uploadSetupReferenceImage(file))
       );
+
+      const uploadedImages = results
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => ({
+          url: result.value?.imageUrl || "",
+          publicId: result.value?.publicId || "",
+        }))
+        .filter((image) => image.url);
+
+      if (uploadedImages.length > 0) {
+        setStrategies(prev =>
+          prev.map(s =>
+            s.id === strategyId
+              ? {
+                  ...s,
+                  referenceImages: [
+                    ...(Array.isArray(s.referenceImages) ? s.referenceImages : []),
+                    ...uploadedImages,
+                  ],
+                }
+              : s
+          )
+        );
+      }
+
+      const failedUploads = results.length - uploadedImages.length;
+      if (failedUploads > 0) {
+        setError(
+          failedUploads === results.length
+            ? "Failed to upload setup image(s)"
+            : `${failedUploads} image${failedUploads === 1 ? "" : "s"} failed to upload.`
+        );
+      }
     } catch (e) {
       setError(e.message || "Failed to upload setup image");
     } finally {
-      setSaving(false);
+      setUploadingByStrategy(prev => {
+        const nextCount = Math.max((prev[strategyId] || 0) - selectedFiles.length, 0);
+        if (nextCount === 0) {
+          const { [strategyId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [strategyId]: nextCount };
+      });
     }
   };
 
@@ -198,53 +235,31 @@ export default function IndianSetupStrategiesPage() {
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      <header style={{
-        padding: "12px 20px",
+      <IndianMarketHeader />
+
+      {/* Page-level action bar */}
+      <div style={{
+        padding: "10px 20px",
         borderBottom: "1px solid #E2E8F0",
         background: "rgba(255,255,255,0.95)",
-        backdropFilter: "blur(16px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 10,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              border: "1px solid #E2E8F0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#FFFFFF",
-              cursor: "pointer",
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F1923" strokeWidth="2.2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "0.03em" }}>Options Setups</div>
-            <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", marginTop: 2 }}>
-              NSE / BSE STRATEGIES · RULE CHECKLISTS
-            </div>
-          </div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0F1923" }}>
+          NSE / BSE TRADING SETUPS · RULE CHECKLISTS
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             type="button"
             onClick={async () => {
               try {
-                setSaving(true);
+                setIsSaving(true);
                 setError("");
                 const payload = strategies.map(s => ({
                   name: s.name,
-                  referenceImages: Array.isArray(s.referenceImages) ? s.referenceImages.slice(0, 5) : [],
+                  referenceImages: Array.isArray(s.referenceImages) ? s.referenceImages : [],
                   rules: (s.rules || []).map(r => ({ label: r.label })),
                 }));
                 await saveSetups(payload, MARKETS.INDIAN_MARKET);
@@ -252,10 +267,10 @@ export default function IndianSetupStrategiesPage() {
               } catch (e) {
                 setError(e.message || "Failed to save setups");
               } finally {
-                setSaving(false);
+                setIsSaving(false);
               }
             }}
-            disabled={saving}
+            disabled={isSaving || uploadingCount > 0}
             style={{
               fontSize: 11,
               fontFamily: "'JetBrains Mono',monospace",
@@ -263,12 +278,12 @@ export default function IndianSetupStrategiesPage() {
               padding: "7px 12px",
               borderRadius: 999,
               border: "1px solid #0D9E6E55",
-              background: saving ? "#E2E8F0" : "linear-gradient(135deg,#0D9E6E,#22C78E)",
-              color: saving ? "#64748B" : "#FFFFFF",
-              cursor: saving ? "default" : "pointer",
+              background: isSaving || uploadingCount > 0 ? "#E2E8F0" : "linear-gradient(135deg,#0D9E6E,#22C78E)",
+              color: isSaving || uploadingCount > 0 ? "#64748B" : "#FFFFFF",
+              cursor: isSaving || uploadingCount > 0 ? "default" : "pointer",
             }}
           >
-            {saving ? "SAVING..." : "SAVE SETUPS"}
+            {isSaving ? "SAVING..." : uploadingCount > 0 ? `UPLOADING ${uploadingCount}...` : "SAVE SETUPS"}
           </button>
           <Link
             href="/indian-market/dashboard"
@@ -287,7 +302,7 @@ export default function IndianSetupStrategiesPage() {
             BACK TO DASHBOARD
           </Link>
         </div>
-      </header>
+      </div>
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "22px 16px 30px" }}>
         {error && (
@@ -315,10 +330,10 @@ export default function IndianSetupStrategiesPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, gap: 10 }}>
             <div>
               <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-                OPTIONS STRATEGY CHECKLISTS
+                OPTIONS TRADING SETUP CHECKLISTS
               </div>
               <div style={{ fontSize: 11, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
-                Create each options strategy once, then add rules you expect to follow for that setup.
+                Create each trading setup once, then add rules you expect to follow for it.
               </div>
             </div>
             <button
@@ -337,7 +352,7 @@ export default function IndianSetupStrategiesPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              + ADD STRATEGY
+              + ADD TRADING SETUP
             </button>
           </div>
 
@@ -362,7 +377,7 @@ export default function IndianSetupStrategiesPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
                       <label style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                        STRATEGY NAME
+                        TRADING SETUP NAME
                       </label>
                       <input
                         type="text"
@@ -408,13 +423,16 @@ export default function IndianSetupStrategiesPage() {
                           cursor: "pointer",
                         }}
                       >
-                        {(strategy.referenceImages?.length || 0) >= 5 ? "MAX 5 IMAGES" : "+ ADD IMAGE"}
+                          {uploadingByStrategy[strategy.id] ? `UPLOADING ${uploadingByStrategy[strategy.id]}...` : "+ ADD IMAGES"}
                         <input
                           type="file"
                           accept="image/*"
+                          multiple
                           style={{ display: "none" }}
-                          disabled={(strategy.referenceImages?.length || 0) >= 5}
-                          onChange={e => handleReferenceImageChange(strategy.id, e.target.files?.[0])}
+                          onChange={e => {
+                            handleReferenceImageChange(strategy.id, e.target.files);
+                            e.target.value = "";
+                          }}
                         />
                       </label>
                       {(strategy.referenceImages?.length || 0) > 0 ? (
@@ -456,7 +474,7 @@ export default function IndianSetupStrategiesPage() {
                         </div>
                       ) : (
                         <div style={{ fontSize: 11, color: "#64748B" }}>
-                          Save up to 5 ideal options setup screenshots here for future comparison.
+                          Add as many ideal setup screenshots as you want for future comparison.
                         </div>
                       )}
                     </div>
@@ -556,7 +574,7 @@ export default function IndianSetupStrategiesPage() {
                           type="text"
                           value={rule.label}
                           onChange={e => updateRuleLabel(strategy.id, rule.id, e.target.value)}
-                          placeholder="Add rule for this strategy..."
+                          placeholder="Add rule for this trading setup..."
                           style={{
                             flex: 1,
                             border: "none",
@@ -588,7 +606,7 @@ export default function IndianSetupStrategiesPage() {
                     ))}
                     {strategy.rules.length === 0 && (
                       <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif", marginTop: 4 }}>
-                        No rules yet — add your first rule for this strategy.
+                        No rules yet — add your first rule for this trading setup.
                       </div>
                     )}
                   </div>

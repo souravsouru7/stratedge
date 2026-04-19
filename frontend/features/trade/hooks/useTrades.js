@@ -14,14 +14,15 @@ export function useTrades() {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [filter, setFilter]             = useState("ALL");
+  const [period, setPeriod]             = useState("1m");
   const [search, setSearch]             = useState("");
   const [mounted, setMounted]           = useState(false);
 
   // 1. Data Fetching via useQuery
   const { data: trades = [], isLoading: loading, error } = useQuery({
-    queryKey: ["trades"],
+    queryKey: ["trades", period],
     queryFn: async () => {
-      const data = await getTrades();
+      const data = await getTrades("Forex", { period });
       return Array.isArray(data) ? data : [];
     },
     // Only fetch if authenticated (simple check)
@@ -61,7 +62,9 @@ export function useTrades() {
   // Client-side filtering logic (preserved from original)
   const filtered = trades.filter((t) => {
     const matchFilter = filter === "ALL" || t.type?.toUpperCase() === filter;
-    const matchSearch = t.pair?.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const dateText = new Date(t.tradeDate || t.createdAt).toLocaleDateString().toLowerCase();
+    const matchSearch = t.pair?.toLowerCase().includes(q) || dateText.includes(q);
     return matchFilter && matchSearch;
   });
 
@@ -83,10 +86,11 @@ export function useTrades() {
     loading: loading || deleteMutation.isPending,
     deleteTarget,
     filter,
+    period,
     search,
     summaryStats,
     mounted,
     error,
-    handlers: { setFilter, setSearch, setDeleteTarget, confirmDelete, cancelDelete },
+    handlers: { setFilter, setPeriod, setSearch, setDeleteTarget, confirmDelete, cancelDelete },
   };
 }

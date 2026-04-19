@@ -64,6 +64,17 @@ function UploadCard({ state }) {
   const [showSample, setShowSample] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmImageUrl, setConfirmImageUrl] = useState("");
+  const normalizedError = String(error || "").toLowerCase();
+  const isSubscriptionError =
+    normalizedError.includes("subscription required") ||
+    normalizedError.includes("used your free upload") ||
+    normalizedError.includes("please subscribe");
+  const isWrongScreenshotError =
+    normalizedError.includes("doesn't look like a trade screenshot") ||
+    normalizedError.includes("does not appear to be a trade screenshot") ||
+    normalizedError.includes("not a valid trade screenshot") ||
+    normalizedError.includes("could not extract any trade") ||
+    normalizedError.includes("upload a screenshot from your broker");
 
   useEffect(() => {
     if (!showConfirmModal || !file) return;
@@ -159,9 +170,31 @@ function UploadCard({ state }) {
 
       {/* Error */}
       {error && (
-        <div style={{ marginTop: 14, padding: "12px 16px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 8, display: "flex", alignItems: "center", gap: 10 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D63B3B" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span style={{ fontSize: 12, color: "#D63B3B" }}>{error}</span>
+        <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid #FCA5A5", background: "#FEF2F2", overflow: "hidden" }}>
+          <div style={{ padding: "10px 14px", background: "#FEE2E2", borderBottom: "1px solid #FCA5A5", display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D63B3B" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#9B1C1C" }}>
+              {isSubscriptionError ? "Subscription Required" : isWrongScreenshotError ? "Wrong Image Uploaded" : "Upload Error"}
+            </span>
+          </div>
+          <div style={{ padding: "10px 14px" }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#7F1D1D", lineHeight: 1.65 }}>{error}</p>
+            {isSubscriptionError && (
+              <div style={{ marginTop: 10, fontSize: 11, color: "#7F1D1D", lineHeight: 1.6 }}>
+                Subscribe to continue using screenshot uploads. Manual trade entry will still work without uploading.
+              </div>
+            )}
+            {isWrongScreenshotError && (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                {["Open your broker app (MT5, Zerodha Kite, Upstox, etc.)", "Go to your trade history or positions", "Take a screenshot showing pair, entry/exit price, and P&L", "Upload that screenshot here"].map((tip, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", background: "#FCA5A5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#9B1C1C", flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                    <span style={{ fontSize: 11, color: "#7F1D1D", lineHeight: 1.5 }}>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -367,6 +400,10 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
           <FormInput label={isInd ? "SYMBOL" : "PAIR"} name="pair" value={trade?.pair} onChange={onChange} placeholder={isInd ? "NIFTY 26100 CE" : "EUR/USD"} />
           <FormSelect label="ACTION" name="action" value={trade?.action} onChange={onChange} options={[{ value: "buy", label: "Buy / Long" }, { value: "sell", label: "Sell / Short" }]} />
         </div>
+        <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
+          <FormInput label="TRADE DATE" name="tradeDate" value={trade?.tradeDate} onChange={onChange} type="date" required />
+          <div />
+        </div>
 
         {isInd ? (
           <>
@@ -527,7 +564,7 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
         <div style={{ marginBottom: isInd ? 20 : 0 }}>
           <label style={labelSt}>WOULD YOU RETAKE THIS TRADE?</label>
           <div style={{ display: "flex", gap: 10 }}>
-            {["Yes", "No", "Maybe"].map(v => (
+            {["Yes", "No"].map(v => (
               <button key={v} type="button"
                 onClick={() => onChange({ target: { name: "wouldRetake", value: trade?.wouldRetake === v ? "" : v } })}
                 style={{ flex: 1, padding: "10px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", border: trade?.wouldRetake === v ? "2px solid #8B5CF6" : "1.5px solid #E2E8F0", background: trade?.wouldRetake === v ? "rgba(139,92,246,0.1)" : "#FFF", color: trade?.wouldRetake === v ? "#8B5CF6" : "#94A3B8", transition: "all 0.2s" }}>

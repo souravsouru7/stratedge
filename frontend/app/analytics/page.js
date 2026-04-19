@@ -67,6 +67,93 @@ function PairRow({ name, count, winRate, profit }) {
   );
 }
 
+// ── Generate actionable psychology insights from data ─────────────────────────
+function generatePsychInsights({ moodRows, confRows, tagRows, wouldRetakeAnalysis, disciplineScore }) {
+  const insights = [];
+
+  // Mood insights
+  if (moodRows.length >= 2) {
+    const sorted = [...moodRows].sort((a, b) => parseFloat(b.avgProfit) - parseFloat(a.avgProfit));
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    if (best && parseFloat(best.avgProfit) > 0) {
+      insights.push({ type: "success", icon: "🧠", title: `Trade best when ${best.label}`, body: `${best.winRate}% win rate · avg +$${parseFloat(best.avgProfit).toFixed(2)} per trade. Prioritize setups in this mental state.` });
+    }
+    if (worst && parseFloat(worst.avgProfit) < 0 && worst.trades >= 2) {
+      insights.push({ type: "danger", icon: "⚠️", title: `Avoid trading when ${worst.label}`, body: `${worst.winRate}% win rate · avg $${parseFloat(worst.avgProfit).toFixed(2)} per trade across ${worst.trades} trades. Step away or reduce size.` });
+    }
+  }
+
+  // Confidence paradox — high confidence losing
+  const highConf = confRows.find(c => c.level === "High" || c.level === "Overconfident");
+  const lowConf  = confRows.find(c => c.level === "Low");
+  if (highConf && parseFloat(highConf.avgProfit) < 0 && highConf.trades >= 2) {
+    insights.push({ type: "warning", icon: "🚨", title: "High confidence → losing trades", body: `Your "High" confidence trades average $${parseFloat(highConf.avgProfit).toFixed(2)}. Overconfidence may be causing oversizing or skipping confirmation.` });
+  }
+  if (lowConf && parseFloat(lowConf.avgProfit) > 0 && lowConf.trades >= 2) {
+    insights.push({ type: "success", icon: "💡", title: "Low confidence trades are profitable", body: `Cautious entries average +$${parseFloat(lowConf.avgProfit).toFixed(2)}. Your hesitation signals good instincts — trust them.` });
+  }
+
+  // Dangerous emotional tags
+  const dangerTags = ["FOMO", "Revenge", "Fear", "Greed", "Rushed", "Frustrated"];
+  tagRows.forEach(t => {
+    if (dangerTags.includes(t.tag) && parseFloat(t.avgProfit) < 0 && t.trades >= 1) {
+      insights.push({ type: "danger", icon: t.emoji || "❌", title: `${t.tag} trades cost you money`, body: `${t.trades} trade${t.trades > 1 ? "s" : ""} · ${t.winRate}% WR · avg $${parseFloat(t.avgProfit).toFixed(2)}. Rule: when you feel ${t.tag.toLowerCase()}, close the platform.` });
+    }
+  });
+
+  // Positive emotional tags
+  tagRows.forEach(t => {
+    if (!dangerTags.includes(t.tag) && parseFloat(t.avgProfit) > 5 && parseFloat(t.winRate) >= 70 && t.trades >= 2) {
+      insights.push({ type: "success", icon: t.emoji || "✅", title: `${t.tag} state is your edge`, body: `${t.trades} trades · ${t.winRate}% WR · avg +$${parseFloat(t.avgProfit).toFixed(2)}. Seek more trades in this mindset.` });
+    }
+  });
+
+  // Would retake divergence
+  const yes = wouldRetakeAnalysis?.yes;
+  const no  = wouldRetakeAnalysis?.no;
+  if (yes && no && yes.trades >= 2 && no.trades >= 2) {
+    const yesPnl = parseFloat(yes.avgProfit);
+    const noPnl  = parseFloat(no.avgProfit);
+    if (yesPnl > 0 && noPnl < 0) {
+      insights.push({ type: "success", icon: "🔁", title: "Your trade instincts are calibrated", body: `Trades you'd retake avg +$${yesPnl.toFixed(2)} vs trades you'd skip avg $${noPnl.toFixed(2)}. Your gut is telling you the right thing — listen to it before entry.` });
+    } else if (yesPnl < 0 && no.trades > 0) {
+      insights.push({ type: "warning", icon: "🔁", title: "Retake instinct may need recalibration", body: `Even trades you'd retake are losing (avg $${yesPnl.toFixed(2)}). Review your entry criteria — the setups themselves may be flawed.` });
+    }
+  }
+
+  // Discipline score interpretation
+  if (typeof disciplineScore === "number" && disciplineScore > 0) {
+    if (disciplineScore >= 80) {
+      insights.push({ type: "success", icon: "🏆", title: `Strong discipline score: ${disciplineScore}%`, body: "You're following your rules consistently. Keep protecting this score — it's your moat against emotional trading." });
+    } else if (disciplineScore < 50) {
+      insights.push({ type: "danger", icon: "📉", title: `Discipline score at ${disciplineScore}%`, body: "Less than half your trades follow your plan. Focus on process over outcome: one disciplined loss beats one undisciplined win." });
+    }
+  }
+
+  return insights.slice(0, 6);
+}
+
+// ── Psychology insight card ────────────────────────────────────────────────────
+function PsychInsightCard({ icon, title, body, type }) {
+  const colors = {
+    success: { bg: "#F0FDF4", border: "#BBF7D0", title: "#166534" },
+    danger:  { bg: "#FFF8F8", border: "#FED7D7", title: "#9B1C1C" },
+    warning: { bg: "#FFFBEB", border: "#FDE68A", title: "#92400E" },
+    info:    { bg: "#F0F7FF", border: "#BFDBFE", title: "#1E40AF" },
+  };
+  const s = colors[type] || colors.info;
+  return (
+    <div style={{ borderRadius: 12, border: `1px solid ${s.border}`, background: s.bg, padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <div style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: s.title, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.65 }}>{body}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Psych bar row ──────────────────────────────────────────────────────────────
 function PsychRow({ label, winRate, trades, avgProfit, color }) {
   const wr = parseFloat(winRate || 0);
@@ -400,6 +487,25 @@ function AnalyticsContent() {
                       )}
                     </div>
 
+                    {/* ── Actionable Insights ───────────────────────── */}
+                    {(() => {
+                      const psychInsights = generatePsychInsights({
+                        moodRows, confRows, tagRows,
+                        wouldRetakeAnalysis: psychology.wouldRetakeAnalysis,
+                        disciplineScore,
+                      });
+                      return psychInsights.length > 0 ? (
+                        <div style={{ marginTop: 20 }}>
+                          <div style={{ fontSize: 10, color: C.purple, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 12 }}>PSYCHOLOGY INSIGHTS — WHAT TO DO WITH THIS DATA</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+                            {psychInsights.map((ins, i) => (
+                              <PsychInsightCard key={i} icon={ins.icon} title={ins.title} body={ins.body} type={ins.type} />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+
                     {/* Empty state */}
                     {moodRows.length === 0 && confRows.length === 0 && tagRows.length === 0 && (
                       <p style={{ color: C.muted, fontSize: 12, textAlign: "center", padding: "20px 0" }}>
@@ -407,6 +513,169 @@ function AnalyticsContent() {
                       </p>
                     )}
                   </SectionCard>
+                </div>
+              )}
+
+              {/* ── Repeated Mistakes Feed ───────────────────────── */}
+              {aiInsights?.mistakeFeed?.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <SectionCard title="Repeated Mistakes" subtitle="YOUR MOST COSTLY PATTERNS" delay={0.6} accentColor={C.bear}>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 14, lineHeight: 1.6 }}>
+                      These are your self-tagged mistakes ranked by total P&L cost. Fixing the top one is worth more than finding new setups.
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {aiInsights.mistakeFeed.map((m, i) => {
+                        const isLoss = m.totalPnl < 0;
+                        const rankColors = ["#DC2626", "#EA580C", "#D97706", "#65A30D", "#0284C7"];
+                        const rankColor = rankColors[i] || C.muted;
+                        return (
+                          <div key={m.tag} style={{ borderRadius: 12, border: `1px solid ${rankColor}22`, background: `${rankColor}06`, padding: "14px 16px" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: 8, background: `${rankColor}18`, border: `1.5px solid ${rankColor}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: rankColor, flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>
+                                  {i + 1}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 800, color: C.primary }}>{m.tag}</div>
+                                  <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{m.count} occurrence{m.count !== 1 ? "s" : ""} · avg ${Math.abs(m.avgPnl).toFixed(2)} {m.avgPnl < 0 ? "lost" : "made"} per trade</div>
+                                </div>
+                              </div>
+                              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <div style={{ fontSize: 15, fontWeight: 900, color: isLoss ? C.bear : C.bull, fontFamily: "'JetBrains Mono',monospace" }}>
+                                  {isLoss ? "-" : "+"}${Math.abs(m.totalPnl).toFixed(2)}
+                                </div>
+                                <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>total cost</div>
+                              </div>
+                            </div>
+                            {m.lessons?.length > 0 && (
+                              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${rankColor}20` }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: rankColor, letterSpacing: "0.1em", marginBottom: 6 }}>LESSON LOGGED</div>
+                                <div style={{ fontSize: 11, color: "#374151", fontStyle: "italic", lineHeight: 1.6 }}>"{m.lessons[0]}"</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </SectionCard>
+                </div>
+              )}
+
+              {/* ── Discipline Trend + Revenge/Tilt ──────────────── */}
+              {aiInsights?.weeklyDisciplineTrend?.length > 1 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div className="analytics-section-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+
+                    {/* Discipline Trend */}
+                    <SectionCard title="Discipline Trend" subtitle="WEEKLY PLAN ADHERENCE" delay={0.62} accentColor={C.gold}>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>% of trades following your plan each week</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {aiInsights.weeklyDisciplineTrend.slice(-8).map((w, i, arr) => {
+                          const pct = w.planAdherencePct;
+                          const barColor = pct >= 70 ? C.bull : pct >= 40 ? C.gold : C.bear;
+                          const weekLabel = w.week.replace(/^\d{4}-/, "");
+                          const isLatest = i === arr.length - 1;
+                          const prevPct = i > 0 ? arr[i - 1].planAdherencePct : null;
+                          const trend = prevPct !== null ? (pct > prevPct ? "▲" : pct < prevPct ? "▼" : "—") : "";
+                          const trendColor = trend === "▲" ? C.bull : trend === "▼" ? C.bear : C.muted;
+                          return (
+                            <div key={w.week} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono',monospace", color: isLatest ? C.primary : C.muted, width: 48, flexShrink: 0, fontWeight: isLatest ? 700 : 400 }}>{weekLabel}</div>
+                              <div style={{ flex: 1, height: 6, background: "#F4F2EE", borderRadius: 99, overflow: "hidden" }}>
+                                <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: barColor, borderRadius: 99, transition: "width 0.4s" }} />
+                              </div>
+                              <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: barColor, width: 36, textAlign: "right" }}>{pct}%</div>
+                              <div style={{ fontSize: 9, color: trendColor, width: 12 }}>{trend}</div>
+                              <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono',monospace", color: w.pnl >= 0 ? C.bull : C.bear, width: 54, textAlign: "right" }}>{w.pnl >= 0 ? "+" : ""}${Math.abs(w.pnl).toFixed(0)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {(() => {
+                        const trend = aiInsights.weeklyDisciplineTrend.slice(-4);
+                        if (trend.length < 2) return null;
+                        const first = trend[0].planAdherencePct;
+                        const last = trend[trend.length - 1].planAdherencePct;
+                        const delta = last - first;
+                        if (Math.abs(delta) < 5) return null;
+                        return (
+                          <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: delta > 0 ? "#F0FDF4" : "#FFF8F8", border: `1px solid ${delta > 0 ? "#BBF7D0" : "#FED7D7"}`, fontSize: 11, color: delta > 0 ? "#166534" : "#9B1C1C" }}>
+                            {delta > 0 ? "▲" : "▼"} Discipline {delta > 0 ? "improving" : "declining"} {Math.abs(delta).toFixed(0)}pp over last 4 weeks
+                          </div>
+                        );
+                      })()}
+                    </SectionCard>
+
+                    {/* Revenge / Tilt Alerts */}
+                    <SectionCard title="Revenge & Tilt Alerts" subtitle="EMOTIONAL SPIRAL DETECTION" delay={0.64} accentColor={C.bear}>
+                      {/* Revenge trades */}
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: "0.08em" }}>REVENGE TRADES</div>
+                          <div style={{
+                            fontSize: 18, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace",
+                            color: (aiInsights.behaviorDiscipline?.revengeTradesCount || 0) > 0 ? C.bear : C.bull,
+                          }}>
+                            {aiInsights.behaviorDiscipline?.revengeTradesCount || 0}
+                          </div>
+                        </div>
+                        {(aiInsights.behaviorDiscipline?.revengeTradesCount || 0) > 0 ? (
+                          <>
+                            <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.6, marginBottom: 8 }}>
+                              Trades taken immediately after a loss with 1.5× bigger risk. Total cost:{" "}
+                              <span style={{ fontWeight: 700, color: C.bear, fontFamily: "'JetBrains Mono',monospace" }}>
+                                ${Math.abs(parseFloat(aiInsights.behaviorDiscipline.revengeCostTotal || 0)).toFixed(2)}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {(aiInsights.behaviorDiscipline.revengeTrades || []).slice(-3).map((t, i) => (
+                                <div key={i} style={{ fontSize: 10, color: C.muted, display: "flex", justifyContent: "space-between", padding: "4px 8px", background: "#FFF8F8", borderRadius: 6, border: "1px solid #FED7D7" }}>
+                                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>{t.pair}</span>
+                                  <span>{new Date(t.createdAt).toLocaleDateString()}</span>
+                                  <span style={{ color: C.bear, fontWeight: 700 }}>${Math.abs(t.prevProfit || 0).toFixed(2)} trigger loss</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: C.bear }}>Rule: After a loss, wait 15 min before taking another trade.</div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: 11, color: C.bull, fontWeight: 600 }}>✓ No revenge trades detected — strong emotional control.</div>
+                        )}
+                      </div>
+
+                      {/* Tilt days */}
+                      <div style={{ borderTop: "1px solid #F4F2EE", paddingTop: 14 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: "0.08em" }}>TILT DAYS</div>
+                          <div style={{
+                            fontSize: 18, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace",
+                            color: (aiInsights.psychologicalPatterns?.tiltDays?.length || 0) > 0 ? C.bear : C.bull,
+                          }}>
+                            {aiInsights.psychologicalPatterns?.tiltDays?.length || 0}
+                          </div>
+                        </div>
+                        {(aiInsights.psychologicalPatterns?.tiltDays?.length || 0) > 0 ? (
+                          <>
+                            <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.6, marginBottom: 8 }}>
+                              Days with 3+ consecutive losses + increasing position size detected.
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {aiInsights.psychologicalPatterns.tiltDays.slice(-3).map((td, i) => (
+                                <div key={i} style={{ fontSize: 10, color: C.muted, display: "flex", justifyContent: "space-between", padding: "4px 8px", background: "#FFF8F8", borderRadius: 6, border: "1px solid #FED7D7" }}>
+                                  <span>{td.day}</span>
+                                  <span style={{ fontFamily: "'JetBrains Mono',monospace" }}>{td.streakLength} losses</span>
+                                  <span style={{ color: C.bear, fontWeight: 700 }}>-${Math.abs(parseFloat(td.totalLoss)).toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: C.bear }}>Rule: Stop trading after 3 consecutive losses.</div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: 11, color: C.bull, fontWeight: 600 }}>✓ No tilt days detected — great discipline.</div>
+                        )}
+                      </div>
+                    </SectionCard>
+                  </div>
                 </div>
               )}
 

@@ -3,8 +3,42 @@ const { clearUserCache } = require("../utils/cacheUtils");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 
+function normalizeTradeDate(tradeDate) {
+  const parsed = new Date(tradeDate);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ApiError(400, "Trade date is invalid", "VALIDATION_ERROR");
+  }
+  return parsed;
+}
+
+function getEffectiveTradeTime(trade) {
+  return new Date(trade.tradeDate || trade.createdAt || 0).getTime();
+}
+
+function getPeriodStart(period) {
+  const now = new Date();
+  const start = new Date(now);
+
+  switch (String(period || "all").toLowerCase()) {
+    case "1w":
+      start.setDate(start.getDate() - 7);
+      return start;
+    case "1m":
+      start.setMonth(start.getMonth() - 1);
+      return start;
+    case "3m":
+      start.setMonth(start.getMonth() - 3);
+      return start;
+    case "1y":
+      start.setFullYear(start.getFullYear() - 1);
+      return start;
+    default:
+      return null;
+  }
+}
+
 exports.createTrade = asyncHandler(async (req, res) => {
-  const { pair, type, underlying, strikePrice, optionType } = req.body;
+  const { pair, type, underlying, strikePrice, optionType, tradeDate } = req.body;
 
   if (!type) {
     throw new ApiError(400, "Type (BUY/SELL) is required", "VALIDATION_ERROR");
@@ -28,12 +62,16 @@ exports.createTrade = asyncHandler(async (req, res) => {
   if (!symbol) {
     throw new ApiError(400, "Symbol is required (provide pair or underlying + strike + optionType)", "VALIDATION_ERROR");
   }
+  if (!tradeDate) {
+    throw new ApiError(400, "Trade date is required", "VALIDATION_ERROR");
+  }
 
   const trade = await IndianTrade.create({
     ...req.body,
     pair: symbol,
     type: type.toUpperCase(),
     optionType: ot,
+    tradeDate: normalizeTradeDate(tradeDate),
     user: req.user._id
   });
 
@@ -43,18 +81,19 @@ exports.createTrade = asyncHandler(async (req, res) => {
 });
 
 exports.getTrades = asyncHandler(async (req, res) => {
-  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const period = String(req.query.period || "all").toLowerCase();
   const query = { user: req.user._id };
+  const periodStart = getPeriodStart(period);
   const trades = await IndianTrade.find(query)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
     .select(
-      "pair underlying type optionType quantity lotSize entryPrice exitPrice profit strategy session createdAt"
+      "pair underlying type optionType quantity lotSize entryPrice exitPrice profit strategy session entryBasis entryBasisCustom createdAt tradeDate"
     )
     .lean();
-  res.json(trades);
+  res.json(
+    trades
+      .filter((trade) => !periodStart || getEffectiveTradeTime(trade) >= periodStart.getTime())
+      .sort((a, b) => getEffectiveTradeTime(b) - getEffectiveTradeTime(a))
+  );
 });
 
 exports.getTrade = asyncHandler(async (req, res) => {
@@ -71,16 +110,15 @@ exports.getTrade = asyncHandler(async (req, res) => {
 });
 
 exports.updateTrade = asyncHandler(async (req, res) => {
-  const { type } = req.body;
+  const { type, tradeDate } = req.body;
 
   const validTypes = ["BUY", "SELL"];
   if (type && !validTypes.includes(type.toUpperCase())) {
     throw new ApiError(400, "Type must be BUY or SELL", "VALIDATION_ERROR");
   }
-
     const trade = await IndianTrade.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id },
-      { ...req.body, ...(type && { type: type.toUpperCase() }) },
+      { ...req.body, ...(tradeDate && { tradeDate: normalizeTradeDate(tradeDate) }), ...(type && { type: type.toUpperCase() }) },
       {
         returnDocument: "after",
         // Allow "save after OCR" to upsert the first trade (jobId is an OCR id,

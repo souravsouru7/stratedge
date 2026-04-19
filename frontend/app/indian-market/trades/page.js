@@ -1,354 +1,623 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getTrades, deleteTrade } from "@/services/tradeApi";
 import Link from "next/link";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 
-/* Same theme as Forex */
-const theme = {
-    bull: "#0D9E6E",
-    bear: "#D63B3B",
-    gold: "#B8860B",
-    primary: "#0D9E6E",
-    secondary: "#0F1923",
-    muted: "#94A3B8",
-    border: "#E2E8F0",
-    bg: "#F0EEE9",
-    card: "#FFFFFF"
+// ─── Tokens ──────────────────────────────────────────────────────────────────
+const C = {
+  bull: "#0D9E6E", bear: "#D63B3B", gold: "#B8860B", blue: "#2563EB",
+  purple: "#7C3AED", bg: "#F0EEE9", card: "#FFFFFF", border: "#E2E8F0",
+  muted: "#94A3B8", ink: "#0F1923", ink2: "#334155",
+  mono: "'JetBrains Mono',monospace", sans: "'Plus Jakarta Sans',sans-serif",
 };
 
-function TickerTape() {
-    const options = [
-        { sym: "NIFTY CE", val: "+2.1%", bull: true }, { sym: "NIFTY PE", val: "-1.4%", bull: false },
-        { sym: "BANK NIFTY CE", val: "+1.8%", bull: true }, { sym: "BANK NIFTY PE", val: "+0.6%", bull: true },
-        { sym: "FIN NIFTY CE", val: "-0.3%", bull: false }, { sym: "MIDCPNIFTY PE", val: "+1.2%", bull: true }
-    ];
-    const items = [...options, ...options];
-    return (
-        <div style={{ overflow: "hidden", background: theme.secondary, borderBottom: `3px solid ${theme.gold}`, padding: "7px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10 }}>
-            <div style={{ display: "inline-flex", gap: "48px", animation: "ticker 32s linear infinite" }}>
-                {items.map((t, i) => (
-                    <span key={i} style={{ fontSize: "11px", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>
-                        <span style={{ color: "#E8F5E9", marginRight: 6 }}>{t.sym}</span>
-                        <span style={{ color: t.bull ? "#A5D6A7" : "#EF9A9A" }}>{t.bull ? "▲" : "▼"} {t.val}</span>
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const fmtINR = (v) => v != null ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
+const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
+const fmtTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+const getTradeDisplayDate = (trade) => trade.tradeDate || trade.createdAt;
 
-/* ─────────────────────────────────────────
-   EMPTY STATE — Enhanced for better onboarding
-───────────────────────────────────────── */
-function EmptyState() {
+// ─── Ticker ──────────────────────────────────────────────────────────────────
+const TICKERS = [
+  { sym: "NIFTY CE", val: "+2.1%", bull: true }, { sym: "NIFTY PE", val: "-1.4%", bull: false },
+  { sym: "BANK NIFTY CE", val: "+1.8%", bull: true }, { sym: "BANK NIFTY PE", val: "+0.6%", bull: true },
+  { sym: "FIN NIFTY CE", val: "-0.3%", bull: false }, { sym: "MIDCPNIFTY PE", val: "+1.2%", bull: true },
+  { sym: "NIFTY CE", val: "+2.1%", bull: true }, { sym: "SENSEX CE", val: "+0.9%", bull: true },
+];
+function TickerTape() {
+  const items = [...TICKERS, ...TICKERS];
   return (
-    <div style={{ 
-      textAlign: "center", 
-      padding: "80px 20px",
-      background: "linear-gradient(135deg, rgba(13,158,110,0.03) 0%, rgba(240,238,233,0.5) 100%)",
-      borderRadius: 14,
-      margin: "20px",
-      border: "1px dashed rgba(13,158,110,0.2)",
-    }}>
-      {/* Icon illustration */}
-      <div style={{ marginBottom: 24, position: "relative" }}>
-        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ margin: "0 auto" }}>
-          {/* Background circle */}
-          <circle cx="40" cy="40" r="36" fill="rgba(13,158,110,0.08)" stroke="rgba(13,158,110,0.15)" strokeWidth="2" />
-          
-          {/* Chart bars */}
-          <rect x="24" y="38" width="8" height="18" fill="rgba(13,158,110,0.6)" rx="2" />
-          <rect x="36" y="32" width="8" height="24" fill="rgba(13,158,110,0.8)" rx="2" />
-          <rect x="48" y="42" width="8" height="14" fill="rgba(214,59,59,0.5)" rx="2" />
-          
-          {/* Upward trend arrow */}
-          <path d="M20 52 L32 42 L42 50 L60 28" stroke="rgba(13,158,110,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points="52 28 60 28 60 36" fill="none" stroke="rgba(13,158,110,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
-      
-      {/* Main message */}
-      <div style={{ 
-        fontFamily: "'Plus Jakarta Sans',sans-serif", 
-        fontSize: 20, 
-        fontWeight: 800, 
-        color: theme.secondary, 
-        marginBottom: 10,
-        letterSpacing: "-0.02em",
-      }}>
-        Upload your first trade to get started
-      </div>
-      
-      {/* Subtext */}
-      <div style={{ 
-        fontSize: 11, 
-        color: "#64748B", 
-        lineHeight: 1.6, 
-        maxWidth: 420, 
-        margin: "0 auto 24px",
-        fontFamily: "'Plus Jakarta Sans',sans-serif",
-      }}>
-        Track your trades, analyze performance, and improve discipline with detailed analytics and insights.
-      </div>
-      
-      {/* CTA Button */}
-      <Link href="/indian-market/add-trade" style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        background: "linear-gradient(135deg, #0D9E6E 0%, #22C78E 100%)",
-        color: "#FFFFFF",
-        padding: "14px 28px",
-        borderRadius: 12,
-        textDecoration: "none",
-        fontSize: 12,
-        fontWeight: 800,
-        letterSpacing: "0.08em",
-        boxShadow: "0 4px 14px rgba(13,158,110,0.3)",
-        transition: "transform 0.2s, box-shadow 0.2s",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = "0 6px 20px rgba(13,158,110,0.4)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "0 4px 14px rgba(13,158,110,0.3)";
-      }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-        UPLOAD TRADE
-      </Link>
-      
-      {/* Quick tips */}
-      <div style={{ 
-        marginTop: 28, 
-        paddingTop: 20, 
-        borderTop: "1px solid rgba(13,158,110,0.15)",
-        display: "grid", 
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", 
-        gap: 16,
-        maxWidth: 520,
-        margin: "28px auto 0",
-      }}>
-        {[
-          { icon: "📊", text: "Track Performance" },
-          { icon: "🎯", text: "Analyze Patterns" },
-          { icon: "📈", text: "Improve Strategy" },
-        ].map((tip, idx) => (
-          <div key={idx} style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 6,
-          }}>
-            <span style={{ fontSize: 20 }}>{tip.icon}</span>
-            <span style={{ fontSize: 9, color: "#64748B", fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 600 }}>
-              {tip.text}
-            </span>
-          </div>
+    <div style={{ overflow: "hidden", background: C.ink, borderBottom: `3px solid ${C.bull}`, padding: "7px 0", whiteSpace: "nowrap" }}>
+      <div style={{ display: "inline-flex", gap: 48, animation: "ticker 36s linear infinite" }}>
+        {items.map((t, i) => (
+          <span key={i} style={{ fontSize: 11, fontFamily: C.mono, letterSpacing: "0.04em" }}>
+            <span style={{ color: "rgba(255,255,255,0.55)", marginRight: 6 }}>{t.sym}</span>
+            <span style={{ color: t.bull ? "#6EE7B7" : "#FCA5A5" }}>{t.bull ? "▲" : "▼"} {t.val}</span>
+          </span>
         ))}
       </div>
     </div>
   );
 }
 
-function TradeRow({ trade, onDelete, idx }) {
-    const profitNum = parseFloat(trade.profit) || 0;
-    const bull = profitNum >= 0;
-    const isLong = trade.type?.toUpperCase() === "BUY" || trade.type?.toUpperCase() === "LONG";
-    const optType = trade.optionType || (trade.pair && trade.pair.includes(" PE") ? "PE" : "CE");
-    return (
-        <tr style={{ borderBottom: `1px solid ${theme.border}`, animation: `fadeUp 0.4s ease ${idx * 0.05}s both`, transition: "background 0.2s" }}
-            onMouseEnter={e => e.currentTarget.style.background = "rgba(46,125,50,0.05)"}
-            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            <td style={{ padding: "14px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: bull ? theme.bull : theme.bear }} />
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: theme.primary, fontWeight: 600 }}>{trade.pair || `${trade.underlying || ""} ${trade.strikePrice || ""} ${optType}`}</span>
-                </div>
-            </td>
-            <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: theme.muted }}>{trade.strikePrice != null ? `₹${Number(trade.strikePrice).toLocaleString("en-IN")}` : "—"}</span>
-            </td>
-            <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: optType === "CE" ? theme.bull : theme.bear, letterSpacing: "0.06em" }}>{optType}</span>
-            </td>
-            <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 9, letterSpacing: "0.12em", color: isLong ? theme.bull : theme.bear, background: isLong ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)", borderRadius: 20, padding: "3px 10px", fontFamily: "'JetBrains Mono',monospace" }}>
-                    {isLong ? "▲ LONG" : "▼ SHORT"}
-                </span>
-            </td>
-            <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 11, color: theme.muted }}>{trade.entryPrice != null ? `₹${Number(trade.entryPrice).toLocaleString("en-IN")}` : "—"}</span>
-                {trade.exitPrice != null && <span style={{ fontSize: 10, color: theme.muted, marginLeft: 4 }}>→ ₹{Number(trade.exitPrice).toLocaleString("en-IN")}</span>}
-            </td>
-            <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700, color: bull ? theme.bull : theme.bear }}>
-                    {bull ? "+" : ""}₹{Math.abs(profitNum).toLocaleString("en-IN")}
-                </span>
-            </td>
-            <td style={{ padding: "14px 16px" }}>
-                <span style={{ fontSize: 9, letterSpacing: "0.08em", color: trade.entryBasis === "Plan" ? theme.primary : trade.entryBasis === "Emotion" ? theme.bear : theme.gold, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, textTransform: "uppercase" }}>
-                    {trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis || "Plan"}
-                </span>
-            </td>
-            <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <Link href={`/indian-market/trades/view?id=${trade._id}`} style={{ fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", color: theme.bull, border: `1px solid ${theme.bull}55`, background: `${theme.bull}11`, borderRadius: 4, padding: "5px 12px", textDecoration: "none" }}>VIEW</Link>
-                    <button onClick={() => onDelete(trade)} style={{ fontSize: 9, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", color: theme.bear, border: `1px solid ${theme.bear}55`, background: `${theme.bear}11`, borderRadius: 4, padding: "5px 12px", cursor: "pointer" }}>DELETE</button>
-                </div>
-            </td>
-        </tr>
-    );
+// ─── Summary stat bar ─────────────────────────────────────────────────────────
+function StatBar({ trades }) {
+  const total = trades.length;
+  const wins  = trades.filter(t => (t.profit || 0) > 0).length;
+  const wr    = total ? ((wins / total) * 100).toFixed(0) : 0;
+  const pnl   = trades.reduce((a, t) => a + (parseFloat(t.profit) || 0), 0);
+  const bull  = pnl >= 0;
+
+  const stats = [
+    { label: "Total Trades",  value: total, mono: false },
+    { label: "Win Rate",      value: `${wr}%`,           color: Number(wr) >= 50 ? C.bull : C.bear },
+    { label: "Total P&L",     value: `${bull ? "+" : ""}${fmtINR(pnl)}`, color: bull ? C.bull : C.bear },
+    { label: "Winners",       value: wins, color: C.bull },
+    { label: "Losers",        value: total - wins, color: C.bear },
+  ];
+
+  return (
+    <div className="stat-bar" style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+      {stats.map(s => (
+        <div key={s.label} style={{
+          background: C.card, borderRadius: 12, border: `1px solid ${C.border}`,
+          padding: "14px 16px", textAlign: "center",
+          boxShadow: "0 1px 6px rgba(15,25,35,0.04)",
+        }}>
+          <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono, letterSpacing: "0.06em", marginBottom: 4 }}>{s.label}</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: s.color || C.ink, fontFamily: C.mono }}>{s.value}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
-export default function IndianTradesPage() {
-    const router = useRouter();
-    const { currentMarket } = useMarket();
-    const [trades, setTrades] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [deleteTarget, setDeleteTarget] = useState(null);
-
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (!token) { router.push("/login"); return; }
-        fetchTrades();
-    }, [router]);
-
-    const fetchTrades = async () => {
-        setLoading(true);
-        try {
-            const data = await getTrades(MARKETS.INDIAN_MARKET);
-            setTrades(data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDelete = async (trade) => {
-        if (confirm("Delete this Indian Market trade?")) {
-            await deleteTrade(trade._id, MARKETS.INDIAN_MARKET);
-            fetchTrades();
-        }
-    };
-
-    return (
-        <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: "'Plus Jakarta Sans',sans-serif", color: theme.primary }}>
-            <header style={{
-                background: "#FFF", borderBottom: `1px solid ${theme.border}`, minHeight: 60, padding: "10px 24px",
-                display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between"
-            }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <Link href="/indian-market/dashboard" style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 168, height: 48, position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-start" }}><img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} /></div>
-                        <div>
-                            <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: theme.primary, lineHeight: 1 }}>
-                                {""}
-                            </div>
-                            <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.secondary, marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                                OPTIONS JOURNAL · NSE
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-
-                <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {[
-                        { href: "/indian-market/trades", label: "Journal" },
-                        { href: "/indian-market/add-trade", label: "Log Option" },
-                        { href: "/indian-market/analytics", label: "Analytics" },
-                        { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
-                    ].map(n => (
-                        <Link
-                            key={n.href}
-                            href={n.href}
-                            style={{
-                                fontSize: 13,
-                                color: theme.primary,
-                                fontWeight: 700,
-                                textDecoration: "none",
-                                padding: "10px 16px",
-                                borderRadius: 999,
-                                transition: "all 0.2s",
-                                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                background: "rgba(13,158,110,0.08)",
-                                border: "1.5px solid rgba(13,158,110,0.25)",
-                                minHeight: "44px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center"
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.background = "rgba(13,158,110,0.18)",
-                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.6)",
-                                e.currentTarget.style.transform = "translateY(-2px)"
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.background = "rgba(13,158,110,0.08)",
-                                e.currentTarget.style.borderColor = "rgba(13,158,110,0.25)",
-                                e.currentTarget.style.transform = "translateY(0)"
-                            }}
-                        >
-                            {n.label}
-                        </Link>
-                    ))}
-                </nav>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <MarketSwitcher />
-                </div>
-            </header>
-            <TickerTape />
-            <main style={{ padding: "28px 20px", maxWidth: 960, margin: "0 auto" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                    <h1 style={{ fontSize: 24, fontWeight: 800 }}>Options Journal <span style={{ color: theme.secondary }}>(NSE / BSE)</span></h1>
-                    <Link href="/indian-market/add-trade" style={{
-                        background: theme.primary, color: theme.gold, borderRadius: 8, padding: "10px 18px",
-                        textDecoration: "none", fontSize: 12, fontWeight: 700
-                    }}>+ NEW OPTIONS TRADE</Link>
-                </div>
-
-                <div style={{ background: theme.card, borderRadius: 12, border: `1px solid ${theme.border}`, overflow: "hidden" }}>
-                    {loading ? (
-                        <div style={{ padding: 40, textAlign: "center" }}>Loading trades...</div>
-                    ) : trades.length === 0 ? (
-                        <EmptyState />
-                    ) : (
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                                <tr style={{ background: "#F9F9F9", borderBottom: `1px solid ${theme.border}` }}>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>SYMBOL</th>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>STRIKE</th>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>CE/PE</th>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>TYPE</th>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>ENTRY → EXIT</th>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>P&L</th>
-                                    <th style={{ padding: 14, textAlign: "left", fontSize: 10, color: theme.muted }}>BASIS</th>
-                                    <th style={{ padding: 14, textAlign: "right", fontSize: 10, color: theme.muted }}>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {trades.map((t, idx) => (
-                                    <TradeRow key={t._id} trade={t} onDelete={handleDelete} idx={idx} />
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </main>
-            <style jsx global>{`
-        @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+// ─── Delete confirm modal ─────────────────────────────────────────────────────
+function DeleteModal({ trade, onConfirm, onCancel }) {
+  if (!trade) return null;
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(15,25,35,0.6)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }}>
+      <div style={{
+        background: C.card, borderRadius: 16, padding: 28, maxWidth: 360, width: "100%",
+        boxShadow: "0 20px 60px rgba(15,25,35,0.3)",
+        animation: "fadeUp 0.2s ease both",
+      }}>
+        <div style={{ fontSize: 28, marginBottom: 12, textAlign: "center" }}>🗑️</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, textAlign: "center", marginBottom: 8 }}>
+          Delete Trade?
         </div>
-    );
+        <div style={{ fontSize: 13, color: C.muted, textAlign: "center", marginBottom: 6 }}>
+          This will permanently remove
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.bear, textAlign: "center", fontFamily: C.mono, marginBottom: 24 }}>
+          {trade.pair}
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${C.border}`,
+            background: "transparent", fontSize: 13, fontWeight: 700, color: C.ink2, cursor: "pointer",
+          }}>Cancel</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, padding: "11px 0", borderRadius: 10, border: "none",
+            background: C.bear, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer",
+          }}>Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Trade Card ───────────────────────────────────────────────────────────────
+function TradeCard({ trade, onDelete, style: extraStyle }) {
+  const profit  = parseFloat(trade.profit) || 0;
+  const bull    = profit >= 0;
+  const optType = trade.optionType || (trade.pair?.includes(" PE") ? "PE" : "CE");
+  const isLong  = trade.type?.toUpperCase() === "BUY";
+
+  const lotSizeMap = { NIFTY: 25, "BANK NIFTY": 15, BANKNIFTY: 15, "FIN NIFTY": 25, FINNIFTY: 25, MIDCPNIFTY: 75, SENSEX: 10, BANKEX: 15 };
+  const defaultLS  = lotSizeMap[String(trade.underlying || "").toUpperCase().trim()] || 1;
+  const lotSize    = trade.lotSize > 0 ? trade.lotSize : defaultLS;
+  const lots       = trade.quantity || 0;
+
+  const entryBasisColor = { Plan: C.bull, Emotion: C.bear, Impulsive: C.bear, Custom: C.blue }[trade.entryBasis] || C.muted;
+
+  // Planned R:R label
+  let rrLabel = null;
+  if (trade.riskRewardRatio && trade.riskRewardRatio !== "custom") rrLabel = trade.riskRewardRatio;
+  else if (trade.riskRewardRatio === "custom" && trade.riskRewardCustom) rrLabel = trade.riskRewardCustom;
+
+  return (
+    <div style={{
+      background: C.card, borderRadius: 14, border: `1px solid ${C.border}`,
+      overflow: "hidden", boxShadow: "0 2px 10px rgba(15,25,35,0.05)",
+      transition: "box-shadow 0.2s, transform 0.2s",
+      ...extraStyle,
+    }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 24px rgba(15,25,35,0.1)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 10px rgba(15,25,35,0.05)"; e.currentTarget.style.transform = "translateY(0)"; }}
+    >
+      {/* Color bar top */}
+      <div style={{ height: 3, background: bull ? `linear-gradient(90deg,${C.bull},#22C78E)` : `linear-gradient(90deg,${C.bear},#F87171)` }} />
+
+      <div style={{ padding: "14px 16px" }}>
+        {/* Row 1: Instrument + P&L */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div style={{ flex: 1 }}>
+            {/* Symbol */}
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                background: bull ? "linear-gradient(135deg,#064E3B,#047857)" : "linear-gradient(135deg,#7F1D1D,#B91C1C)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontWeight: 800, fontSize: 11, fontFamily: C.mono,
+              }}>
+                {(trade.underlying || trade.pair || "N").charAt(0)}
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, fontFamily: C.mono, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+                  {trade.pair || `${trade.underlying} ${trade.strikePrice} ${optType}`}
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono }}>
+                  {fmtDate(getTradeDisplayDate(trade))} · {fmtTime(getTradeDisplayDate(trade))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* P&L */}
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: bull ? C.bull : C.bear, fontFamily: C.mono, letterSpacing: "-0.02em" }}>
+              {bull ? "+" : ""}₹{Math.abs(profit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </div>
+            {lots > 0 && (
+              <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono }}>
+                {lots}L × {lotSize}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: Badges */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          {/* Direction */}
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", fontFamily: C.mono,
+            color: isLong ? C.bull : C.bear,
+            background: isLong ? `${C.bull}15` : `${C.bear}15`,
+            border: `1px solid ${isLong ? C.bull : C.bear}40`,
+            borderRadius: 5, padding: "3px 8px",
+          }}>
+            {isLong ? "▲ BUY" : "▼ SELL"}
+          </span>
+
+          {/* CE/PE */}
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", fontFamily: C.mono,
+            color: optType === "CE" ? C.bull : C.bear,
+            background: optType === "CE" ? `${C.bull}10` : `${C.bear}10`,
+            border: `1px solid ${optType === "CE" ? C.bull : C.bear}30`,
+            borderRadius: 5, padding: "3px 8px",
+          }}>
+            {optType === "CE" ? "CE CALL" : "PE PUT"}
+          </span>
+
+          {/* Trade type */}
+          {trade.tradeType && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", fontFamily: C.mono,
+              color: C.muted, background: C.bg, border: `1px solid ${C.border}`,
+              borderRadius: 5, padding: "3px 8px",
+            }}>
+              {trade.tradeType}
+            </span>
+          )}
+
+          {/* Entry Basis */}
+          {trade.entryBasis && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", fontFamily: C.mono,
+              color: entryBasisColor, background: `${entryBasisColor}10`,
+              border: `1px solid ${entryBasisColor}30`,
+              borderRadius: 5, padding: "3px 8px",
+            }}>
+              {trade.entryBasis === "Custom" ? trade.entryBasisCustom : trade.entryBasis}
+            </span>
+          )}
+
+          {/* R:R */}
+          {rrLabel && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, fontFamily: C.mono, color: C.gold,
+              background: `${C.gold}10`, border: `1px solid ${C.gold}30`,
+              borderRadius: 5, padding: "3px 8px",
+            }}>
+              R:R {rrLabel}
+            </span>
+          )}
+        </div>
+
+        {/* Row 3: Prices */}
+        <div className="card-price-grid" style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+          {[
+            { label: "Entry", val: fmtINR(trade.entryPrice) },
+            { label: "Exit",  val: fmtINR(trade.exitPrice)  },
+            { label: "Strike", val: trade.strikePrice != null ? `₹${Number(trade.strikePrice).toLocaleString("en-IN")}` : "—" },
+          ].map(p => (
+            <div key={p.label} style={{ background: C.bg, borderRadius: 7, padding: "7px 10px" }}>
+              <div style={{ fontSize: 9, color: C.muted, fontFamily: C.mono, marginBottom: 2 }}>{p.label}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontFamily: C.mono }}>{p.val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Setup score bar (if present) */}
+        {trade.setupScore != null && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 9, color: C.muted, fontFamily: C.mono }}>SETUP SCORE</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: trade.setupScore >= 70 ? C.bull : trade.setupScore >= 40 ? C.gold : C.bear, fontFamily: C.mono }}>
+                {trade.setupScore}%
+              </span>
+            </div>
+            <div style={{ height: 4, background: C.border, borderRadius: 2 }}>
+              <div style={{
+                height: "100%", borderRadius: 2,
+                width: `${trade.setupScore}%`,
+                background: trade.setupScore >= 70 ? C.bull : trade.setupScore >= 40 ? C.gold : C.bear,
+                transition: "width 0.5s ease",
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* Strategy tag */}
+        {trade.strategy && (
+          <div style={{ marginBottom: 12, fontSize: 11, color: C.ink2, fontStyle: "italic", borderLeft: `2px solid ${C.bull}`, paddingLeft: 8 }}>
+            {trade.strategy}
+          </div>
+        )}
+
+        {/* Row 4: Action buttons */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link
+            href={`/indian-market/trades/view?id=${trade._id}`}
+            style={{
+              flex: 1, textAlign: "center",
+              padding: "9px 0", borderRadius: 8,
+              background: `${C.bull}15`, border: `1.5px solid ${C.bull}40`,
+              fontSize: 11, fontWeight: 700, color: C.bull,
+              fontFamily: C.mono, textDecoration: "none", letterSpacing: "0.08em",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.bull; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = `${C.bull}15`; e.currentTarget.style.color = C.bull; }}
+          >
+            VIEW →
+          </Link>
+          <Link
+            href={`/indian-market/trades/edit?id=${trade._id}`}
+            style={{
+              flex: 1, textAlign: "center",
+              padding: "9px 0", borderRadius: 8,
+              background: `${C.blue}12`, border: `1.5px solid ${C.blue}30`,
+              fontSize: 11, fontWeight: 700, color: C.blue,
+              fontFamily: C.mono, textDecoration: "none", letterSpacing: "0.08em",
+            }}
+          >
+            EDIT
+          </Link>
+          <button
+            onClick={() => onDelete(trade)}
+            style={{
+              padding: "9px 14px", borderRadius: 8,
+              background: `${C.bear}12`, border: `1.5px solid ${C.bear}30`,
+              fontSize: 11, fontWeight: 700, color: C.bear,
+              fontFamily: C.mono, cursor: "pointer", letterSpacing: "0.08em",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.bear; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = `${C.bear}12`; e.currentTarget.style.color = C.bear; }}
+          >
+            🗑
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Filter bar ───────────────────────────────────────────────────────────────
+function FilterBar({ filter, setFilter, period, setPeriod, search, setSearch }) {
+  const filters = [
+    { key: "all",  label: "All" },
+    { key: "win",  label: "Winners" },
+    { key: "loss", label: "Losers" },
+    { key: "CE",   label: "Calls" },
+    { key: "PE",   label: "Puts" },
+  ];
+  const periods = [
+    { key: "1w", label: "1W" },
+    { key: "1m", label: "1M" },
+    { key: "3m", label: "3M" },
+    { key: "all", label: "ALL" },
+  ];
+  return (
+    <div className="filter-bar-row" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+      {/* Search */}
+      <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+        <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search symbol, trading setup, date…"
+          style={{
+            width: "100%", boxSizing: "border-box",
+            padding: "9px 12px 9px 32px", borderRadius: 8,
+            border: `1.5px solid ${C.border}`, fontSize: 12,
+            fontFamily: C.sans, background: C.card, outline: "none",
+            color: C.ink,
+          }}
+        />
+      </div>
+
+      {/* Filter pills */}
+      <div className="filter-pills" style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        {filters.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            style={{
+              padding: "8px 14px", borderRadius: 20, border: "1.5px solid",
+              borderColor: filter === f.key ? C.bull : C.border,
+              background: filter === f.key ? C.bull : C.card,
+              color: filter === f.key ? "#fff" : C.muted,
+              fontSize: 11, fontWeight: 700, cursor: "pointer",
+              fontFamily: C.mono, transition: "all 0.15s",
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className="filter-pills" style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        {periods.map(p => (
+          <button
+            key={p.key}
+            onClick={() => setPeriod(p.key)}
+            style={{
+              padding: "8px 14px", borderRadius: 20, border: "1.5px solid",
+              borderColor: period === p.key ? C.ink : C.border,
+              background: period === p.key ? C.ink : C.card,
+              color: period === p.key ? "#fff" : C.muted,
+              fontSize: 11, fontWeight: 700, cursor: "pointer",
+              fontFamily: C.mono, transition: "all 0.15s",
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+function EmptyState() {
+  return (
+    <div style={{
+      textAlign: "center", padding: "60px 20px",
+      background: C.card, borderRadius: 14, border: `1px dashed ${C.border}`,
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: C.ink, marginBottom: 8 }}>No trades yet</div>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Log your first options trade to start tracking</div>
+      <Link href="/indian-market/add-trade" style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        background: `linear-gradient(135deg,${C.bull},#22C78E)`,
+        color: "#fff", padding: "12px 24px", borderRadius: 10,
+        textDecoration: "none", fontSize: 12, fontWeight: 800,
+        fontFamily: C.mono, letterSpacing: "0.08em",
+        boxShadow: `0 4px 14px ${C.bull}40`,
+      }}>
+        + LOG FIRST TRADE
+      </Link>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function IndianTradesPage() {
+  const router = useRouter();
+  const { currentMarket } = useMarket();
+  const [trades, setTrades]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting]       = useState(false);
+  const [filter, setFilter]           = useState("all");
+  const [period, setPeriod]           = useState("1m");
+  const [search, setSearch]           = useState("");
+
+  useEffect(() => {
+    if (!localStorage.getItem("token")) { router.push("/login"); return; }
+    fetchTrades();
+  }, [period]);
+
+  const fetchTrades = async () => {
+    setLoading(true);
+    try { setTrades(await getTrades(MARKETS.INDIAN_MARKET, { period })); }
+    finally { setLoading(false); }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteTrade(deleteTarget._id, MARKETS.INDIAN_MARKET);
+      setTrades(t => t.filter(x => x._id !== deleteTarget._id));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let list = trades;
+    if (filter === "win")  list = list.filter(t => (t.profit || 0) > 0);
+    if (filter === "loss") list = list.filter(t => (t.profit || 0) < 0);
+    if (filter === "CE")   list = list.filter(t => (t.optionType || "CE") === "CE");
+    if (filter === "PE")   list = list.filter(t => (t.optionType || "CE") === "PE");
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(t =>
+        (t.pair || "").toLowerCase().includes(q) ||
+        (t.strategy || "").toLowerCase().includes(q) ||
+        (t.underlying || "").toLowerCase().includes(q) ||
+        new Date(getTradeDisplayDate(t)).toLocaleDateString("en-IN").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [trades, filter, search]);
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: C.sans, color: C.ink }}>
+
+      <IndianMarketHeader />
+
+      <TickerTape />
+
+
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px 60px" }}>
+
+        {/* Page title + CTA */}
+        <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 900, color: C.ink, margin: 0, letterSpacing: "-0.02em" }}>
+              Options Journal
+            </h1>
+            <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0", fontFamily: C.mono }}>NSE / BSE · F&O Trades</p>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Link href="/indian-market/upload-trade" style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "10px 18px", borderRadius: 10,
+              border: `1.5px solid ${C.bull}`, color: C.bull,
+              background: `${C.bull}10`, textDecoration: "none",
+              fontSize: 12, fontWeight: 700, fontFamily: C.mono,
+            }}>
+              ↑ Upload
+            </Link>
+            <Link href="/indian-market/add-trade" style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "10px 20px", borderRadius: 10,
+              background: `linear-gradient(135deg,${C.bull},#22C78E)`,
+              color: "#fff", textDecoration: "none",
+              fontSize: 12, fontWeight: 800, fontFamily: C.mono,
+              boxShadow: `0 4px 14px ${C.bull}40`,
+              letterSpacing: "0.06em",
+            }}>
+              + NEW TRADE
+            </Link>
+          </div>
+        </div>
+
+        {/* Stats bar */}
+        {!loading && trades.length > 0 && <StatBar trades={trades} />}
+
+        {/* Filters */}
+        {!loading && trades.length > 0 && (
+          <FilterBar filter={filter} setFilter={setFilter} period={period} setPeriod={setPeriod} search={search} setSearch={setSearch} />
+        )}
+
+        {/* Content */}
+        {loading ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 80, gap: 14 }}>
+            <div style={{ width: 36, height: 36, border: `3px solid ${C.border}`, borderTop: `3px solid ${C.bull}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            <span style={{ color: C.muted, fontSize: 13, fontFamily: C.mono }}>Loading trades…</span>
+          </div>
+        ) : filtered.length === 0 && trades.length === 0 ? (
+          <EmptyState />
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, color: C.muted, fontSize: 13 }}>
+            No trades match your filter.{" "}
+            <button onClick={() => { setFilter("all"); setSearch(""); }} style={{ background: "none", border: "none", color: C.bull, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: C.muted, fontFamily: C.mono, marginBottom: 14 }}>
+              Showing {filtered.length} of {trades.length} trades · {period.toUpperCase()} window
+            </div>
+            <div className="trade-grid" style={{ display: "grid", gap: 14 }}>
+              {filtered.map((trade, idx) => (
+                <TradeCard
+                  key={trade._id}
+                  trade={trade}
+                  onDelete={setDeleteTarget}
+                  style={{ animation: `fadeUp 0.35s ease ${Math.min(idx, 8) * 0.05}s both` }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </main>
+
+      {/* Delete modal */}
+      <DeleteModal
+        trade={deleteTarget}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <style>{`
+        @keyframes ticker  { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        @keyframes fadeUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        * { box-sizing: border-box; }
+        input::placeholder { color: #CBD5E1; }
+
+        /* ── Default (desktop) ── */
+        .stat-bar        { grid-template-columns: repeat(5, 1fr); }
+        .trade-grid      { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+        .card-price-grid { grid-template-columns: 1fr 1fr 1fr; }
+        .header-nav      { display: flex; }
+        .page-header     { flex-direction: row; }
+        .filter-bar-row  { flex-direction: row; }
+
+        /* ── Tablet ≤ 768px ── */
+        @media (max-width: 768px) {
+          .stat-bar        { grid-template-columns: repeat(3, 1fr); }
+          .trade-grid      { grid-template-columns: repeat(2, 1fr); }
+          .card-price-grid { grid-template-columns: 1fr 1fr 1fr; }
+          .header-nav      { display: none; }
+        }
+
+        /* ── Mobile ≤ 480px ── */
+        @media (max-width: 480px) {
+          .stat-bar           { grid-template-columns: repeat(2, 1fr); }
+          .trade-grid         { grid-template-columns: 1fr; }
+          .card-price-grid    { grid-template-columns: 1fr 1fr; }
+          .page-header        { flex-direction: column; align-items: flex-start; }
+          .filter-bar-row     { flex-direction: column; align-items: stretch; }
+          .filter-pills       { overflow-x: auto; padding-bottom: 4px; }
+          .mobile-bottom-nav  {
+            display: flex !important;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #fff; border-top: 1px solid #E2E8F0;
+            z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+          }
+          main { padding-bottom: 80px !important; }
+        }
+      `}</style>
+    </div>
+  );
 }

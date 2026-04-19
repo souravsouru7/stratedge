@@ -12,12 +12,19 @@ import { useTrades }         from "@/features/trade/hooks/useTrades";
 import { Skeleton }          from "@/features/shared";
 
 const FILTER_OPTIONS = ["ALL", "LONG", "SHORT"];
+const PERIOD_OPTIONS = [
+  { value: "1w", label: "1W" },
+  { value: "1m", label: "1M" },
+  { value: "3m", label: "3M" },
+  { value: "all", label: "ALL" },
+];
 
 function TradesContent() {
   const {
     filtered, loading, deleteTarget, filter, search,
+    period,
     summaryStats, mounted,
-    handlers: { setFilter, setSearch, setDeleteTarget, confirmDelete, cancelDelete },
+    handlers: { setFilter, setPeriod, setSearch, setDeleteTarget, confirmDelete, cancelDelete },
   } = useTrades();
 
   return (
@@ -64,8 +71,15 @@ function TradesContent() {
                 </button>
               ))}
             </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {PERIOD_OPTIONS.map(option => (
+                <button key={option.value} onClick={() => setPeriod(option.value)} style={{ fontSize: 10, letterSpacing: "0.1em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, padding: "9px 14px", minHeight: 38, borderRadius: 20, border: period === option.value ? "1.5px solid rgba(15,25,35,0.35)" : "1px solid #E2E8F0", background: period === option.value ? "#0F1923" : "#FFFFFF", color: period === option.value ? "#FFFFFF" : "#94A3B8", cursor: "pointer", transition: "all 0.2s" }}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
             <input
-              type="text" placeholder="Search pair..." value={search}
+              type="text" placeholder="Search pair or date..." value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ flex: 1, minWidth: 140, padding: "9px 14px", fontSize: 12, fontFamily: "'JetBrains Mono',monospace", border: "1px solid #E2E8F0", borderRadius: 8, outline: "none", background: "#FFFFFF", color: "#0F1923" }}
             />
@@ -82,6 +96,7 @@ function TradesContent() {
           {filtered.length > 0 && (
             <div style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", fontSize: 9, color: "#94A3B8", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace", background: "#F8F6F2", borderRadius: "0 0 14px 14px", marginTop: -1, border: "1px solid #E2E8F0", borderTop: "none" }}>
               <span>SHOWING {filtered.length} TRADES</span>
+              <span>{period.toUpperCase()} WINDOW</span>
               <span>EDGEDISCIPLINE AI JOURNAL</span>
             </div>
           )}

@@ -260,9 +260,9 @@ function normalizeAiFeedback(raw) {
 
 function KpiCard({ label, value, color }) {
   return (
-    <div style={{ background: "#FAFAFA", borderRadius: 12, border: "1px solid #E8EDF2", padding: "14px 16px", flex: 1, minWidth: 0 }}>
+    <div style={{ background: "#FAFAFA", borderRadius: 12, border: "1px solid #E8EDF2", padding: "14px 16px", minWidth: 0 }}>
       <div style={{ fontSize: 9, color: C.muted, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8 }}>{label.toUpperCase()}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: color || C.primary, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: color || C.primary, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1 }}>{value}</div>
     </div>
   );
 }
@@ -393,33 +393,33 @@ function WeeklyReportsContent() {
       <header style={{
         position: "sticky", top: 0, zIndex: 1000,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 28px", height: 60, gap: 16,
+        padding: "0 16px", height: 56, gap: 10,
         background: "rgba(255,255,255,0.92)", backdropFilter: "blur(16px)",
         borderBottom: "1px solid #E8EDF2",
       }}>
         <Link href={dashHref} style={{ textDecoration: "none", flexShrink: 0 }}>
-          <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: 130, height: 36, objectFit: "contain", display: "block" }} />
+          <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: 110, height: 32, objectFit: "contain", display: "block" }} />
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "flex-end" }}>
           <MarketSwitcher />
 
-          <button onClick={onGenerateNow} disabled={busy} style={{
+          <button onClick={onGenerateNow} disabled={busy} className="wr-gen-btn" style={{
             display: "flex", alignItems: "center", gap: 6,
             background: busy ? "#E2E8F0" : C.bull,
-            border: "none", borderRadius: 8, padding: "8px 16px",
+            border: "none", borderRadius: 8, padding: "8px 14px",
             color: busy ? C.muted : "#FFFFFF",
             fontSize: 12, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-            transition: "all 0.2s",
+            transition: "all 0.2s", whiteSpace: "nowrap",
           }}>
             <RefreshCw size={13} style={{ animation: busy ? "spin 1s linear infinite" : "none" }} />
-            {busy ? "Generating…" : "Generate Report"}
+            <span className="wr-gen-label">{busy ? "Generating…" : "Generate Report"}</span>
           </button>
 
           <button onClick={() => { localStorage.removeItem("token"); router.push("/login"); }}
             title="Logout" style={{
               display: "flex", alignItems: "center", justifyContent: "center",
-              width: 34, height: 34, background: "transparent",
+              width: 34, height: 34, background: "transparent", flexShrink: 0,
               border: "1px solid #E2E8F0", borderRadius: 8, cursor: "pointer", color: C.muted,
             }}>
             <LogOut size={14} />
@@ -428,7 +428,7 @@ function WeeklyReportsContent() {
       </header>
 
       {/* ── Body ────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "24px", display: "grid", gridTemplateColumns: "280px 1fr", gap: 20, alignItems: "start" }}>
+      <div className="wr-body" style={{ maxWidth: 1180, margin: "0 auto", padding: "24px", display: "grid", gridTemplateColumns: "280px 1fr", gap: 20, alignItems: "start" }}>
 
         {/* Sidebar */}
         <aside style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E8EDF2", overflow: "hidden", boxShadow: "0 2px 12px rgba(15,25,35,0.04)", position: "sticky", top: 80 }}>
@@ -443,7 +443,7 @@ function WeeklyReportsContent() {
               No reports yet.<br />Click <strong style={{ color: C.bull }}>Generate Report</strong> above.
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column" }}>
+            <div className="wr-sidebar-list" style={{ display: "flex", flexDirection: "column" }}>
               {reports.map(r => {
                 const label = r?.snapshot?.week?.label || new Date(r.weekStart).toDateString();
                 const rNet  = r?.snapshot?.pnl?.net ?? 0;
@@ -496,17 +496,17 @@ function WeeklyReportsContent() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
               {/* ── Week header ──────────────────────────────────── */}
-              <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E8EDF2", padding: "18px 22px", boxShadow: "0 2px 12px rgba(15,25,35,0.04)" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 8 }}>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: C.primary }}>
+              <div style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E8EDF2", padding: "16px 18px", boxShadow: "0 2px 12px rgba(15,25,35,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C.primary, lineHeight: 1.4, wordBreak: "break-word" }}>
                       {snap?.week?.label?.replace(" (Last 7 days)", "") || "Weekly Report"}
                     </h2>
                     <div style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono',monospace", marginTop: 4, letterSpacing: "0.04em" }}>
                       {selected.aiModel ? `AI: ${selected.aiModel}` : "No AI model"} · {snap?.counts?.totalTrades ?? 0} trades
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: net >= 0 ? "rgba(13,158,110,0.08)" : "rgba(214,59,59,0.08)", border: `1px solid ${net >= 0 ? "rgba(13,158,110,0.2)" : "rgba(214,59,59,0.2)"}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: net >= 0 ? "rgba(13,158,110,0.08)" : "rgba(214,59,59,0.08)", border: `1px solid ${net >= 0 ? "rgba(13,158,110,0.2)" : "rgba(214,59,59,0.2)"}`, flexShrink: 0 }}>
                     {net >= 0 ? <TrendingUp size={14} color={C.bull} /> : <TrendingDown size={14} color={C.bear} />}
                     <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", color: net >= 0 ? C.bull : C.bear }}>
                       {net >= 0 ? "+" : ""}{currency}{Math.abs(net).toFixed(2)}
@@ -515,7 +515,7 @@ function WeeklyReportsContent() {
                 </div>
 
                 {/* KPI row */}
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div className="wr-kpi-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
                   <KpiCard label="Win Rate"      value={`${snap?.rates?.winRatePct ?? 0}%`} color={parseFloat(snap?.rates?.winRatePct ?? 0) >= 50 ? C.bull : C.bear} />
                   <KpiCard label="Profit Factor" value={snap?.rates?.profitFactor ?? "—"}   color={parseFloat(snap?.rates?.profitFactor ?? 0) >= 1 ? C.bull : C.bear} />
                   <KpiCard label="Avg Win"       value={`${currency}${snap?.rates?.avgWin ?? 0}`}  color={C.bull} />
@@ -638,11 +638,41 @@ function WeeklyReportsContent() {
 
       <style jsx global>{`
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        * { box-sizing: border-box; }
+
+        /* ── Tablet ──────────────────────────────────────── */
         @media (max-width: 900px) {
-          div[style*="gridTemplateColumns: 280px"] { grid-template-columns: 1fr !important; }
+          .wr-body { grid-template-columns: 1fr !important; padding: 16px !important; }
           .wr-grid { grid-template-columns: 1fr !important; }
         }
-        * { box-sizing: border-box; }
+
+        /* ── Mobile ──────────────────────────────────────── */
+        @media (max-width: 600px) {
+          .wr-body { padding: 12px !important; gap: 12px !important; }
+
+          /* Header */
+          .wr-gen-label { display: none; }
+          .wr-gen-btn   { padding: 8px 10px !important; }
+
+          /* Sidebar: static + horizontal scrollable list on mobile */
+          aside { position: static !important; }
+          .wr-sidebar-list {
+            flex-direction: row !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .wr-sidebar-list::-webkit-scrollbar { display: none; }
+          .wr-sidebar-list > button {
+            min-width: 160px !important;
+            border-bottom: none !important;
+            border-right: 1px solid #F4F2EE !important;
+            flex-shrink: 0 !important;
+          }
+
+          /* Week header */
+          .wr-kpi-row { grid-template-columns: repeat(2, 1fr) !important; }
+        }
       `}</style>
     </div>
   );

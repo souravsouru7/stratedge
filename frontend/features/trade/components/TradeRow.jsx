@@ -7,12 +7,19 @@ import Link from "next/link";
  */
 export default function TradeRow({ trade, onDelete, idx }) {
   const bull = parseFloat(trade.profit) >= 0;
+  const tradeDate = new Date(trade.tradeDate || trade.createdAt);
   return (
     <tr
       style={{ borderBottom: "1px solid #E2E8F0", animation: `fadeUp 0.4s ease ${idx * 0.05}s both`, transition: "background 0.2s" }}
       onMouseEnter={e => e.currentTarget.style.background = "#F8F6F2"}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
     >
+      <td style={{ padding: "14px 16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#64748B" }}>
+          <span>{tradeDate.toLocaleDateString()}</span>
+          <span>{tradeDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+      </td>
       {/* Pair */}
       <td style={{ padding: "14px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

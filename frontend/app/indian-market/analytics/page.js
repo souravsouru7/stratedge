@@ -26,6 +26,7 @@ import {
   Area
 } from "recharts";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 
@@ -160,7 +161,7 @@ function PathToAdvanced({ summary, ai, perf, quality, psychology, currency }) {
   const psychologyScore = parseFloat(psychology?.psychologyScore || 0);
 
   const checks = [
-    { label: "Log at least 5 trades with details (strategy, entry basis)", done: totalTrades >= 5, value: `${totalTrades} / 5` },
+    { label: "Log at least 5 trades with details (trading setup, entry basis)", done: totalTrades >= 5, value: `${totalTrades} / 5` },
     { label: "Log at least 10 trades for advanced insights", done: totalTrades >= 10, value: `${totalTrades} / 10` },
     { label: "Win rate ≥ 50%", done: winRate >= 50, value: `${winRate}%` },
     { label: "Total P&L positive", done: totalProfit > 0, value: `${currency}${totalProfit.toFixed(0)}` },
@@ -377,131 +378,7 @@ export default function IndianAnalyticsPage() {
         color: theme.primary
       }}
     >
-      <header
-        style={{
-          background: "#FFFFFF",
-          borderBottom: `1px solid ${theme.border}`,
-          minHeight: 60,
-          padding: "10px 24px",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              border: `1px solid ${theme.border}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 8,
-              cursor: "pointer",
-              background: "#FFFFFF",
-              padding: 0
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.primary} strokeWidth="2.2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <Link
-            href="/indian-market/dashboard"
-            style={{ textDecoration: "none", color: theme.primary, display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-            >
-              <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  fontSize: 15,
-                  fontWeight: 800,
-                  letterSpacing: "0.04em",
-                  color: theme.primary,
-                  lineHeight: 1
-                }}
-              >
-                {""}
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  letterSpacing: "0.18em",
-                  color: theme.secondary,
-                  marginTop: 1,
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontWeight: 600
-                }}
-              >
-                INDIAN MARKET · ANALYTICS
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[
-            { href: "/indian-market/trades", label: "Journal" },
-            { href: "/indian-market/add-trade", label: "Log option" },
-            { href: "/indian-market/analytics", label: "Analytics" },
-            { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
-          ].map(n => (
-            <Link
-              key={n.href}
-              href={n.href}
-              style={{
-                fontSize: 13,
-                color: theme.primary,
-                fontWeight: 700,
-                textDecoration: "none",
-                padding: "10px 16px",
-                borderRadius: 999,
-                transition: "all 0.2s",
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-                background: "rgba(13,158,110,0.08)",
-                border: "1.5px solid rgba(13,158,110,0.25)",
-                minHeight: "44px",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "rgba(13,158,110,0.18)";
-                e.currentTarget.style.borderColor = "rgba(13,158,110,0.6)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "rgba(13,158,110,0.08)";
-                e.currentTarget.style.borderColor = "rgba(13,158,110,0.25)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <MarketSwitcher />
-        </div>
-      </header>
+      <IndianMarketHeader />
 
       <main style={{ padding: "28px 20px", maxWidth: 1100, margin: "0 auto" }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 24 }}>
@@ -1117,7 +994,7 @@ export default function IndianAnalyticsPage() {
                 {/* Strategy League */}
                 {Array.isArray(data.ai?.strategyLeague) && data.ai.strategyLeague.filter(s => s.strategy !== "Unspecified").length > 0 && (
                   <div style={{ flex: "1 1 280px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Strategy League</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Trading Setup League</div>
                     <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>Your setups ranked by total profit.</div>
                     {data.ai.strategyLeague.filter(s => s.strategy !== "Unspecified").slice(0, 6).map((s, i) => {
                       const profit = parseFloat(s.totalProfit);
@@ -1309,7 +1186,7 @@ export default function IndianAnalyticsPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
               {data.distribution?.byStrategy && Object.keys(data.distribution.byStrategy).length > 0 && (
                 <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Strategy</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Trading Setup</div>
                   <DistList title="" data={data.distribution.byStrategy} currency={currency} maxItems={6} />
                 </div>
               )}
@@ -1641,6 +1518,160 @@ export default function IndianAnalyticsPage() {
                 </div>
               )}
             </div>
+
+            {/* ── Repeated Mistakes Feed ── */}
+            {data.ai?.mistakeFeed?.length > 0 && (
+              <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 24, marginBottom: 24, boxShadow: "0 2px 10px rgba(15,23,42,0.05)" }}>
+                <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>Repeated Mistakes</div>
+                <div style={{ fontSize: 11, color: theme.muted, marginBottom: 16 }}>
+                  Your self-tagged mistakes ranked by total P&L cost. Fixing #1 is worth more than finding new setups.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {data.ai.mistakeFeed.map((m, i) => {
+                    const rankColors = ["#DC2626", "#EA580C", "#D97706", "#65A30D", "#0284C7"];
+                    const rankColor = rankColors[i] || theme.muted;
+                    return (
+                      <div key={m.tag} style={{ borderRadius: 12, border: `1px solid ${rankColor}22`, background: `${rankColor}06`, padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${rankColor}18`, border: `1.5px solid ${rankColor}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: rankColor, flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>
+                              {i + 1}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: theme.secondary }}>{m.tag}</div>
+                              <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>{m.count} occurrence{m.count !== 1 ? "s" : ""} · avg ₹{Math.abs(m.avgPnl).toFixed(2)} {m.avgPnl < 0 ? "lost" : "made"} per trade</div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 900, color: m.totalPnl < 0 ? theme.bear : theme.bull, fontFamily: "'JetBrains Mono',monospace" }}>
+                              {m.totalPnl < 0 ? "-" : "+"}₹{Math.abs(m.totalPnl).toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: 9, color: theme.muted, marginTop: 2 }}>total cost</div>
+                          </div>
+                        </div>
+                        {m.lessons?.length > 0 && (
+                          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${rankColor}20` }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: rankColor, letterSpacing: "0.1em", marginBottom: 6 }}>LESSON LOGGED</div>
+                            <div style={{ fontSize: 11, color: "#374151", fontStyle: "italic", lineHeight: 1.6 }}>"{m.lessons[0]}"</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Discipline Trend + Revenge/Tilt ── */}
+            {data.ai?.weeklyDisciplineTrend?.length > 1 && (
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
+
+                {/* Discipline Trend */}
+                <div style={{ flex: "1 1 320px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 24, boxShadow: "0 2px 10px rgba(15,23,42,0.05)" }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 4 }}>Discipline Trend</div>
+                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 14 }}>Weekly plan adherence % with P&L</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {data.ai.weeklyDisciplineTrend.slice(-8).map((w, i, arr) => {
+                      const pct = w.planAdherencePct;
+                      const barColor = pct >= 70 ? theme.bull : pct >= 40 ? theme.gold : theme.bear;
+                      const weekLabel = w.week.replace(/^\d{4}-/, "");
+                      const isLatest = i === arr.length - 1;
+                      const prevPct = i > 0 ? arr[i - 1].planAdherencePct : null;
+                      const trend = prevPct !== null ? (pct > prevPct ? "▲" : pct < prevPct ? "▼" : "—") : "";
+                      const trendColor = trend === "▲" ? theme.bull : trend === "▼" ? theme.bear : theme.muted;
+                      return (
+                        <div key={w.week} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono',monospace", color: isLatest ? theme.secondary : theme.muted, width: 48, flexShrink: 0, fontWeight: isLatest ? 700 : 400 }}>{weekLabel}</div>
+                          <div style={{ flex: 1, height: 6, background: theme.bg, borderRadius: 99, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: barColor, borderRadius: 99 }} />
+                          </div>
+                          <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: barColor, width: 36, textAlign: "right" }}>{pct}%</div>
+                          <div style={{ fontSize: 9, color: trendColor, width: 12 }}>{trend}</div>
+                          <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono',monospace", color: w.pnl >= 0 ? theme.bull : theme.bear, width: 60, textAlign: "right" }}>{w.pnl >= 0 ? "+" : ""}₹{Math.abs(w.pnl).toFixed(0)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {(() => {
+                    const trend = data.ai.weeklyDisciplineTrend.slice(-4);
+                    if (trend.length < 2) return null;
+                    const delta = trend[trend.length - 1].planAdherencePct - trend[0].planAdherencePct;
+                    if (Math.abs(delta) < 5) return null;
+                    return (
+                      <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: delta > 0 ? "#F0FDF4" : "#FFF8F8", border: `1px solid ${delta > 0 ? "#BBF7D0" : "#FED7D7"}`, fontSize: 11, color: delta > 0 ? "#166534" : "#9B1C1C" }}>
+                        {delta > 0 ? "▲" : "▼"} Discipline {delta > 0 ? "improving" : "declining"} {Math.abs(delta).toFixed(0)}pp over last 4 weeks
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Revenge & Tilt Alerts */}
+                <div style={{ flex: "1 1 320px", background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 24, boxShadow: "0 2px 10px rgba(15,23,42,0.05)" }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 16 }}>Revenge & Tilt Alerts</div>
+
+                  {/* Revenge */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: theme.muted, letterSpacing: "0.08em" }}>REVENGE TRADES</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: (data.ai.behaviorDiscipline?.revengeTradesCount || 0) > 0 ? theme.bear : theme.bull, fontFamily: "'JetBrains Mono',monospace" }}>
+                        {data.ai.behaviorDiscipline?.revengeTradesCount || 0}
+                      </div>
+                    </div>
+                    {(data.ai.behaviorDiscipline?.revengeTradesCount || 0) > 0 ? (
+                      <>
+                        <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.6, marginBottom: 8 }}>
+                          Trades taken after a loss with 1.5× bigger risk. Total cost:{" "}
+                          <span style={{ fontWeight: 700, color: theme.bear, fontFamily: "'JetBrains Mono',monospace" }}>
+                            ₹{Math.abs(parseFloat(data.ai.behaviorDiscipline.revengeCostTotal || 0)).toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {(data.ai.behaviorDiscipline.revengeTrades || []).slice(-3).map((t, i) => (
+                            <div key={i} style={{ fontSize: 10, color: theme.muted, display: "flex", justifyContent: "space-between", padding: "4px 8px", background: "#FFF8F8", borderRadius: 6, border: "1px solid #FED7D7" }}>
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>{t.pair}</span>
+                              <span>{new Date(t.createdAt).toLocaleDateString("en-IN")}</span>
+                              <span style={{ color: theme.bear, fontWeight: 700 }}>₹{Math.abs(t.prevProfit || 0).toFixed(0)} trigger</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: theme.bear }}>Rule: After a loss, wait 15 min before the next trade.</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: theme.bull, fontWeight: 600 }}>✓ No revenge trades detected — strong control.</div>
+                    )}
+                  </div>
+
+                  {/* Tilt */}
+                  <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: theme.muted, letterSpacing: "0.08em" }}>TILT DAYS</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: (data.ai.psychologicalPatterns?.tiltDays?.length || 0) > 0 ? theme.bear : theme.bull, fontFamily: "'JetBrains Mono',monospace" }}>
+                        {data.ai.psychologicalPatterns?.tiltDays?.length || 0}
+                      </div>
+                    </div>
+                    {(data.ai.psychologicalPatterns?.tiltDays?.length || 0) > 0 ? (
+                      <>
+                        <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.6, marginBottom: 8 }}>
+                          3+ consecutive losses with increasing lot size detected.
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {data.ai.psychologicalPatterns.tiltDays.slice(-3).map((td, i) => (
+                            <div key={i} style={{ fontSize: 10, color: theme.muted, display: "flex", justifyContent: "space-between", padding: "4px 8px", background: "#FFF8F8", borderRadius: 6, border: "1px solid #FED7D7" }}>
+                              <span>{td.day}</span>
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace" }}>{td.streakLength} losses</span>
+                              <span style={{ color: theme.bear, fontWeight: 700 }}>-₹{Math.abs(parseFloat(td.totalLoss)).toFixed(0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: theme.bear }}>Rule: Stop trading after 3 consecutive losses.</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: theme.bull, fontWeight: 600 }}>✓ No tilt days detected — great discipline.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Path to Advanced / Profitable */}
             <PathToAdvanced

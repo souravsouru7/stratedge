@@ -30,6 +30,8 @@ export default function LoginForm({
     },
   ];
 
+  const isAnyLoading = loading || googleLoading;
+
   return (
     <div style={{ background: "#FFFFFF", borderRadius: 16, overflow: "hidden", border: "1px solid #E2E8F0", boxShadow: "0 8px 40px rgba(15,25,35,0.1), 0 2px 8px rgba(15,25,35,0.05)", animation: shake ? "shake 0.5s ease-in-out" : "none" }}>
       {/* Top accent */}
@@ -108,8 +110,9 @@ export default function LoginForm({
         {/* Google */}
         <div style={{ marginBottom: 16 }}>
           {process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? (
-            <button type="button" onClick={handleGoogleSignIn} disabled={googleLoading}
-              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "11px 16px", border: "1.5px solid #E2E8F0", borderRadius: 8, background: "#fff", cursor: googleLoading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, color: "#0F1923", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: googleLoading ? 0.7 : 1, boxShadow: "0 1px 6px rgba(15,25,35,0.08)" }}
+            <button type="button" onClick={handleGoogleSignIn}
+              disabled={isAnyLoading}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "11px 16px", border: "1.5px solid #E2E8F0", borderRadius: 8, background: "#fff", cursor: isAnyLoading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, color: "#0F1923", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: isAnyLoading ? 0.7 : 1, boxShadow: "0 1px 6px rgba(15,25,35,0.08)", transition: "all 0.2s" }}
             >
               <svg width="18" height="18" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.7 0 6.7 5.5 2.7 13.5l7.8 6C12.4 13.2 17.8 9.5 24 9.5z"/>
@@ -126,7 +129,7 @@ export default function LoginForm({
           )}
         </div>
 
-        <div style={{ height: 1, background: "#F1F5F9", marginBottom: 20 }} />
+        <div style={{ height: 1, background: "#F1F5F9", marginBottom: 16 }} />
 
         {/* Submit */}
         <button type="submit" disabled={loading}

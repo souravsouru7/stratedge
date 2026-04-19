@@ -755,7 +755,7 @@ exports.getAIInsights = async (req, res) => {
   try {
     const query = forexQuery(req);
     const trades = await Trade.find(query)
-      .select("profit entryPrice stopLoss takeProfit session pair createdAt entryBasis strategy riskRewardRatio riskRewardCustom lotSize")
+      .select("profit entryPrice stopLoss takeProfit session pair createdAt entryBasis strategy riskRewardRatio riskRewardCustom lotSize mistakeTag lesson")
       .lean()
       .limit(10000);
 
@@ -776,7 +776,8 @@ exports.getAIInsights = async (req, res) => {
       byDay: { Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0 },
       behaviorBuckets: { Plan: { count: 0, pnl: 0 }, Emotion: { count: 0, pnl: 0 }, Impulsive: { count: 0, pnl: 0 }, Other: { count: 0, pnl: 0 } },
       weeklyPlan: {},
-      strategyStats: {}
+      strategyStats: {},
+      mistakeTagStats: {}
     };
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -824,9 +825,21 @@ exports.getAIInsights = async (req, res) => {
       const year = d.getFullYear();
       const week = Math.ceil(((d - new Date(year, 0, 1)) / 86400000 + d.getDay() + 1) / 7);
       const weekKey = `${year}-W${week}`;
-      if (!stats.weeklyPlan[weekKey]) stats.weeklyPlan[weekKey] = { total: 0, plan: 0 };
+      if (!stats.weeklyPlan[weekKey]) stats.weeklyPlan[weekKey] = { total: 0, plan: 0, pnl: 0 };
       stats.weeklyPlan[weekKey].total++;
+      stats.weeklyPlan[weekKey].pnl += profit;
       if (t.entryBasis === "Plan") stats.weeklyPlan[weekKey].plan++;
+
+      // Mistake tag
+      if (t.mistakeTag && t.mistakeTag.trim()) {
+        const mk = t.mistakeTag.trim();
+        if (!stats.mistakeTagStats[mk]) stats.mistakeTagStats[mk] = { count: 0, pnl: 0, lessons: [] };
+        stats.mistakeTagStats[mk].count++;
+        stats.mistakeTagStats[mk].pnl += profit;
+        if (t.lesson && t.lesson.trim() && stats.mistakeTagStats[mk].lessons.length < 3) {
+          stats.mistakeTagStats[mk].lessons.push(t.lesson.trim());
+        }
+      }
 
       // Strategy stats
       const stratKey = t.strategy || "Unspecified";
@@ -916,10 +929,17 @@ exports.getAIInsights = async (req, res) => {
       emotionPnl: (stats.behaviorBuckets.Emotion.pnl + stats.behaviorBuckets.Impulsive.pnl).toFixed(2)
     };
 
-    // Weekly plan adherence timeline
-    const planTimeline = Object.entries(stats.weeklyPlan)
+    // Weekly discipline trend (plan adherence + P&L per week)
+    const weeklyDisciplineTrend = Object.entries(stats.weeklyPlan)
       .sort(([a], [b]) => (a > b ? 1 : -1))
-      .map(([week, v]) => ({ week, planAdherencePct: v.total ? ((v.plan / v.total) * 100).toFixed(1) : "0.0" }));
+      .slice(-12)
+      .map(([week, v]) => ({
+        week,
+        planAdherencePct: v.total ? parseFloat(((v.plan / v.total) * 100).toFixed(1)) : 0,
+        pnl: parseFloat(v.pnl.toFixed(2)),
+        total: v.total,
+      }));
+    const planTimeline = weeklyDisciplineTrend.map(w => ({ week: w.week, planAdherencePct: String(w.planAdherencePct) }));
 
     // Revenge trading detector - optimized with early exit
     const revengeTrades = [];
@@ -935,8 +955,15 @@ exports.getAIInsights = async (req, res) => {
         revengeTrades.push({ id: curr._id, pair: curr.pair, createdAt: curr.createdAt, prevProfit: prev.profit, currRisk, prevRisk });
       }
     }
+    const revengeCostTotal = revengeTrades.reduce((acc, t) => acc + (t.prevProfit || 0), 0);
 
-    const behaviorDiscipline = { ruleEmotion: behaviorRuleEmotion, planTimeline, revengeTradesCount: revengeTrades.length, revengeTrades: revengeTrades };
+    // Mistake feed — top costly recurring mistakes
+    const mistakeFeed = Object.entries(stats.mistakeTagStats)
+      .map(([tag, s]) => ({ tag, count: s.count, totalPnl: parseFloat(s.pnl.toFixed(2)), avgPnl: parseFloat((s.pnl / s.count).toFixed(2)), lessons: s.lessons }))
+      .sort((a, b) => a.totalPnl - b.totalPnl) // most costly first
+      .slice(0, 5);
+
+    const behaviorDiscipline = { ruleEmotion: behaviorRuleEmotion, planTimeline, revengeTradesCount: revengeTrades.length, revengeTrades, revengeCostTotal: revengeCostTotal.toFixed(2) };
 
     // 2) Session edge card
     const sessionEdge = sessionEntries.map(([name, s]) => ({
@@ -1030,6 +1057,8 @@ exports.getAIInsights = async (req, res) => {
       strategyLeague,
       weeklyNarrative,
       nextWeekChecklist,
+      mistakeFeed,
+      weeklyDisciplineTrend,
       topStrategies: strategyLeague.slice(0, 5),
       topPairs: pairs.slice(0, 5),
       bestDay: bestDay[0],

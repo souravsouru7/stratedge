@@ -4,7 +4,7 @@ import { Skeleton } from "@/features/shared";
 import TradeRow  from "./TradeRow";
 import TradeCard from "./TradeCard";
 
-const TABLE_HEADERS = ["PAIR", "TYPE", "BASIS", "P&L", "ACTIONS"];
+const TABLE_HEADERS = ["DATE", "PAIR", "TYPE", "BASIS", "P&L", "ACTIONS"];
 
 /**
  * TradeTable
@@ -37,7 +37,7 @@ export default function TradeTable({ trades, loading, onDelete }) {
               <thead>
                 <tr style={{ borderBottom: "1px solid #E2E8F0" }}>
                   {TABLE_HEADERS.map((h, i) => (
-                    <th key={h} style={{ padding: "14px 16px", textAlign: i === 4 ? "right" : "left" }}>
+                    <th key={h} style={{ padding: "14px 16px", textAlign: i === 5 ? "right" : "left" }}>
                       <Skeleton width="40px" height="10px" />
                     </th>
                   ))}
@@ -46,6 +46,7 @@ export default function TradeTable({ trades, loading, onDelete }) {
               <tbody>
                 {[...Array(skeletonCount)].map((_, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid #F7FAFC" }}>
+                    <td style={{ padding: "16px" }}><Skeleton width="70px" height="14px" /></td>
                     <td style={{ padding: "16px" }}><Skeleton width="80px" height="14px" /></td>
                     <td style={{ padding: "16px" }}><Skeleton width="40px" height="14px" /></td>
                     <td style={{ padding: "16px" }}><Skeleton width="60px" height="14px" /></td>
@@ -71,7 +72,7 @@ export default function TradeTable({ trades, loading, onDelete }) {
               <thead>
                 <tr style={{ borderBottom: "1px solid #E2E8F0", background: "#F8F6F2" }}>
                   {TABLE_HEADERS.map((h, i) => (
-                    <th key={h} style={{ padding: "14px 16px", fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", textAlign: i === 4 ? "right" : "left", fontWeight: 700 }}>
+                    <th key={h} style={{ padding: "14px 16px", fontSize: 10, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", textAlign: i === 5 ? "right" : "left", fontWeight: 700 }}>
                       {h}
                     </th>
                   ))}

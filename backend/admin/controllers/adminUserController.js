@@ -10,22 +10,20 @@ const asyncHandler = require("../../utils/asyncHandler");
  * @access  Private/Admin
  */
 exports.getAllUsers = asyncHandler(async (req, res) => {
-  const users = await User.find({ role: { $ne: "admin" } }).select("+password").lean();
+  const users = await User.find({ role: { $ne: "admin" } }).select("-password").lean();
 
-    // Enrich users with trade counts
     const enrichedUsers = await Promise.all(
       users.map(async (user) => {
-        const forexCount = await Trade.countDocuments({ user: user._id });
-        const indianCount = await IndianTrade.countDocuments({ user: user._id });
-        
-        // Remove password before sending to frontend
-        const { password, ...userWithoutPassword } = user;
-        
+        const [forexCount, indianCount] = await Promise.all([
+          Trade.countDocuments({ user: user._id }),
+          IndianTrade.countDocuments({ user: user._id }),
+        ]);
+
         return {
-          ...userWithoutPassword,
+          ...user,
           tradeCount: forexCount + indianCount,
           forexTradeCount: forexCount,
-          indianTradeCount: indianCount
+          indianTradeCount: indianCount,
         };
       })
     );
@@ -90,7 +88,11 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
  */
 exports.extendUserPlan = asyncHandler(async (req, res) => {
   const { days } = req.body;
-  const extensionDays = parseInt(days, 10) || 30;
+  const parsed = parseInt(days, 10);
+  if (!parsed || parsed <= 0) {
+    throw new ApiError(400, "days must be a positive integer", "VALIDATION_ERROR");
+  }
+  const extensionDays = Math.min(parsed, 365); // cap at 1 year per single extension
 
   const user = await User.findById(req.params.id);
   if (!user) {

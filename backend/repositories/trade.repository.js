@@ -10,6 +10,9 @@ const TRADE_LIST_PROJECTION = [
   "profit",
   "strategy",
   "session",
+  "entryBasis",
+  "entryBasisCustom",
+  "tradeDate",
   "status",
   "marketType",
   "createdAt",
@@ -33,6 +36,7 @@ const TRADE_STATUS_PROJECTION = [
   "status",
   "error",
   "createdAt",
+  "tradeDate",
   "queuedAt",
   "processingStartedAt",
   "processedAt",
@@ -59,6 +63,7 @@ const WEEKLY_TRADE_PROJECTION = [
   "entryBasis",
   "mistakeTag",
   "createdAt",
+  "tradeDate",
 ].join(" ");
 
 async function createTrade(data) {

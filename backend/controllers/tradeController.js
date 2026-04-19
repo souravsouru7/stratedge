@@ -7,23 +7,13 @@ exports.createTrade = asyncHandler(async (req, res) => {
 });
 
 exports.getTrades = asyncHandler(async (req, res) => {
-  console.time("getTradesQuery");
-  try {
-    const trades = await tradeService.getTrades(req.user._id, req.query);
-    res.json(trades);
-  } finally {
-    console.timeEnd("getTradesQuery");
-  }
+  const trades = await tradeService.getTrades(req.user._id, req.query);
+  res.json(trades);
 });
 
 exports.getTrade = asyncHandler(async (req, res) => {
-  console.time("getTradeQuery");
-  try {
-    const trade = await tradeService.getTrade(req.user._id, req.params.id);
-    res.json(trade);
-  } finally {
-    console.timeEnd("getTradeQuery");
-  }
+  const trade = await tradeService.getTrade(req.user._id, req.params.id);
+  res.json(trade);
 });
 
 exports.getTradeStatus = asyncHandler(async (req, res) => {

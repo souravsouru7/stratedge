@@ -22,7 +22,6 @@ async function saveSetups(userId, marketType = "Forex", strategies) {
       referenceImages: Array.isArray(strategy.referenceImages)
         ? strategy.referenceImages
             .filter((image) => image && (image.url || image.publicId))
-            .slice(0, 5)
             .map((image) => ({
               url: String(image.url || "").trim(),
               publicId: String(image.publicId || "").trim(),

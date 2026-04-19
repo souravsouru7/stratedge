@@ -38,6 +38,13 @@ const userSchema = new mongoose.Schema(
     resetPasswordOTPExpires: {
       type: Date
     },
+    otpAttempts: {
+      type: Number,
+      default: 0,
+    },
+    otpLockUntil: {
+      type: Date,
+    },
     subscriptionStatus: {
       type: String,
       enum: ["inactive", "active", "expired"],
@@ -65,6 +72,16 @@ const userSchema = new mongoose.Schema(
     hasSeenWelcomeGuide: {
       type: Boolean,
       default: false
+    },
+    termsAcceptance: {
+      acceptedTerms: { type: Boolean, default: false },
+      acceptedPrivacy: { type: Boolean, default: false },
+      acceptedAt: { type: Date, default: null },
+      termsVersion: { type: String, default: null }
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
     }
   },
   { timestamps: true }

@@ -15,6 +15,40 @@ function normalizeTradeType(type) {
   return normalizedType;
 }
 
+function normalizeTradeDate(tradeDate) {
+  const parsed = new Date(tradeDate);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ApiError(400, "Trade date is invalid", "VALIDATION_ERROR");
+  }
+  return parsed;
+}
+
+function getEffectiveTradeTime(trade) {
+  return new Date(trade.tradeDate || trade.createdAt || 0).getTime();
+}
+
+function getPeriodStart(period) {
+  const now = new Date();
+  const start = new Date(now);
+
+  switch (String(period || "all").toLowerCase()) {
+    case "1w":
+      start.setDate(start.getDate() - 7);
+      return start;
+    case "1m":
+      start.setMonth(start.getMonth() - 1);
+      return start;
+    case "3m":
+      start.setMonth(start.getMonth() - 3);
+      return start;
+    case "1y":
+      start.setFullYear(start.getFullYear() - 1);
+      return start;
+    default:
+      return null;
+  }
+}
+
 async function createTrade(userId, payload) {
   if (!payload.pair) {
     throw new ApiError(400, "Pair is required", "VALIDATION_ERROR");
@@ -22,10 +56,14 @@ async function createTrade(userId, payload) {
   if (!payload.type) {
     throw new ApiError(400, "Action/Type is required", "VALIDATION_ERROR");
   }
+  if (!payload.tradeDate) {
+    throw new ApiError(400, "Trade date is required", "VALIDATION_ERROR");
+  }
 
   const trade = await tradeRepository.createTrade({
     ...payload,
     type: normalizeTradeType(payload.type),
+    tradeDate: normalizeTradeDate(payload.tradeDate),
     user: userId,
     status: payload.status || "completed",
     error: payload.error ?? null,
@@ -37,13 +75,16 @@ async function createTrade(userId, payload) {
 }
 
 async function getTrades(userId, query) {
-  const page = Math.max(parseInt(query.page, 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
-  const key = buildCacheKey("trades", userId, "list", `page=${page}`, `limit=${limit}`);
+  const period = String(query.period || "all").toLowerCase();
+  const key = buildCacheKey("trades", userId, "list", `period=${period}`);
   const startedAt = Date.now();
   const { data: trades } = await rememberCache(key, TRADE_LIST_TTL_SECONDS, async () => {
-    const rows = await tradeRepository.findForexTradesByUser(userId, { page, limit });
-    return rows.map((trade) => ({
+    const rows = await tradeRepository.findForexTradesByUser(userId);
+    const periodStart = getPeriodStart(period);
+    return rows
+      .filter((trade) => !periodStart || getEffectiveTradeTime(trade) >= periodStart.getTime())
+      .sort((a, b) => getEffectiveTradeTime(b) - getEffectiveTradeTime(a))
+      .map((trade) => ({
       ...trade,
       symbol: trade.pair ?? null,
       pnl: trade.profit ?? 0,
@@ -111,6 +152,9 @@ async function updateTrade(userId, tradeId, payload) {
   const update = { ...payload };
   if (payload.type) {
     update.type = normalizeTradeType(payload.type);
+  }
+  if (payload.tradeDate) {
+    update.tradeDate = normalizeTradeDate(payload.tradeDate);
   }
 
   const trade = await tradeRepository.updateForexTradeByUser(tradeId, userId, update);

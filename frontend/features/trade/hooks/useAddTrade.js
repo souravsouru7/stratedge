@@ -9,6 +9,11 @@ import { uploadTradeImage } from "@/services/uploadApi";
 import { MARKETS } from "@/context/MarketContext";
 import { useToast } from "@/features/shared/components/ui/Toast";
 
+const getTodayInputValue = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+};
+
 /**
  * useAddTrade
  * Encapsulates setup loading, screenshot uploading, and form submission logic using TanStack Query.
@@ -33,6 +38,7 @@ export function useAddTrade(marketType, isIndianMarket) {
     balance: "",
     strategy: "",
     strategyCustom: "",
+    tradeDate: getTodayInputValue(),
     session: "",
     notes: "",
     riskRewardRatio: "",
@@ -165,6 +171,10 @@ export function useAddTrade(marketType, isIndianMarket) {
       addToast(`Please enter a ${isIndianMarket ? "Symbol" : "Pair"}`, "info");
       return;
     }
+    if (!trade.tradeDate) {
+      addToast("Please select a trade date", "info");
+      return;
+    }
 
     const tradeData = {
       ...trade,
@@ -177,6 +187,7 @@ export function useAddTrade(marketType, isIndianMarket) {
       lotSize: !isIndianMarket ? parseFloat(trade.lotSize) : undefined,
       quantity: isIndianMarket ? parseFloat(trade.quantity) : undefined,
       strategy: trade.strategy === "Custom" ? trade.strategyCustom : trade.strategy,
+      tradeDate: trade.tradeDate,
       riskRewardRatio: trade.riskRewardCustom?.trim() ? "custom" : (trade.riskRewardRatio || ""),
       riskRewardCustom: trade.riskRewardCustom?.trim() || "",
     };

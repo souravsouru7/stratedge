@@ -80,6 +80,9 @@ function AddTradeContent() {
               <FormInput label={isIndianMarket ? "SYMBOL" : "PAIR"} name="pair" value={trade.pair} onChange={handleChange} placeholder={isIndianMarket ? "RELIANCE" : "XAUUSD"} />
               <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <FormSelect label="ACTION" name="type" value={trade.type} onChange={handleChange} options={[{v:"BUY",l:"BUY"},{v:"SELL",l:"SELL"}].map(o=>({value:o.v,label:o.l}))} />
+                <FormInput label="TRADE DATE" name="tradeDate" value={trade.tradeDate} onChange={handleChange} type="date" required />
+              </div>
+              <div style={{ maxWidth: 352 }}>
                 <FormInput label={isIndianMarket ? "QUANTITY" : "LOT SIZE"} name={isIndianMarket ? "quantity" : "lotSize"} value={isIndianMarket ? trade.quantity : trade.lotSize} onChange={handleChange} placeholder={isIndianMarket ? "100" : "0.01"} />
               </div>
               <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

@@ -10,7 +10,7 @@ const BG   = "#F0EEE9";
 const CARD = "#FFFFFF";
 const BDR  = "#E2E8F0";
 const TXT  = "#0F1923";
-const SUB  = "#64748B";
+const SUB  = "#475569";   // was #64748B — bumped up for readability
 const FONT = "'Plus Jakarta Sans', sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
@@ -75,16 +75,16 @@ function ProcessNode({ number, text, accent }) {
     <div style={{
       background:CARD, border:`1px solid ${BDR}`,
       borderLeft:`4px solid ${accent}`, borderRadius:12,
-      padding:"13px 16px", display:"flex", alignItems:"flex-start", gap:12,
+      padding:"14px 18px", display:"flex", alignItems:"flex-start", gap:14,
       boxShadow:"0 1px 8px rgba(15,25,35,0.05)",
     }}>
       <div style={{
-        width:26, height:26, borderRadius:999, flexShrink:0,
-        background:`${accent}18`, border:`1.5px solid ${accent}44`,
+        width:28, height:28, borderRadius:999, flexShrink:0,
+        background:`${accent}18`, border:`1.5px solid ${accent}55`,
         display:"flex", alignItems:"center", justifyContent:"center",
-        fontSize:10, fontWeight:800, fontFamily:MONO, color:accent,
+        fontSize:12, fontWeight:800, fontFamily:MONO, color:accent,
       }}>{number}</div>
-      <span style={{ fontSize:13, fontWeight:600, color:TXT, lineHeight:1.55, fontFamily:FONT }}>{text}</span>
+      <span style={{ fontSize:14, fontWeight:600, color:TXT, lineHeight:1.6, fontFamily:FONT }}>{text}</span>
     </div>
   );
 }
@@ -103,11 +103,11 @@ function DiamondNode() {
         <div style={{
           position:"absolute", inset:0,
           display:"flex", flexDirection:"column",
-          alignItems:"center", justifyContent:"center", textAlign:"center", gap:2,
+          alignItems:"center", justifyContent:"center", textAlign:"center", gap:3,
         }}>
-          <span style={{ fontSize:8, fontFamily:MONO, letterSpacing:"0.14em", color:SUB, fontWeight:700 }}>DID YOU</span>
-          <span style={{ fontSize:8, fontFamily:MONO, letterSpacing:"0.14em", color:SUB, fontWeight:700 }}>APPLY THE</span>
-          <span style={{ fontSize:9, fontFamily:MONO, letterSpacing:"0.14em", color:TXT, fontWeight:900 }}>FIX?</span>
+          <span style={{ fontSize:10, fontFamily:MONO, letterSpacing:"0.12em", color:SUB, fontWeight:700 }}>DID YOU</span>
+          <span style={{ fontSize:10, fontFamily:MONO, letterSpacing:"0.12em", color:SUB, fontWeight:700 }}>APPLY THE</span>
+          <span style={{ fontSize:12, fontFamily:MONO, letterSpacing:"0.12em", color:TXT, fontWeight:900 }}>FIX?</span>
         </div>
       </div>
     </div>
@@ -122,8 +122,8 @@ function TBranch() {
       <div style={{ position:"absolute", left:"25%", top:"38%", width:"50%", height:2, background:BDR }} />
       <div style={{ position:"absolute", left:"25%", top:"38%", width:2, height:"62%", background:`${R}55`, transform:"translateX(-50%)" }} />
       <div style={{ position:"absolute", left:"75%", top:"38%", width:2, height:"62%", background:`${G}55`, transform:"translateX(-50%)" }} />
-      <div style={{ position:"absolute", left:"10%", top:"42%", padding:"2px 9px", borderRadius:999, background:`rgba(214,59,59,0.1)`, border:`1px solid rgba(214,59,59,0.28)`, fontSize:9, fontFamily:MONO, fontWeight:800, color:R, letterSpacing:"0.1em" }}>NO</div>
-      <div style={{ position:"absolute", right:"10%", top:"42%", padding:"2px 9px", borderRadius:999, background:`rgba(13,158,110,0.1)`, border:`1px solid rgba(13,158,110,0.28)`, fontSize:9, fontFamily:MONO, fontWeight:800, color:G, letterSpacing:"0.1em" }}>YES</div>
+      <div style={{ position:"absolute", left:"10%", top:"42%", padding:"3px 11px", borderRadius:999, background:`rgba(214,59,59,0.1)`, border:`1px solid rgba(214,59,59,0.3)`, fontSize:11, fontFamily:MONO, fontWeight:800, color:R, letterSpacing:"0.1em" }}>NO</div>
+      <div style={{ position:"absolute", right:"10%", top:"42%", padding:"3px 11px", borderRadius:999, background:`rgba(13,158,110,0.1)`, border:`1px solid rgba(13,158,110,0.3)`, fontSize:11, fontFamily:MONO, fontWeight:800, color:G, letterSpacing:"0.1em" }}>YES</div>
     </div>
   );
 }
@@ -134,13 +134,13 @@ function MobileSplit() {
     <div className="p-mobile-split" style={{ display:"none", flexDirection:"column", alignItems:"center", gap:0 }}>
       <VArrow color={SUB} height={24} />
       <div style={{ display:"flex", gap:10, width:"100%" }}>
-        <div style={{ flex:1, padding:"10px 14px", borderRadius:10, background:`rgba(214,59,59,0.08)`, border:`1px solid rgba(214,59,59,0.2)`, display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:14, color:R }}>✕</span>
-          <span style={{ fontSize:10, fontFamily:MONO, fontWeight:800, color:R, letterSpacing:"0.1em" }}>NO — IGNORED</span>
+        <div style={{ flex:1, padding:"12px 14px", borderRadius:10, background:`rgba(214,59,59,0.08)`, border:`1px solid rgba(214,59,59,0.2)`, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:16, color:R }}>✕</span>
+          <span style={{ fontSize:12, fontFamily:MONO, fontWeight:800, color:R, letterSpacing:"0.08em" }}>NO — IGNORED</span>
         </div>
-        <div style={{ flex:1, padding:"10px 14px", borderRadius:10, background:`rgba(13,158,110,0.08)`, border:`1px solid rgba(13,158,110,0.2)`, display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:14, color:G }}>✓</span>
-          <span style={{ fontSize:10, fontFamily:MONO, fontWeight:800, color:G, letterSpacing:"0.1em" }}>YES — FIXED</span>
+        <div style={{ flex:1, padding:"12px 14px", borderRadius:10, background:`rgba(13,158,110,0.08)`, border:`1px solid rgba(13,158,110,0.2)`, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:16, color:G }}>✓</span>
+          <span style={{ fontSize:12, fontFamily:MONO, fontWeight:800, color:G, letterSpacing:"0.08em" }}>YES — FIXED</span>
         </div>
       </div>
     </div>
@@ -168,8 +168,8 @@ function OutcomeNode({ variant }) {
         fontSize:26, color:accent, margin:"0 auto 12px",
         animation: loop ? "slowSpin 5s linear infinite" : "none",
       }}>{icon}</div>
-      <div style={{ fontSize:15, fontWeight:800, color:accent, marginBottom:6, fontFamily:FONT }}>{title}</div>
-      <div style={{ fontSize:12, color:`${accent}AA`, lineHeight:1.55 }}>{body}</div>
+      <div style={{ fontSize:16, fontWeight:800, color:accent, marginBottom:6, fontFamily:FONT }}>{title}</div>
+      <div style={{ fontSize:13, color:accent, lineHeight:1.6, opacity:0.8 }}>{body}</div>
     </div>
   );
 }
@@ -182,27 +182,27 @@ function Flowchart({ problem, onBack, onNavigate }) {
       {/* Problem banner */}
       <div style={{
         background:CARD, border:`1px solid ${BDR}`, borderRadius:18,
-        padding:"20px 22px", marginBottom:0,
-        display:"flex", alignItems:"center", gap:16, flexWrap:"wrap",
+        padding:"22px 24px", marginBottom:0,
+        display:"flex", alignItems:"center", gap:18, flexWrap:"wrap",
         boxShadow:"0 2px 20px rgba(15,25,35,0.06)",
       }}>
         <div style={{
-          width:60, height:60, borderRadius:16, flexShrink:0,
+          width:64, height:64, borderRadius:16, flexShrink:0,
           background:BG, border:`1px solid ${BDR}`,
-          display:"flex", alignItems:"center", justifyContent:"center", fontSize:30,
+          display:"flex", alignItems:"center", justifyContent:"center", fontSize:32,
         }}>{problem.icon}</div>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:9, fontFamily:MONO, letterSpacing:"0.2em", color:SUB, fontWeight:700, marginBottom:4 }}>
+          <div style={{ fontSize:11, fontFamily:MONO, letterSpacing:"0.18em", color:SUB, fontWeight:700, marginBottom:5 }}>
             PROBLEM {String(problem.id).padStart(2,"0")} · {problem.tag}
           </div>
-          <h2 style={{ fontSize:"clamp(18px,4vw,28px)", fontWeight:900, color:TXT, margin:0, letterSpacing:"-0.03em" }}>
+          <h2 style={{ fontSize:"clamp(20px,4vw,30px)", fontWeight:900, color:TXT, margin:0, letterSpacing:"-0.02em" }}>
             {problem.title}
           </h2>
-          <p style={{ fontSize:13, color:SUB, margin:"4px 0 0", lineHeight:1.5 }}>{problem.desc}</p>
+          <p style={{ fontSize:14, color:SUB, margin:"6px 0 0", lineHeight:1.6 }}>{problem.desc}</p>
         </div>
         <button onClick={onBack} style={{
-          fontSize:10, fontFamily:MONO, letterSpacing:"0.1em", fontWeight:700,
-          padding:"9px 14px", borderRadius:9, border:`1px solid ${BDR}`,
+          fontSize:12, fontFamily:MONO, letterSpacing:"0.08em", fontWeight:700,
+          padding:"10px 16px", borderRadius:9, border:`1px solid ${BDR}`,
           background:BG, color:SUB, cursor:"pointer", flexShrink:0,
         }}>← BACK</button>
       </div>
@@ -212,37 +212,30 @@ function Flowchart({ problem, onBack, onNavigate }) {
         <VArrow color={SUB} height={28} />
       </div>
 
-      {/* Diamond */}
       <DiamondNode />
-
-      {/* Desktop T-branch */}
       <TBranch />
-
-      {/* Mobile split (only visible on small screens) */}
       <MobileSplit />
 
       {/* Path headers */}
       <div className="p-path-headers">
-        <div style={{ padding:"14px 16px", borderRadius:12, background:`rgba(214,59,59,0.07)`, border:`1px solid rgba(214,59,59,0.2)`, display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:32, height:32, borderRadius:9, flexShrink:0, background:`rgba(214,59,59,0.15)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:R }}>✕</div>
+        <div style={{ padding:"16px 18px", borderRadius:12, background:`rgba(214,59,59,0.07)`, border:`1px solid rgba(214,59,59,0.22)`, display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`rgba(214,59,59,0.15)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:R }}>✕</div>
           <div>
-            <div style={{ fontSize:10, fontWeight:800, fontFamily:MONO, color:R, letterSpacing:"0.1em" }}>IF IGNORED</div>
-            <div style={{ fontSize:10, color:`rgba(214,59,59,0.6)`, marginTop:1 }}>What keeps happening</div>
+            <div style={{ fontSize:12, fontWeight:800, fontFamily:MONO, color:R, letterSpacing:"0.1em" }}>IF IGNORED</div>
+            <div style={{ fontSize:12, color:SUB, marginTop:2, fontFamily:FONT }}>What keeps happening</div>
           </div>
         </div>
-        <div style={{ padding:"14px 16px", borderRadius:12, background:`rgba(13,158,110,0.07)`, border:`1px solid rgba(13,158,110,0.2)`, display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:32, height:32, borderRadius:9, flexShrink:0, background:`rgba(13,158,110,0.15)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:G }}>✓</div>
+        <div style={{ padding:"16px 18px", borderRadius:12, background:`rgba(13,158,110,0.07)`, border:`1px solid rgba(13,158,110,0.22)`, display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`rgba(13,158,110,0.15)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:G }}>✓</div>
           <div>
-            <div style={{ fontSize:10, fontWeight:800, fontFamily:MONO, color:G, letterSpacing:"0.1em" }}>IF FIXED</div>
-            <div style={{ fontSize:10, color:`rgba(13,158,110,0.6)`, marginTop:1 }}>What changes instead</div>
+            <div style={{ fontSize:12, fontWeight:800, fontFamily:MONO, color:G, letterSpacing:"0.1em" }}>IF FIXED</div>
+            <div style={{ fontSize:12, color:SUB, marginTop:2, fontFamily:FONT }}>What changes instead</div>
           </div>
         </div>
       </div>
 
       {/* Two-path steps */}
       <div className="p-step-cols" style={{ marginTop:14 }}>
-
-        {/* LEFT — ignore path (red) */}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
           {problem.symptoms.map((s, i) => (
             <div key={i} style={{ width:"100%", display:"flex", flexDirection:"column", alignItems:"center" }}>
@@ -252,8 +245,6 @@ function Flowchart({ problem, onBack, onNavigate }) {
           ))}
           <OutcomeNode variant="loop" />
         </div>
-
-        {/* RIGHT — fix path (green) */}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
           {problem.solutions.map((s, i) => (
             <div key={i} style={{ width:"100%", display:"flex", flexDirection:"column", alignItems:"center" }}>
@@ -268,18 +259,18 @@ function Flowchart({ problem, onBack, onNavigate }) {
       {/* Quick nav */}
       <div style={{
         marginTop:28, background:CARD, border:`1px solid ${BDR}`,
-        borderRadius:14, padding:"18px 20px",
+        borderRadius:14, padding:"20px 22px",
         boxShadow:"0 2px 10px rgba(15,25,35,0.04)",
       }}>
-        <div style={{ fontSize:9, fontFamily:MONO, letterSpacing:"0.2em", color:SUB, fontWeight:700, marginBottom:12 }}>
+        <div style={{ fontSize:11, fontFamily:MONO, letterSpacing:"0.18em", color:SUB, fontWeight:700, marginBottom:14 }}>
           OTHER PROBLEMS
         </div>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
           {PROBLEMS.filter(p => p.id !== problem.id).map(p => (
             <button key={p.id} onClick={() => onNavigate(p)} style={{
-              display:"inline-flex", alignItems:"center", gap:6,
-              fontSize:12, fontWeight:700, fontFamily:FONT,
-              padding:"8px 14px", borderRadius:999,
+              display:"inline-flex", alignItems:"center", gap:7,
+              fontSize:13, fontWeight:700, fontFamily:FONT,
+              padding:"9px 16px", borderRadius:999,
               border:`1px solid ${BDR}`, background:BG, color:TXT,
               cursor:"pointer", transition:"all 0.15s",
             }}
@@ -300,14 +291,14 @@ function ProblemGrid({ onSelect }) {
   const [hov, setHov] = useState(null);
   return (
     <div style={{ animation:"fadeUp 0.28s ease" }}>
-      <div style={{ marginBottom:24 }}>
-        <div style={{ fontSize:9, fontFamily:MONO, letterSpacing:"0.22em", color:SUB, fontWeight:700, marginBottom:10 }}>
+      <div style={{ marginBottom:28 }}>
+        <div style={{ fontSize:11, fontFamily:MONO, letterSpacing:"0.2em", color:SUB, fontWeight:700, marginBottom:12 }}>
           EDGEDISCIPLINE · PSYCHOLOGY GUIDE
         </div>
-        <h1 style={{ fontSize:"clamp(24px,5vw,40px)", fontWeight:900, margin:0, letterSpacing:"-0.03em", color:TXT, lineHeight:1.1 }}>
+        <h1 style={{ fontSize:"clamp(26px,5vw,42px)", fontWeight:900, margin:0, letterSpacing:"-0.03em", color:TXT, lineHeight:1.1 }}>
           Trading Psychology
         </h1>
-        <p style={{ fontSize:14, color:SUB, marginTop:8, lineHeight:1.6, maxWidth:520 }}>
+        <p style={{ fontSize:15, color:SUB, marginTop:10, lineHeight:1.7, maxWidth:520, fontFamily:FONT }}>
           Select any problem below to see its full{" "}
           <span style={{ fontWeight:700, color:R }}>if&nbsp;ignored</span> vs{" "}
           <span style={{ fontWeight:700, color:G }}>if&nbsp;fixed</span>{" "}
@@ -316,70 +307,64 @@ function ProblemGrid({ onSelect }) {
       </div>
 
       {/* Legend strip */}
-      <div className="p-legend" style={{ marginBottom:28 }}>
+      <div className="p-legend" style={{ marginBottom:32 }}>
 
         {/* Step 1 */}
-        <div style={{ flex:1, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:"18px 16px", display:"flex", flexDirection:"column", alignItems:"center", gap:12, boxShadow:"0 2px 12px rgba(15,25,35,0.05)", textAlign:"center" }}>
+        <div style={{ flex:1, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:"20px 18px", display:"flex", flexDirection:"column", alignItems:"center", gap:14, boxShadow:"0 2px 12px rgba(15,25,35,0.05)", textAlign:"center" }}>
           <div style={{ width:48, height:26, borderRadius:999, border:`2px solid ${BDR}`, background:BG, display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <div style={{ width:8, height:8, borderRadius:999, background:SUB, opacity:0.4 }} />
+            <div style={{ width:8, height:8, borderRadius:999, background:SUB, opacity:0.5 }} />
           </div>
           <div>
-            <div style={{ fontSize:16, fontWeight:800, color:TXT, fontFamily:FONT, letterSpacing:"-0.01em", marginBottom:3 }}>Pick a Problem</div>
-            <div style={{ fontSize:11, color:SUB, fontFamily:FONT, lineHeight:1.5 }}>Choose from 10 common trading psychology traps</div>
+            <div style={{ fontSize:15, fontWeight:800, color:TXT, fontFamily:FONT, letterSpacing:"-0.01em", marginBottom:4 }}>Pick a Problem</div>
+            <div style={{ fontSize:12, color:SUB, fontFamily:FONT, lineHeight:1.6 }}>Choose from 10 common trading psychology traps</div>
           </div>
         </div>
 
-        {/* Arrow */}
         <div className="p-legend-arrow">→</div>
 
         {/* Step 2 */}
-        <div style={{ flex:1, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:"18px 16px", display:"flex", flexDirection:"column", alignItems:"center", gap:12, boxShadow:"0 2px 12px rgba(15,25,35,0.05)", textAlign:"center" }}>
+        <div style={{ flex:1, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:"20px 18px", display:"flex", flexDirection:"column", alignItems:"center", gap:14, boxShadow:"0 2px 12px rgba(15,25,35,0.05)", textAlign:"center" }}>
           <div style={{ width:48, height:28, borderRadius:8, border:`2px solid ${BDR}`, background:BG, display:"flex", alignItems:"center", justifyContent:"center", gap:3 }}>
             <div style={{ width:20, height:3, borderRadius:999, background:BDR }} />
           </div>
           <div>
-            <div style={{ fontSize:16, fontWeight:800, color:TXT, fontFamily:FONT, letterSpacing:"-0.01em", marginBottom:3 }}>Problem Identified</div>
-            <div style={{ fontSize:11, color:SUB, fontFamily:FONT, lineHeight:1.5 }}>See what the problem looks like in your trading</div>
+            <div style={{ fontSize:15, fontWeight:800, color:TXT, fontFamily:FONT, letterSpacing:"-0.01em", marginBottom:4 }}>Problem Identified</div>
+            <div style={{ fontSize:12, color:SUB, fontFamily:FONT, lineHeight:1.6 }}>See what the problem looks like in your trading</div>
           </div>
         </div>
 
-        {/* Arrow */}
         <div className="p-legend-arrow">→</div>
 
         {/* Step 3 — Decision */}
-        <div style={{ flex:1, background:CARD, border:`2px solid ${BDR}`, borderRadius:16, padding:"18px 16px", display:"flex", flexDirection:"column", alignItems:"center", gap:12, boxShadow:"0 4px 20px rgba(15,25,35,0.08)", textAlign:"center", position:"relative" }}>
-          {/* Diamond shape */}
+        <div style={{ flex:1, background:CARD, border:`2px solid ${BDR}`, borderRadius:16, padding:"20px 18px", display:"flex", flexDirection:"column", alignItems:"center", gap:14, boxShadow:"0 4px 20px rgba(15,25,35,0.08)", textAlign:"center", position:"relative" }}>
           <div style={{ position:"relative", width:48, height:48, flexShrink:0 }}>
             <div style={{ position:"absolute", top:"15%", left:"15%", width:"70%", height:"70%", transform:"rotate(45deg)", background:BG, border:`2px solid ${BDR}`, borderRadius:4 }} />
             <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <span style={{ fontSize:9, fontFamily:MONO, fontWeight:900, color:TXT, letterSpacing:"0.06em" }}>?</span>
+              <span style={{ fontSize:13, fontFamily:MONO, fontWeight:900, color:TXT, letterSpacing:"0.06em" }}>?</span>
             </div>
           </div>
           <div>
-            <div style={{ fontSize:16, fontWeight:800, color:TXT, fontFamily:FONT, letterSpacing:"-0.01em", marginBottom:3 }}>Did You Apply the Fix?</div>
-            <div style={{ fontSize:11, color:SUB, fontFamily:FONT, lineHeight:1.5 }}>A decision diamond splits the chart into two paths</div>
+            <div style={{ fontSize:15, fontWeight:800, color:TXT, fontFamily:FONT, letterSpacing:"-0.01em", marginBottom:4 }}>Did You Apply the Fix?</div>
+            <div style={{ fontSize:12, color:SUB, fontFamily:FONT, lineHeight:1.6 }}>A decision diamond splits the chart into two paths</div>
           </div>
         </div>
 
-        {/* Arrow */}
         <div className="p-legend-arrow">→</div>
 
         {/* Step 4 — two outcomes */}
         <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10 }}>
-          {/* NO */}
-          <div style={{ background:`rgba(214,59,59,0.06)`, border:`1.5px solid rgba(214,59,59,0.25)`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`rgba(214,59,59,0.12)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:R }}>✕</div>
+          <div style={{ background:`rgba(214,59,59,0.06)`, border:`1.5px solid rgba(214,59,59,0.28)`, borderRadius:14, padding:"15px 18px", display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`rgba(214,59,59,0.12)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:R }}>✕</div>
             <div>
               <div style={{ fontSize:14, fontWeight:800, color:R, fontFamily:FONT, letterSpacing:"-0.01em" }}>Ignored Path</div>
-              <div style={{ fontSize:11, color:`rgba(214,59,59,0.65)`, fontFamily:FONT }}>Cycle repeats — same mistakes</div>
+              <div style={{ fontSize:12, color:R, fontFamily:FONT, opacity:0.75, marginTop:2 }}>Cycle repeats — same mistakes</div>
             </div>
           </div>
-          {/* YES */}
-          <div style={{ background:`rgba(13,158,110,0.06)`, border:`1.5px solid rgba(13,158,110,0.25)`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`rgba(13,158,110,0.12)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:G }}>✓</div>
+          <div style={{ background:`rgba(13,158,110,0.06)`, border:`1.5px solid rgba(13,158,110,0.28)`, borderRadius:14, padding:"15px 18px", display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`rgba(13,158,110,0.12)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:G }}>✓</div>
             <div>
               <div style={{ fontSize:14, fontWeight:800, color:G, fontFamily:FONT, letterSpacing:"-0.01em" }}>Fixed Path</div>
-              <div style={{ fontSize:11, color:`rgba(13,158,110,0.65)`, fontFamily:FONT }}>Edge built — discipline grows</div>
+              <div style={{ fontSize:12, color:G, fontFamily:FONT, opacity:0.75, marginTop:2 }}>Edge built — discipline grows</div>
             </div>
           </div>
         </div>
@@ -397,28 +382,28 @@ function ProblemGrid({ onSelect }) {
               style={{
                 background:CARD,
                 border:`1px solid ${active ? "rgba(13,158,110,0.45)" : BDR}`,
-                borderRadius:16, padding:"18px 16px", textAlign:"left",
+                borderRadius:16, padding:"20px 18px", textAlign:"left",
                 cursor:"pointer",
                 boxShadow: active ? "0 6px 28px rgba(13,158,110,0.12)" : "0 2px 10px rgba(15,25,35,0.04)",
                 transform: active ? "translateY(-3px)" : "translateY(0)",
                 transition:"all 0.18s ease", position:"relative",
               }}
             >
-              <div style={{ position:"absolute", top:12, right:14, fontSize:10, fontFamily:MONO, fontWeight:700, color:"rgba(15,25,35,0.13)" }}>
+              <div style={{ position:"absolute", top:14, right:16, fontSize:12, fontFamily:MONO, fontWeight:700, color:"rgba(15,25,35,0.18)" }}>
                 {String(p.id).padStart(2,"0")}
               </div>
               <div style={{
-                width:46, height:46, borderRadius:13, marginBottom:12,
+                width:48, height:48, borderRadius:14, marginBottom:14,
                 background:BG, border:`1px solid ${BDR}`,
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:22,
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:24,
                 transform: active ? "scale(1.08)" : "scale(1)", transition:"transform 0.18s",
               }}>{p.icon}</div>
-              <div style={{ fontSize:9, fontFamily:MONO, letterSpacing:"0.14em", color: active ? G : SUB, fontWeight:700, marginBottom:4, transition:"color 0.18s" }}>
+              <div style={{ fontSize:11, fontFamily:MONO, letterSpacing:"0.14em", color: active ? G : SUB, fontWeight:700, marginBottom:5, transition:"color 0.18s" }}>
                 {p.tag}
               </div>
-              <div style={{ fontSize:14, fontWeight:800, color:TXT, marginBottom:4, letterSpacing:"-0.01em" }}>{p.title}</div>
-              <div style={{ fontSize:11, color:SUB, lineHeight:1.5 }}>{p.desc}</div>
-              <div style={{ marginTop:12, fontSize:9, fontFamily:MONO, letterSpacing:"0.12em", fontWeight:700, color: active ? G : "rgba(15,25,35,0.18)", transition:"color 0.18s" }}>
+              <div style={{ fontSize:15, fontWeight:800, color:TXT, marginBottom:5, letterSpacing:"-0.01em", fontFamily:FONT }}>{p.title}</div>
+              <div style={{ fontSize:13, color:SUB, lineHeight:1.6, fontFamily:FONT }}>{p.desc}</div>
+              <div style={{ marginTop:14, fontSize:11, fontFamily:MONO, letterSpacing:"0.12em", fontWeight:700, color: active ? G : "#94A3B8", transition:"color 0.18s" }}>
                 VIEW FLOWCHART →
               </div>
             </button>
@@ -435,43 +420,42 @@ export default function TradingPsychologyPage() {
 
   return (
     <div style={{ minHeight:"100vh", background:BG, fontFamily:FONT, color:TXT }}>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Header */}
       <header style={{
         position:"sticky", top:0, zIndex:100,
-        padding:"10px 20px", minHeight:56,
-        display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
-        background:"rgba(240,238,233,0.95)", backdropFilter:"blur(20px)",
+        padding:"12px 20px", minHeight:60,
+        display:"flex", alignItems:"center", justifyContent:"space-between", gap:12,
+        background:"rgba(240,238,233,0.96)", backdropFilter:"blur(20px)",
         borderBottom:`1px solid ${BDR}`,
         boxShadow:"0 1px 12px rgba(15,25,35,0.06)",
       }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
           <Link href="/checklist" style={{
             display:"inline-flex", alignItems:"center", gap:6,
-            fontSize:11, fontFamily:MONO, letterSpacing:"0.08em", fontWeight:700,
-            padding:"8px 12px", borderRadius:9,
+            fontSize:12, fontFamily:MONO, letterSpacing:"0.08em", fontWeight:700,
+            padding:"9px 14px", borderRadius:9,
             border:`1px solid ${BDR}`, background:CARD, color:SUB, textDecoration:"none",
             flexShrink:0,
           }}>← Checklist</Link>
           {selected && (
-            <span style={{ fontSize:13, fontWeight:700, color:TXT, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            <span style={{ fontSize:14, fontWeight:700, color:TXT, fontFamily:FONT, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               · {selected.icon} {selected.title}
             </span>
           )}
         </div>
         <div style={{
-          fontSize:9, fontFamily:MONO, letterSpacing:"0.14em", fontWeight:700,
-          padding:"6px 12px", borderRadius:999, flexShrink:0,
-          border:`1px solid rgba(13,158,110,0.25)`,
-          background:`rgba(13,158,110,0.07)`, color:G,
+          fontSize:11, fontFamily:MONO, letterSpacing:"0.12em", fontWeight:700,
+          padding:"7px 14px", borderRadius:999, flexShrink:0,
+          border:`1px solid rgba(13,158,110,0.28)`,
+          background:`rgba(13,158,110,0.08)`, color:G,
         }}>
           {selected ? "FLOWCHART" : "10 PATTERNS"}
         </div>
       </header>
 
       {/* Main */}
-      <main style={{ width:"100%", padding:"24px 20px 100px" }}>
+      <main style={{ width:"100%", maxWidth:1080, margin:"0 auto", padding:"28px 20px 100px" }}>
         {selected ? (
           <Flowchart
             problem={selected}
@@ -487,39 +471,34 @@ export default function TradingPsychologyPage() {
       <div style={{
         position:"fixed", bottom:0, left:0, right:0, zIndex:50,
         background:"rgba(240,238,233,0.97)", backdropFilter:"blur(16px)",
-        borderTop:`1px solid ${BDR}`, padding:"13px 20px", textAlign:"center",
+        borderTop:`1px solid ${BDR}`, padding:"14px 20px", textAlign:"center",
       }}>
-        <span style={{ fontSize:13, fontWeight:800, fontFamily:FONT, letterSpacing:"-0.01em", color:TXT }}>
+        <span style={{ fontSize:14, fontWeight:800, fontFamily:FONT, letterSpacing:"-0.01em", color:TXT }}>
           Focus on <span style={{ color:G }}>discipline</span>, not <span style={{ color:R }}>emotion</span>
         </span>
       </div>
 
       <style>{`
-        /* ── Responsive layout classes ── */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-        /* Flowchart: path headers row */
+        * { box-sizing: border-box; }
+
         .p-path-headers {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14px;
           margin-bottom: 0;
         }
-
-        /* Flowchart: two-column steps */
         .p-step-cols {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14px;
         }
-
-        /* Problem selector: card grid */
         .p-prob-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
           gap: 14px;
         }
-
-        /* Legend strip */
         .p-legend {
           display: flex;
           align-items: stretch;
@@ -529,56 +508,25 @@ export default function TradingPsychologyPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 22px;
+          font-size: 24px;
           color: #CBD5E1;
           font-weight: 300;
           flex-shrink: 0;
           padding: 0 2px;
         }
-
-        /* Desktop T-branch — visible by default */
         .p-tbranch { display: block; }
-
-        /* Mobile split — hidden by default */
         .p-mobile-split { display: none !important; }
 
-        /* ── Mobile breakpoint ── */
         @media (max-width: 600px) {
-
-          /* Stack flowchart columns vertically */
-          .p-path-headers {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-          .p-step-cols {
-            grid-template-columns: 1fr;
-            gap: 24px;
-          }
-
-          /* Hide desktop T-branch, show mobile split */
+          .p-path-headers { grid-template-columns: 1fr; gap: 10px; }
+          .p-step-cols { grid-template-columns: 1fr; gap: 24px; }
           .p-tbranch { display: none !important; }
           .p-mobile-split { display: flex !important; }
-
-          /* Problem cards: 2 columns on mobile */
-          .p-prob-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-          }
-
-          /* Legend: stack vertically on mobile */
-          .p-legend {
-            flex-direction: column;
-            gap: 8px;
-          }
-          .p-legend-arrow {
-            transform: rotate(90deg);
-            font-size: 18px;
-            align-self: center;
-            padding: 0;
-          }
+          .p-prob-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+          .p-legend { flex-direction: column; gap: 8px; }
+          .p-legend-arrow { transform: rotate(90deg); font-size: 20px; align-self: center; padding: 0; }
         }
 
-        /* ── Animations ── */
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }

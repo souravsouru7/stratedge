@@ -59,3 +59,8 @@ export const getWelcomeGuideSeen = async () => {
 export const markWelcomeGuideSeen = async () => {
   return await apiClient.patch('/auth/me/preferences', { hasSeenWelcomeGuide: true });
 };
+
+// ── Terms & Privacy Policy acceptance ────────────────────────────────────────
+export const acceptTerms = async () => {
+  return await apiClient.post('/auth/accept-terms');
+};

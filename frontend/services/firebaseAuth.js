@@ -5,9 +5,11 @@ import {
   GoogleAuthProvider,
   browserLocalPersistence,
   getAuth,
+  getRedirectResult,
   setPersistence,
   signInWithCredential,
   signInWithPopup,
+  signInWithRedirect,
 } from "firebase/auth";
 
 const getFirebaseConfig = () => {
@@ -180,14 +182,61 @@ const signInWithNativeGoogle = async () => {
   }
 };
 
+const isMobileBrowser = () => {
+  if (typeof window === "undefined") return false;
+  if (isCapacitorApp()) return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+const REDIRECT_PENDING_KEY = "firebase_google_redirect_pending";
+
 const signInWithWebGoogle = async () => {
-  const auth = await getFirebaseAuth();
+  const auth = getAuth(getFirebaseApp());
   const provider = new GoogleAuthProvider();
   provider.addScope("email");
   provider.addScope("profile");
 
+  if (isMobileBrowser()) {
+    // Mobile browsers block popups → use redirect flow instead.
+    // The caller must handle the result via handleGoogleRedirectResult() on next page load.
+    sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
+    await signInWithRedirect(auth, provider);
+    return null; // page will reload; result handled in handleGoogleRedirectResult
+  }
+
+  // Desktop: popup works fine.
+  // IMPORTANT: getAuth() must be called SYNCHRONOUSLY — no await before
+  // signInWithPopup. Any await breaks the user-gesture chain and causes
+  // auth/internal-error or auth/popup-blocked in some browsers.
   const result = await signInWithPopup(auth, provider);
+
+  if (!isCapacitorApp()) {
+    try { await setPersistence(auth, browserLocalPersistence); } catch { /* non-fatal */ }
+  }
+
   return result.user.getIdToken();
+};
+
+/**
+ * Call this on page mount (login/register) to collect the idToken after a
+ * mobile redirect sign-in. Returns the Firebase idToken string, or null if
+ * there is no pending redirect result.
+ */
+export const handleGoogleRedirectResult = async () => {
+  if (typeof window === "undefined") return null;
+  if (!sessionStorage.getItem(REDIRECT_PENDING_KEY)) return null;
+
+  try {
+    const auth = getAuth(getFirebaseApp());
+    const result = await getRedirectResult(auth);
+    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    if (!result) return null;
+    return await result.user.getIdToken();
+  } catch (err) {
+    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    console.error("[GoogleAuth] redirect result error:", err);
+    throw err;
+  }
 };
 
 export const signInWithFirebaseGoogle = async () => {
