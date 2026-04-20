@@ -69,6 +69,17 @@ export function useAnalytics() {
   const error = coreError || deepError || null;
   const loading = coreLoading || deepLoading;
 
+  const data = {
+    summary: coreData.summary,
+    performance: coreData.performance,
+    distribution: coreData.distribution,
+    riskReward: deepResults[0]?.data,
+    timeAnalysis: deepResults[1]?.data,
+    drawdown: deepResults[2]?.data,
+    aiInsights: deepResults[3]?.data,
+    psychology: deepResults[4]?.data,
+  };
+
   useEffect(() => {
     const token = typeof window !== "undefined" && localStorage.getItem("token");
     if (!token) {
@@ -78,13 +89,14 @@ export function useAnalytics() {
   }, [router]);
 
   // Auto-navigate calendar to the most recent month with trades
+  const timeAnalysis = data.timeAnalysis;
   useEffect(() => {
-    const dateKeys = Object.keys(data.timeAnalysis?.byDate || {});
+    const dateKeys = Object.keys(timeAnalysis?.byDate || {});
     if (dateKeys.length === 0) return;
     const latestKey = [...dateKeys].sort().slice(-1)[0];
     const [year, month] = latestKey.split("-").map(Number);
     if (year && month) setCalendarMonth(new Date(year, month - 1, 1));
-  }, [data.timeAnalysis]);
+  }, [timeAnalysis]);
 
   const shiftMonth = (amount) =>
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + amount, 1));
