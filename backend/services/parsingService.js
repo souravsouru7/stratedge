@@ -577,7 +577,13 @@ function normalizeBrokerLabels(text) {
     .replace(/\bPNL\b/gi, "P&L")
     .replace(/\bContract\s*Note\b/gi, "Contract Note")
     .replace(/\bScrip\s*Name\b/gi, "Symbol")
-    .replace(/\bInstrument\b/gi, "Symbol");
+    .replace(/\bInstrument\b/gi, "Symbol")
+    // Fix OCR typos where `-₹` becomes `=%, ~%, -%`
+    .replace(/([=~-])%/g, "-₹")
+    // Fix OCR typos where decimal dot becomes colon `1313:00`
+    .replace(/(\d):(\d{2})(?!\d)/g, "$1.$2")
+    // Strip percentage changes (e.g. "(-53.71%)" or "+1.5%") to prevent them from being parsed as P&L
+    .replace(/\(?\s*[+\-]?\s*[\d,]+\.\d*\s*%\s*\)?/g, " ");
 }
 
 exports.parseIndianTrade = (text, opts = {}) => {
@@ -738,7 +744,7 @@ exports.parseIndianTrade = (text, opts = {}) => {
 
     // Exit Price (LTP/CMP/Mkt – brokers use "Mkt ₹82.25")
     const exitMatch = line.match(
-      /(?:LTP|CMP|Mkt|Exit\s*Price|Sell\s*Avg)\s*₹?\s*[:\s]*([\d,]+\.?\d*)/i
+      /(?:LTP|CMP|Mkt|\bTP\b|Exit\s*Price|Sell\s*Avg)\s*₹?\s*[:\s]*([\d,]+\.?\d*)/i
     );
     if (exitMatch) {
       exitPrice = exitMatch[1].replace(/,/g, "");
@@ -1016,7 +1022,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       }
 
       // ── LTP / Mkt Price (brokers use "Mkt ₹82.25" or "LTP 161.60") ──
-      const ltpMatch = ctx.match(/(?:LTP|Mkt)\s*₹?\s*[:\s]*([\d,]+\.?\d*)/i);
+      const ltpMatch = ctx.match(/(?:LTP|Mkt|\bTP\b)\s*₹?\s*[:\s]*([\d,]+\.?\d*)/i);
       if (ltpMatch && ltpPrice === null) {
         ltpPrice = parseFloat(ltpMatch[1].replace(/,/g, ""));
       }
@@ -1071,7 +1077,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       strike,
       optionType: rawType,
       quantity,
-      entryPrice: entryPrice !== null ? entryPrice : ltpPrice,
+      entryPrice: entryPrice !== null && entryPrice !== 0 ? entryPrice : ltpPrice,
       pnl,
       _pnlHasRupee: pnlHasRupee,
     };

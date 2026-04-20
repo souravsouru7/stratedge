@@ -148,7 +148,11 @@ function mapIndianTradeList(parsed) {
 }
 
 async function extractIndianTradeWithAI(extractedText, options = {}) {
-  if (!extractedText || extractedText.trim().length < 10) {
+  const textWithoutPercents = String(extractedText || "")
+    .replace(/([=~-])%/g, "-₹")
+    .replace(/(\d):(\d{2})(?!\d)/g, "$1.$2")
+    .replace(/\(?\s*[+\-]?\s*[\d,]+\.\d*\s*%\s*\)?/g, " ");
+  if (!textWithoutPercents || textWithoutPercents.trim().length < 10) {
     return null;
   }
 
@@ -165,7 +169,7 @@ If there are multiple positions, return all of them in "trades". If only one tra
 Never include markdown. Never include explanations. Use null for missing fields.
 
 OCR text:
-${String(extractedText).slice(0, 5000)}
+${String(textWithoutPercents).slice(0, 5000)}
 
 JSON format:
 {"pair":"NIFTY 26000 PE","quantity":0,"entryPrice":0,"exitPrice":0,"profit":0,"strikePrice":0,"optionType":"CE|PE","underlying":"NIFTY","broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","quantity":0,"entryPrice":0,"exitPrice":0,"profit":0,"strikePrice":0,"optionType":"PE","underlying":"NIFTY","broker":"Zerodha"}]}`
@@ -174,7 +178,7 @@ ${brokerHint}${multiHint}Fields per trade: pair (e.g. "NIFTY 26000 PE"), profit 
 Return every visible trade inside "trades". Also set top-level fields to the best first/main trade.
 
 OCR text:
-${String(extractedText).slice(0, 4000)}
+${String(textWithoutPercents).slice(0, 4000)}
 
 JSON format: {"pair": "...", "profit": 0, "quantity": 0, "entryPrice": 0, "exitPrice": 0, "strikePrice": 0, "optionType": "CE|PE", "underlying": "...", "broker": "...", "trades": [{"pair": "...", "profit": 0, "quantity": 0, "entryPrice": 0, "exitPrice": 0, "strikePrice": 0, "optionType": "CE|PE", "underlying": "...", "broker": "..."}]}
 Use null for missing values.`;
