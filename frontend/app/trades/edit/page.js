@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { getTrade, updateTrade } from "@/services/tradeApi";
 import { uploadTradeImage } from "@/services/uploadApi";
 import { useRouter, useSearchParams } from "next/navigation";
+import PageHeader from "@/features/shared/components/PageHeader";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -241,34 +242,7 @@ function EditTradePageContent() {
       <CandlestickBackground/>
       <div style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none", background: "linear-gradient(135deg, rgba(240,238,233,0.82) 0%, rgba(240,238,233,0.75) 100%)" }}/>
 
-      {/* Header */}
-      <header style={{
-        position: "relative",
-        zIndex: 20,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-        height: 60,
-        flexWrap: "wrap",
-        gap: 10,
-        background: "rgba(255,255,255,0.92)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid #E2E8F0",
-        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 168, height: 44, position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-start" }}><img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} /></div>
-          <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
-              {""}
-            </div>
-            <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-              AI JOURNAL
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader />
 
       <TickerTape/>
 

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { Menu, X, LogOut } from "lucide-react";
 import MarketSwitcher from "@/components/MarketSwitcher";
 
 const NAV_ITEMS = [
@@ -11,23 +13,13 @@ const NAV_ITEMS = [
   { href: "/indian-market/analytics", label: "Analytics" },
   { href: "/indian-market/setups",    label: "Setups"    },
   { href: "/profile",                 label: "Profile"   },
-  { href: "/weekly-reports?market=Indian_Market", label: "Weekly AI" },
+  { href: "/weekly-reports?market=Indian_Market", label: "Reports" },
 ];
-
-const C = {
-  bull:   "#0D9E6E",
-  bear:   "#D63B3B",
-  border: "#E2E8F0",
-  muted:  "#94A3B8",
-  ink:    "#0F1923",
-  bg:     "#FFFFFF",
-  mono:   "'JetBrains Mono',monospace",
-  sans:   "'Plus Jakarta Sans',sans-serif",
-};
 
 export default function IndianMarketHeader() {
   const router   = useRouter();
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (href) => {
     const base = href.split("?")[0];
@@ -40,96 +32,139 @@ export default function IndianMarketHeader() {
   };
 
   return (
-    <header style={{
-      background:    C.bg,
-      borderBottom:  `1px solid ${C.border}`,
-      padding:       "10px 24px",
-      display:       "flex",
-      alignItems:    "center",
-      justifyContent:"space-between",
-      flexWrap:      "wrap",
-      gap:           10,
-      position:      "sticky",
-      top:           0,
-      zIndex:        50,
-      boxShadow:     "0 1px 8px rgba(15,25,35,0.06)",
-    }}>
-      {/* Logo */}
-      <Link href="/indian-market/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
-        <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: 140, height: 40, objectFit: "contain", objectPosition: "left center" }} />
-        <span style={{ fontSize: 9, letterSpacing: "0.16em", color: C.muted, fontFamily: C.mono, fontWeight: 600 }}>
-          OPTIONS · NSE / BSE
-        </span>
-      </Link>
+    <>
+      <header style={{
+        position: "sticky", top: 0, zIndex: 1000,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 20px", height: 60,
+        background: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(16px)",
+        borderBottom: "1px solid #E8EDF2",
+        boxShadow: "0 1px 0 rgba(15,25,35,0.06)",
+      }}>
 
-      {/* Nav */}
-      <nav style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {NAV_ITEMS.map(n => {
-          const active = isActive(n.href);
-          return (
-            <Link
-              key={n.href}
-              href={n.href}
-              style={{
-                fontSize:       12,
-                fontWeight:     700,
-                textDecoration: "none",
-                padding:        "8px 14px",
-                borderRadius:   20,
-                fontFamily:     C.sans,
-                transition:     "all 0.2s",
-                color:          active ? "#fff"            : C.bull,
-                background:     active ? C.bull            : `${C.bull}10`,
-                border:         `1.5px solid ${active ? C.bull : `${C.bull}30`}`,
-                display:        "inline-flex",
-                alignItems:     "center",
-                minHeight:      "36px",
-              }}
-            >
-              {n.label}
-            </Link>
-          );
-        })}
-      </nav>
+        {/* Logo */}
+        <Link href="/indian-market/dashboard" style={{ textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+          <img src="/mainlogo1.png" alt="Edgecipline"
+            style={{ width: 130, height: 36, objectFit: "contain", display: "block" }} />
+          <span style={{ fontSize: 9, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, display: "block" }}>
+            NSE / BSE
+          </span>
+        </Link>
 
-      {/* Right side */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <MarketSwitcher />
-        <button
-          onClick={handleLogout}
-          style={{
-            display:    "flex",
-            alignItems: "center",
-            gap:        6,
-            background: "rgba(214,59,59,0.08)",
-            border:     "1px solid rgba(214,59,59,0.25)",
-            borderRadius: 8,
-            padding:    "7px 12px",
-            cursor:     "pointer",
-            fontSize:   10,
-            letterSpacing: "0.1em",
-            color:      C.bear,
-            fontFamily: C.mono,
-            fontWeight: 600,
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(214,59,59,0.16)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(214,59,59,0.08)"; }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          LOGOUT
+        {/* Desktop nav */}
+        <div className="im-hdr-desktop" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <nav style={{ display: "flex", alignItems: "center", gap: 2, marginRight: 8 }}>
+            {NAV_ITEMS.map(n => {
+              const active = isActive(n.href);
+              return (
+                <Link key={n.href} href={n.href} className="im-hdr-link"
+                  style={{
+                    fontSize: 13, fontWeight: active ? 700 : 500,
+                    color: active ? "#0D9E6E" : "#4A5568",
+                    textDecoration: "none",
+                    padding: "6px 12px", borderRadius: 6,
+                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                    transition: "all 0.15s",
+                    background: active ? "rgba(13,158,110,0.08)" : "transparent",
+                  }}>
+                  {n.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div style={{ width: 1, height: 20, background: "#E2E8F0", margin: "0 8px" }} />
+
+          <MarketSwitcher />
+
+          <button onClick={handleLogout} title="Logout" style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 36, height: 36, marginLeft: 8,
+            background: "transparent", border: "1px solid #E2E8F0",
+            borderRadius: 8, cursor: "pointer",
+            color: "#94A3B8", transition: "all 0.15s",
+          }} className="im-hdr-logout">
+            <LogOut size={15} />
+          </button>
+        </div>
+
+        {/* Mobile hamburger */}
+        <button className="im-hdr-mobile"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: "#4A5568", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44 }}>
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-      </div>
+      </header>
 
-      <style>{`
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div style={{
+          position: "fixed", top: 60, left: 0, right: 0, bottom: 0,
+          background: "#FFFFFF", zIndex: 999,
+          display: "flex", flexDirection: "column",
+          borderTop: "1px solid #E8EDF2",
+          overflowY: "auto",
+        }}>
+          <div style={{ padding: "24px 24px 0" }}>
+            <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 12 }}>NAVIGATION</div>
+            <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {NAV_ITEMS.map(n => {
+                const active = isActive(n.href);
+                return (
+                  <Link key={n.href} href={n.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{
+                      fontSize: 16, fontWeight: active ? 700 : 500,
+                      color: active ? "#0D9E6E" : "#2D3748",
+                      textDecoration: "none",
+                      padding: "12px 16px", borderRadius: 8,
+                      background: active ? "rgba(13,158,110,0.06)" : "transparent",
+                    }}>
+                    {n.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div style={{ height: 1, background: "#E8EDF2", margin: "20px 0" }} />
+
+          <div style={{ padding: "0 24px" }}>
+            <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 12 }}>MARKET</div>
+            <MarketSwitcher />
+          </div>
+
+          <button onClick={handleLogout} style={{
+            margin: "auto 24px 32px",
+            display: "flex", alignItems: "center", gap: 10,
+            background: "#FFF5F5", border: "1px solid #FED7D7",
+            color: "#C53030", padding: "14px 20px",
+            borderRadius: 10, fontWeight: 600, fontSize: 15, cursor: "pointer",
+          }}>
+            <LogOut size={18} /> Sign out
+          </button>
+        </div>
+      )}
+
+      <style jsx>{`
+        .im-hdr-link:hover {
+          background: rgba(13,158,110,0.06) !important;
+          color: #0D9E6E !important;
+        }
+        .im-hdr-logout:hover {
+          color: #D63B3B !important;
+          border-color: rgba(214,59,59,0.3) !important;
+          background: rgba(214,59,59,0.05) !important;
+        }
         @media (max-width: 768px) {
-          header nav { display: none !important; }
+          .im-hdr-desktop { display: none !important; }
+          .im-hdr-mobile  { display: flex !important; }
+        }
+        @media (min-width: 769px) {
+          .im-hdr-mobile { display: none !important; }
         }
       `}</style>
-    </header>
+    </>
   );
 }

@@ -29,6 +29,7 @@ import MarketSwitcher from "@/components/MarketSwitcher";
 import IndianMarketHeader from "@/components/IndianMarketHeader";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useMarket, MARKETS } from "@/context/MarketContext";
+import CalendarPnL from "@/features/analytics/components/CalendarPnL";
 
 const theme = {
   bull: "#0D9E6E",
@@ -145,6 +146,70 @@ function DistList({ title, data, currency = "₹", maxItems = 6 }) {
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Generate actionable psychology insights ───────────────────────────────────
+function generatePsychInsights({ moodRows, confRows, tagRows, wouldRetakeAnalysis, disciplineScore, currency = "₹" }) {
+  const insights = [];
+  if (moodRows.length >= 2) {
+    const sorted = [...moodRows].sort((a, b) => parseFloat(b.avgProfit) - parseFloat(a.avgProfit));
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+    if (best && parseFloat(best.avgProfit) > 0)
+      insights.push({ type: "success", icon: "🧠", title: `Trade best when ${best.label}`, body: `${best.winRate}% win rate · avg +${currency}${parseFloat(best.avgProfit).toFixed(2)} per trade. Prioritize setups in this mental state.` });
+    if (worst && parseFloat(worst.avgProfit) < 0 && worst.trades >= 2)
+      insights.push({ type: "danger", icon: "⚠️", title: `Avoid trading when ${worst.label}`, body: `${worst.winRate}% win rate · avg ${currency}${parseFloat(worst.avgProfit).toFixed(2)} per trade across ${worst.trades} trades. Step away or reduce size.` });
+  }
+  const highConf = confRows.find(c => c.level === "High" || c.level === "Overconfident");
+  const lowConf  = confRows.find(c => c.level === "Low");
+  if (highConf && parseFloat(highConf.avgProfit) < 0 && highConf.trades >= 2)
+    insights.push({ type: "warning", icon: "🚨", title: "High confidence → losing trades", body: `Your "High" confidence trades average ${currency}${parseFloat(highConf.avgProfit).toFixed(2)}. Overconfidence may be causing oversizing or skipping confirmation.` });
+  if (lowConf && parseFloat(lowConf.avgProfit) > 0 && lowConf.trades >= 2)
+    insights.push({ type: "success", icon: "💡", title: "Low confidence trades are profitable", body: `Cautious entries average +${currency}${parseFloat(lowConf.avgProfit).toFixed(2)}. Your hesitation signals good instincts — trust them.` });
+  const dangerTags = ["FOMO", "Revenge", "Fear", "Greed", "Rushed", "Frustrated"];
+  tagRows.forEach(t => {
+    if (dangerTags.includes(t.tag) && parseFloat(t.avgProfit) < 0 && t.trades >= 1)
+      insights.push({ type: "danger", icon: t.emoji || "❌", title: `${t.tag} trades cost you money`, body: `${t.trades} trade${t.trades > 1 ? "s" : ""} · ${t.winRate}% WR · avg ${currency}${parseFloat(t.avgProfit).toFixed(2)}. Rule: when you feel ${t.tag.toLowerCase()}, close the platform.` });
+  });
+  tagRows.forEach(t => {
+    if (!dangerTags.includes(t.tag) && parseFloat(t.avgProfit) > 5 && parseFloat(t.winRate) >= 70 && t.trades >= 2)
+      insights.push({ type: "success", icon: t.emoji || "✅", title: `${t.tag} state is your edge`, body: `${t.trades} trades · ${t.winRate}% WR · avg +${currency}${parseFloat(t.avgProfit).toFixed(2)}. Seek more trades in this mindset.` });
+  });
+  const yes = wouldRetakeAnalysis?.yes;
+  const no  = wouldRetakeAnalysis?.no;
+  if (yes && no && yes.trades >= 2 && no.trades >= 2) {
+    const yesPnl = parseFloat(yes.avgProfit), noPnl = parseFloat(no.avgProfit);
+    if (yesPnl > 0 && noPnl < 0)
+      insights.push({ type: "success", icon: "🔁", title: "Your trade instincts are calibrated", body: `Trades you'd retake avg +${currency}${yesPnl.toFixed(2)} vs trades you'd skip avg ${currency}${noPnl.toFixed(2)}. Your gut is telling you the right thing — listen to it before entry.` });
+    else if (yesPnl < 0)
+      insights.push({ type: "warning", icon: "🔁", title: "Retake instinct may need recalibration", body: `Even trades you'd retake are losing (avg ${currency}${yesPnl.toFixed(2)}). Review your entry criteria — the setups themselves may be flawed.` });
+  }
+  if (typeof disciplineScore === "number" && disciplineScore > 0) {
+    if (disciplineScore >= 80)
+      insights.push({ type: "success", icon: "🏆", title: `Strong discipline score: ${disciplineScore}%`, body: "You're following your rules consistently. Keep protecting this score — it's your moat against emotional trading." });
+    else if (disciplineScore < 50)
+      insights.push({ type: "danger", icon: "📉", title: `Discipline score at ${disciplineScore}%`, body: "Less than half your trades follow your plan. Focus on process over outcome: one disciplined loss beats one undisciplined win." });
+  }
+  return insights.slice(0, 6);
+}
+
+function PsychInsightCard({ icon, title, body, type }) {
+  const colors = {
+    success: { bg: "#F0FDF4", border: "#BBF7D0", title: "#166534" },
+    danger:  { bg: "#FFF8F8", border: "#FED7D7", title: "#9B1C1C" },
+    warning: { bg: "#FFFBEB", border: "#FDE68A", title: "#92400E" },
+    info:    { bg: "#F0F7FF", border: "#BFDBFE", title: "#1E40AF" },
+  };
+  const s = colors[type] || colors.info;
+  return (
+    <div style={{ borderRadius: 12, border: `1px solid ${s.border}`, background: s.bg, padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <div style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: s.title, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.65 }}>{body}</div>
       </div>
     </div>
   );
@@ -303,6 +368,9 @@ export default function IndianAnalyticsPage() {
   const router = useRouter();
   const { currentMarket } = useMarket();
   const [loading, setLoading] = useState(true);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const prevMonth = () => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  const nextMonth = () => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   const [data, setData] = useState({
     summary: null,
     rr: null,
@@ -326,11 +394,15 @@ export default function IndianAnalyticsPage() {
     fetchData();
   }, [router]);
 
-  const runInBatches = async (tasks, batchSize = 3, pauseMs = 200) => {
+  const safeCall = async (fn) => {
+    try { return await fn(); } catch { return null; }
+  };
+
+  const runInBatches = async (tasks, batchSize = 2, pauseMs = 500) => {
     const results = [];
     for (let i = 0; i < tasks.length; i += batchSize) {
       const batch = tasks.slice(i, i + batchSize);
-      const batchResults = await Promise.all(batch.map((task) => task()));
+      const batchResults = await Promise.all(batch.map((task) => safeCall(task)));
       results.push(...batchResults);
       if (i + batchSize < tasks.length) {
         await new Promise((resolve) => setTimeout(resolve, pauseMs));
@@ -1181,6 +1253,15 @@ export default function IndianAnalyticsPage() {
               </div>
             )}
 
+            {/* Calendar Performance */}
+            {data.time?.byDate && Object.keys(data.time.byDate).length > 0 && (
+              <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 24, marginBottom: 24, boxShadow: "0 2px 10px rgba(15,23,42,0.05)" }}>
+                <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>Calendar Performance</div>
+                <div style={{ fontSize: 11, color: theme.muted, marginBottom: 16 }}>DAILY P&L HEATMAP</div>
+                <CalendarPnL byDate={data.time.byDate || {}} activeMonth={calendarMonth} onPrevMonth={prevMonth} onNextMonth={nextMonth} currency="₹" />
+              </div>
+            )}
+
             {/* Distribution by new Indian form fields */}
             <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, marginTop: 8 }}>Performance by your journal fields</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
@@ -1511,10 +1592,34 @@ export default function IndianAnalyticsPage() {
                       )}
                     </div>
                   </div>
+                  {/* ── Psychology Insights ── */}
+                  {(() => {
+                    const moodRows = data.psychology.moodAnalysis || [];
+                    const confRows = data.psychology.confidenceAnalysis || [];
+                    const tagRows  = data.psychology.emotionalTagImpact || [];
+                    const psychInsights = generatePsychInsights({
+                      moodRows, confRows, tagRows,
+                      wouldRetakeAnalysis: data.psychology.wouldRetakeAnalysis,
+                      disciplineScore: data.psychology.psychologyScore,
+                      currency,
+                    });
+                    return psychInsights.length > 0 ? (
+                      <div style={{ marginTop: 20 }}>
+                        <div style={{ fontSize: 10, color: "#8B5CF6", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 12 }}>
+                          PSYCHOLOGY INSIGHTS — WHAT TO DO WITH THIS DATA
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+                          {psychInsights.map((ins, i) => (
+                            <PsychInsightCard key={i} icon={ins.icon} title={ins.title} body={ins.body} type={ins.type} />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
                 </>
               ) : (
                 <div style={{ padding: 18, borderRadius: 12, border: `1px dashed ${theme.border}`, background: "#F8FAFC", color: theme.muted, fontSize: 12, lineHeight: 1.6 }}>
-                  Psychology analytics unlocks after you log trades with mood, confidence, emotional tags, and the “Would Retake” toggle.
+                  Psychology analytics unlocks after you log trades with mood, confidence, emotional tags, and the "Would Retake" toggle.
                 </div>
               )}
             </div>

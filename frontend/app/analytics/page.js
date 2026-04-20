@@ -178,12 +178,55 @@ function PsychRow({ label, winRate, trades, avgProfit, color }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AnalyticsContent() {
-  const { loading, data, calendarMonth, prevMonth, nextMonth } = useAnalytics();
-  const { summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights, psychology } = data;
+  const { 
+    loading, 
+    coreLoading, 
+    deepLoading, 
+    data, 
+    calendarMonth, 
+    prevMonth, 
+    nextMonth, 
+    error,
+    retryAfterSeconds 
+  } = useAnalytics();
+  const { summary, riskReward, distribution, performance, timeAnalysis, quality, drawdown, aiInsights, psychology } = data || {};
 
   const has    = summary?.totalTrades > 0;
   const pnl    = parseFloat(summary?.totalProfit ?? 0);
   const bullPnl = pnl >= 0;
+
+  // Rate limit error banner
+  if (error?.status === 429 && retryAfterSeconds > 0) {
+    const minutes = Math.floor(retryAfterSeconds / 60);
+    const seconds = retryAfterSeconds % 60;
+    return (
+      <div style={{ minHeight: "100vh", background: "#F4F2EE", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "40px 20px", textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 24 }}>⏳</div>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: C.primary, marginBottom: 12 }}>Rate Limited</h1>
+        <p style={{ fontSize: 16, color: C.muted, marginBottom: 24, maxWidth: "400px" }}>
+          Too many analytics requests. Server cooldown: <strong>{minutes}m {seconds}s</strong>
+        </p>
+        <p style={{ fontSize: 14, color: C.muted, marginBottom: 32 }}>
+          Core charts loading above. Deep analytics (psychology, AI insights) will appear shortly.
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          style={{ 
+            background: C.bull, 
+            color: "white", 
+            border: "none", 
+            padding: "12px 32px", 
+            borderRadius: 12, 
+            fontSize: 14, 
+            fontWeight: 700,
+            cursor: "pointer"
+          }}
+        >
+          🔄 Refresh Now
+        </button>
+      </div>
+    );
+  }
 
   // Strategy rows — FIX: was reading quality?.byStrategy (doesn't exist); correct source is distribution.byStrategy
   const strategyRows = objToRows(distribution?.byStrategy, "name", 6);

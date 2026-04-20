@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { LogOut, RefreshCw, TrendingUp, TrendingDown, Target, AlertTriangle, CheckSquare, Lightbulb } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, Target, AlertTriangle, CheckSquare, Lightbulb } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import MarketSwitcher from "@/components/MarketSwitcher";
 import { generateWeeklyFeedbackNow, listWeeklyReports } from "@/services/reportsApi";
 import { useMarket } from "@/context/MarketContext";
+import PageHeader from "@/features/shared/components/PageHeader";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 
 const C = { bull: "#0D9E6E", bear: "#D63B3B", gold: "#B8860B", blue: "#3B82F6", purple: "#8B5CF6", primary: "#0F1923", muted: "#94A3B8" };
 
@@ -383,55 +384,36 @@ function WeeklyReportsContent() {
   };
 
   const isIndian = marketParam === "Indian_Market";
-  const dashHref = isIndian ? "/indian-market/dashboard" : "/dashboard";
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4F2EE", fontFamily: "'Plus Jakarta Sans',sans-serif", color: C.primary }}>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      {isIndian ? <IndianMarketHeader /> : <PageHeader />}
 
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <header style={{
-        position: "sticky", top: 0, zIndex: 1000,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 16px", height: 56, gap: 10,
-        background: "rgba(255,255,255,0.92)", backdropFilter: "blur(16px)",
-        borderBottom: "1px solid #E8EDF2",
+      {/* ── Page toolbar ── */}
+      <div style={{
+        background: "#FFFFFF", borderBottom: "1px solid #E8EDF2",
+        padding: "10px 20px", display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: 12,
       }}>
-        <Link href={dashHref} style={{ textDecoration: "none", flexShrink: 0 }}>
-          <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: 110, height: 32, objectFit: "contain", display: "block" }} />
-        </Link>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "flex-end" }}>
-          <MarketSwitcher />
-
-          <button onClick={onGenerateNow} disabled={busy} className="wr-gen-btn" style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: busy ? "#E2E8F0" : C.bull,
-            border: "none", borderRadius: 8, padding: "8px 14px",
-            color: busy ? C.muted : "#FFFFFF",
-            fontSize: 12, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
-            transition: "all 0.2s", whiteSpace: "nowrap",
-          }}>
-            <RefreshCw size={13} style={{ animation: busy ? "spin 1s linear infinite" : "none" }} />
-            <span className="wr-gen-label">{busy ? "Generating…" : "Generate Report"}</span>
-          </button>
-
-          <button onClick={() => { localStorage.removeItem("token"); router.push("/login"); }}
-            title="Logout" style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 34, height: 34, background: "transparent", flexShrink: 0,
-              border: "1px solid #E2E8F0", borderRadius: 8, cursor: "pointer", color: C.muted,
-            }}>
-            <LogOut size={14} />
-          </button>
-        </div>
-      </header>
+        <span style={{ fontSize: 15, fontWeight: 700, color: C.primary }}>Weekly AI Reports</span>
+        <button onClick={onGenerateNow} disabled={busy} className="wr-gen-btn" style={{
+          display: "flex", alignItems: "center", gap: 6,
+          background: busy ? "#E2E8F0" : C.bull,
+          border: "none", borderRadius: 8, padding: "8px 14px",
+          color: busy ? C.muted : "#FFFFFF",
+          fontSize: 12, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+          transition: "all 0.2s", whiteSpace: "nowrap",
+        }}>
+          <RefreshCw size={13} style={{ animation: busy ? "spin 1s linear infinite" : "none" }} />
+          <span className="wr-gen-label">{busy ? "Generating…" : "Generate Report"}</span>
+        </button>
+      </div>
 
       {/* ── Body ────────────────────────────────────────────────── */}
       <div className="wr-body" style={{ maxWidth: 1180, margin: "0 auto", padding: "24px", display: "grid", gridTemplateColumns: "280px 1fr", gap: 20, alignItems: "start" }}>
 
         {/* Sidebar */}
-        <aside style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E8EDF2", overflow: "hidden", boxShadow: "0 2px 12px rgba(15,25,35,0.04)", position: "sticky", top: 80 }}>
+        <aside style={{ background: "#FFFFFF", borderRadius: 14, border: "1px solid #E8EDF2", overflow: "hidden", boxShadow: "0 2px 12px rgba(15,25,35,0.04)", position: "sticky", top: 110 }}>
           <div style={{ padding: "14px 16px", borderBottom: "1px solid #E8EDF2" }}>
             <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: "0.08em" }}>REPORT HISTORY</div>
           </div>

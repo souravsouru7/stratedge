@@ -30,37 +30,44 @@ export function useAnalytics() {
   const router = useRouter();
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
-  // Use parallel queries to fetch all data slices
-  const results = useQueries({
+  // SEQUENTIAL: Core analytics first (immediate KPIs)
+  const coreResults = useQueries({
     queries: [
-      { queryKey: ["analytics", "summary"],        queryFn: getSummary,           staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "riskReward"],     queryFn: getRiskRewardAnalysis, staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "distribution"],   queryFn: getTradeDistribution, staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "performance"],    queryFn: getPerformanceMetrics, staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "timeAnalysis"],   queryFn: getTimeAnalysis,      staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "quality"],        queryFn: getTradeQuality,       staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "drawdown"],       queryFn: getDrawdownAnalysis,  staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "aiInsights"],     queryFn: getAIInsights,        staleTime: 5 * 60 * 1000 },
-      { queryKey: ["analytics", "psychology"],     queryFn: async () => {
+      { queryKey: ["analytics", "summary"],      queryFn: getSummary,           staleTime: 5 * 60 * 1000 },
+      { queryKey: ["analytics", "performance"],  queryFn: getPerformanceMetrics, staleTime: 5 * 60 * 1000 },
+      { queryKey: ["analytics", "distribution"], queryFn: getTradeDistribution,  staleTime: 5 * 60 * 1000 },
+    ],
+  });
+
+  const coreData = {
+    summary: coreResults[0].data,
+    performance: coreResults[1].data,
+    distribution: coreResults[2].data,
+  };
+  
+  const coreLoading = coreResults.some(r => r.isLoading);
+  const coreError = coreResults.find(r => r.error)?.error;
+  const hasCoreData = coreResults.every(r => r.data);
+
+  // DEEP: Optional analytics (progressive loading, rate-limit safe)
+  const deepResults = useQueries({
+    queries: hasCoreData ? [  // Only if core succeeded
+      { queryKey: ["analytics", "riskReward"],   queryFn: getRiskRewardAnalysis, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false },
+      { queryKey: ["analytics", "timeAnalysis"], queryFn: getTimeAnalysis,       staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false },
+      { queryKey: ["analytics", "drawdown"],     queryFn: getDrawdownAnalysis,   staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false },
+      { queryKey: ["analytics", "aiInsights"],   queryFn: getAIInsights,         staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false },
+      { queryKey: ["analytics", "psychology"],   queryFn: async () => {
           try { return await getPsychologyAnalytics(); } catch (e) { return null; }
         }, 
         staleTime: 5 * 60 * 1000 
       },
-    ],
+    ] : []
   });
 
-  const loading = results.some((r) => r.isLoading);
-  const data = {
-    summary:      results[0].data,
-    riskReward:   results[1].data,
-    distribution: results[2].data,
-    performance:  results[3].data,
-    timeAnalysis: results[4].data,
-    quality:      results[5].data,
-    drawdown:     results[6].data,
-    aiInsights:   results[7].data,
-    psychology:   results[8].data,
-  };
+  const deepLoading = deepResults.some(r => r.isLoading);
+  const deepError = deepResults.find(r => r.error)?.error;
+  const error = coreError || deepError || null;
+  const loading = coreLoading || deepLoading;
 
   useEffect(() => {
     const token = typeof window !== "undefined" && localStorage.getItem("token");
@@ -88,6 +95,10 @@ export function useAnalytics() {
     calendarMonth,
     prevMonth: () => shiftMonth(-1),
     nextMonth: () => shiftMonth(+1),
-    error: results.find(r => r.error)?.error
+    coreLoading,
+    deepLoading,
+    error,
+    hasCoreData,
+    retryAfterSeconds: error?.retryAfterSeconds || 0
   };
 }

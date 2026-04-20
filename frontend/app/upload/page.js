@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { API_URL } from "@/config/api";
+import PageHeader from "@/features/shared/components/PageHeader";
 
 export default function UploadPage() {
 
@@ -49,10 +50,11 @@ export default function UploadPage() {
   };
 
   return (
+    <div style={{ minHeight: "100vh", background: "#F4F2EE", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+      <PageHeader />
 
-    <div className="p-10">
-
-      <h1 className="text-2xl mb-6">Upload Trade Screenshot</h1>
+      <div style={{ maxWidth: 600, margin: "40px auto", padding: "0 20px" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 24, color: "#0F1923" }}>Upload Trade Screenshot</h1>
 
       <input
         type="file"
@@ -76,8 +78,7 @@ export default function UploadPage() {
         <p className="text-green-500 mt-4">{success}</p>
       )}
 
+      </div>
     </div>
-
   );
-
 }

@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { fetchSetups } from "@/services/setupApi";
 import { logChecklistEvent } from "@/services/checklistApi";
 import { useMarket } from "@/context/MarketContext";
-import MarketSwitcher from "@/components/MarketSwitcher";
 import { Skeleton } from "@/features/shared";
+import PageHeader from "@/features/shared/components/PageHeader";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 
 export default function PreTradeChecklistPage() {
   const router = useRouter();
@@ -73,6 +74,10 @@ export default function PreTradeChecklistPage() {
   const clearAll = () => setChecked({});
 
   const handleSelectStrategy = (idx) => {
+    if (selectedIdx === idx) {
+      setSelectedIdx(null);
+      return;
+    }
     setSelectedIdx(idx);
     setChecked({});
     setSetupSimilarity("");
@@ -111,7 +116,7 @@ export default function PreTradeChecklistPage() {
     }
   };
 
-  const dashHref = currentMarket === "Indian_Market" ? "/indian-market/dashboard" : "/dashboard";
+  const isIndian = currentMarket === "Indian_Market";
 
   if (!mounted) return null;
 
@@ -122,61 +127,7 @@ export default function PreTradeChecklistPage() {
       fontFamily: "'Plus Jakarta Sans',sans-serif",
       color: "#0F1923",
     }}>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-      {/* HEADER */}
-      <header style={{
-        position: "sticky", top: 0, zIndex: 100,
-        padding: "10px 24px", minHeight: 60,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: 10,
-        background: "rgba(255,255,255,0.92)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid #E2E8F0",
-        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href={dashHref} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} />
-            </div>
-            <div>
-              <div style={{ display: "none" }}>EDGEDISCIPLINE</div>
-              <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-                PRE-TRADE CHECKLIST
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <MarketSwitcher />
-          <Link
-            href="/setups"
-            style={{
-              fontSize: 10, fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: "0.08em", padding: "7px 12px",
-              borderRadius: 8, border: "1px solid #E2E8F0",
-              background: "#F8FAFC", color: "#4A5568",
-              textDecoration: "none", fontWeight: 600,
-            }}
-          >
-            MANAGE SETUPS
-          </Link>
-          <Link
-            href={dashHref}
-            style={{
-              fontSize: 10, fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: "0.08em", padding: "7px 12px",
-              borderRadius: 8, border: "1px solid #E2E8F0",
-              background: "#F8FAFC", color: "#4A5568",
-              textDecoration: "none", fontWeight: 600,
-            }}
-          >
-            DASHBOARD
-          </Link>
-        </div>
-      </header>
+      {isIndian ? <IndianMarketHeader /> : <PageHeader />}
 
       {/* MAIN */}
       <main style={{ maxWidth: 720, margin: "0 auto", padding: "28px 16px 40px" }}>
@@ -287,351 +238,293 @@ export default function PreTradeChecklistPage() {
             </Link>
           </div>
         ) : (
-          <>
-            {/* Strategy Selector */}
-            <div style={{
-              background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0",
-              padding: "14px 16px", marginBottom: 14,
-              boxShadow: "0 2px 10px rgba(15,25,35,0.04)",
-            }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, marginBottom: 8 }}>
-                SELECT YOUR STRATEGY
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {strategies.map((s, idx) => {
-                  const active = idx === selectedIdx;
-                  return (
-                    <button
-                      key={s._id || idx}
-                      onClick={() => handleSelectStrategy(idx)}
-                      style={{
-                        fontSize: 12, fontWeight: active ? 800 : 600,
-                        fontFamily: "'Plus Jakarta Sans',sans-serif",
-                        padding: "10px 16px", minHeight: 42, borderRadius: 999,
-                        border: active ? "2px solid #0D9E6E" : "1px solid #E2E8F0",
-                        background: active ? "rgba(13,158,110,0.08)" : "#F8FAFC",
-                        color: active ? "#0D9E6E" : "#4A5568",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      {s.name || "Unnamed"}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {strategies.map((s, idx) => {
+              const isExpanded = selectedIdx === idx;
+              const strategyRules = (s.rules || []).filter(r => r.label && r.label.trim().length > 0);
+              const totalRulesForCard = strategyRules.length;
 
-            {/* Rules Checklist */}
-            {selected && (
-              <div style={{
-                background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0",
-                overflow: "hidden", marginBottom: 14,
-                boxShadow: "0 2px 10px rgba(15,25,35,0.04)",
-              }}>
-                {/* Top accent bar */}
-                <div style={{ height: 4, background: `linear-gradient(90deg, ${lc.color}, ${lc.color}44)` }} />
-
-                <div style={{ padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 800 }}>{selected.name}</div>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", marginTop: 2 }}>
-                        {totalRules} RULE{totalRules === 1 ? "" : "S"} · {checkedCount} CHECKED
-                      </div>
-                    </div>
-                    <button
-                      onClick={clearAll}
-                      style={{
-                        fontSize: 9, fontFamily: "'JetBrains Mono',monospace",
-                        letterSpacing: "0.08em", padding: "5px 10px",
-                        borderRadius: 999, border: "1px solid #E2E8F0",
-                        background: "#F8FAFC", color: "#64748B",
-                        cursor: "pointer",
-                      }}
-                    >
-                      RESET ALL
-                    </button>
-                  </div>
-
-                  {Array.isArray(selected.referenceImages) && selected.referenceImages.length > 0 && (
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr",
-                      gap: 14,
-                      padding: "12px",
-                      marginBottom: 14,
-                      borderRadius: 12,
-                      border: "1px solid #E2E8F0",
-                      background: "#F8FAFC",
-                      alignItems: "center",
-                    }}>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
-                        {selected.referenceImages.slice(0, 5).map((image, idx) => (
-                          <img
-                            key={`${selected._id || selected.name}-${idx}`}
-                            src={image.url}
-                            alt={`${selected.name} reference ${idx + 1}`}
-                            onClick={() => setPreviewImageUrl(image.url)}
-                            style={{
-                              width: "clamp(110px, 28vw, 160px)",
-                              height: "auto",
-                              aspectRatio: "16/10",
-                              objectFit: "cover",
-                              borderRadius: 10,
-                              border: "1px solid #E2E8F0",
-                              cursor: "zoom-in",
-                              flexShrink: 0,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>
-                          SETUP REFERENCES
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-                          Compare the live chart with your saved ideal setup examples
-                        </div>
-                        <div style={{ fontSize: 12, color: "#64748B" }}>
-                          Use these screenshots as your visual benchmark before you commit to the trade.
-                        </div>
-                      </div>
-                      <div style={{
-                        padding: "12px",
-                        borderRadius: 12,
-                        border: "1px solid #E2E8F0",
-                        background: "#FFFFFF",
-                      }}>
-                        <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 8 }}>
-                          VISUAL MATCH CHECK
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-                          Is the current chart setup similar to these reference images?
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          {[
-                            { value: "yes", label: "YES", color: "#0D9E6E", bg: "rgba(13,158,110,0.08)", border: "rgba(13,158,110,0.35)" },
-                            { value: "partly", label: "PARTLY", color: "#B8860B", bg: "rgba(184,134,11,0.08)", border: "rgba(184,134,11,0.35)" },
-                            { value: "no", label: "NO", color: "#D63B3B", bg: "rgba(214,59,59,0.08)", border: "rgba(214,59,59,0.35)" },
-                          ].map((option) => {
-                            const active = setupSimilarity === option.value;
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => setSetupSimilarity(option.value)}
-                                style={{
-                                  padding: "10px 18px",
-                                  minHeight: 42,
-                                  borderRadius: 999,
-                                  border: active ? `2px solid ${option.color}` : `1px solid ${option.border}`,
-                                  background: active ? option.bg : "#F8FAFC",
-                                  color: option.color,
-                                  cursor: "pointer",
-                                  fontSize: 11,
-                                  fontWeight: 800,
-                                  fontFamily: "'JetBrains Mono',monospace",
-                                  letterSpacing: "0.04em",
-                                  flex: 1,
-                                }}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {rules.length === 0 ? (
-                    <div style={{ fontSize: 12, color: "#94A3B8", padding: "20px 0", textAlign: "center" }}>
-                      No rules defined for this strategy. <Link href="/setups" style={{ color: "#0D9E6E", fontWeight: 700 }}>Add rules →</Link>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {rules.map((rule, idx) => {
-                        const isChecked = !!checked[idx];
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => toggleRule(idx)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 12,
-                              padding: "12px 14px", borderRadius: 12,
-                              border: isChecked ? "1.5px solid rgba(13,158,110,0.4)" : "1px solid #E2E8F0",
-                              background: isChecked ? "rgba(13,158,110,0.04)" : "#FAFAFA",
-                              cursor: "pointer", textAlign: "left",
-                              transition: "all 0.2s",
-                              width: "100%",
-                            }}
-                          >
-                            {/* Checkbox */}
-                            <div style={{
-                              width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-                              border: isChecked ? "2px solid #0D9E6E" : "2px solid #CBD5E1",
-                              background: isChecked ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              transition: "all 0.2s",
-                              boxShadow: isChecked ? "0 2px 8px rgba(13,158,110,0.3)" : "none",
-                            }}>
-                              {isChecked && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3">
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                              )}
-                            </div>
-
-                            {/* Rule text */}
-                            <span style={{
-                              fontSize: 13, fontWeight: 600,
-                              color: isChecked ? "#0D9E6E" : "#0F1923",
-                              textDecoration: isChecked ? "line-through" : "none",
-                              opacity: isChecked ? 0.7 : 1,
-                              transition: "all 0.2s",
-                              fontFamily: "'Plus Jakarta Sans',sans-serif",
-                            }}>
-                              {rule.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Confidence Meter */}
-            {totalRules > 0 && (
-              <div style={{
-                background: "#FFFFFF", borderRadius: 14, border: "1px solid #E2E8F0",
-                overflow: "hidden", marginBottom: 14,
-                boxShadow: "0 2px 10px rgba(15,25,35,0.04)",
-              }}>
-                <div style={{ padding: "18px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-                      SETUP CONFIDENCE
-                    </div>
-                    <div style={{
-                      fontSize: 24, fontWeight: 900,
-                      fontFamily: "'JetBrains Mono',monospace",
-                      color: lc.color,
-                    }}>
-                      {score}%
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div style={{
-                    height: 12, background: "#F0EEE9", borderRadius: 12,
-                    overflow: "hidden", position: "relative", marginBottom: 12,
-                  }}>
-                    <div style={{
-                      height: "100%", borderRadius: 12,
-                      width: `${score}%`,
-                      background: `linear-gradient(90deg, ${lc.color}, ${lc.color}99)`,
-                      boxShadow: `0 0 12px ${lc.color}44`,
-                      transition: "width 0.4s cubic-bezier(0.22,1,0.36,1)",
-                    }} />
-                  </div>
-
-                  {/* Level badge */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "12px 14px", borderRadius: 10,
-                    background: lc.bg, border: `1px solid ${lc.border}`,
-                  }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 10,
-                      background: `${lc.color}18`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 18, fontWeight: 900, color: lc.color,
-                    }}>
-                      {lc.icon}
-                    </div>
-                    <div>
-                      <div style={{
-                        fontSize: 13, fontWeight: 800, color: lc.color,
-                        fontFamily: "'JetBrains Mono',monospace",
-                        letterSpacing: "0.06em",
-                      }}>
-                        {lc.label}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#4A5568", marginTop: 2 }}>
-                        {lc.sub}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Go / No-Go Decision */}
-            {totalRules > 0 && (
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {score >= 80 ? (
-                  <button
-                    onClick={handleTakeTrade}
-                    disabled={isSubmitting}
+              return (
+                <div key={s._id || idx} style={{
+                  background: "#FFFFFF", borderRadius: 14,
+                  border: isExpanded ? "1.5px solid rgba(13,158,110,0.5)" : "1px solid #E2E8F0",
+                  overflow: "hidden",
+                  boxShadow: isExpanded ? "0 4px 20px rgba(13,158,110,0.08)" : "0 2px 10px rgba(15,25,35,0.04)",
+                  transition: "border 0.2s, box-shadow 0.2s",
+                }}>
+                  {/* Collapsed header — always visible */}
+                  <div
+                    onClick={() => handleSelectStrategy(idx)}
                     style={{
-                      flex: 1, minWidth: 180, padding: "15px 18px", minHeight: 52, borderRadius: 12, border: "none", cursor: isSubmitting ? "not-allowed" : "pointer",
-                      background: "linear-gradient(135deg, #0D9E6E, #22C78E)",
-                      color: "#FFFFFF",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                      fontSize: 13, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
-                      letterSpacing: "0.06em",
-                      boxShadow: "0 4px 20px rgba(13,158,110,0.35)",
-                      transition: "all 0.2s",
-                      opacity: isSubmitting ? 0.7 : 1,
+                      padding: "14px 16px", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                      userSelect: "none",
                     }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    {isSubmitting ? "LOGGING..." : "TAKE TRADE →"}
-                  </button>
-                ) : (
-                  <div style={{
-                    flex: 1, minWidth: 180, padding: "15px 18px", minHeight: 52, borderRadius: 12,
-                    background: score >= 50 ? "rgba(184,134,11,0.08)" : "rgba(214,59,59,0.06)",
-                    border: `1px solid ${score >= 50 ? "rgba(184,134,11,0.3)" : "rgba(214,59,59,0.25)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                    fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
-                    letterSpacing: "0.04em",
-                    color: score >= 50 ? "#B8860B" : "#D63B3B",
-                  }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="15" y1="9" x2="9" y2="15" />
-                      <line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
-                    {score >= 50 ? "REVIEW RULES" : "SKIP TRADE"}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#0F1923", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {s.name || "Unnamed Strategy"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", marginTop: 3 }}>
+                        {totalRulesForCard} RULE{totalRulesForCard !== 1 ? "S" : ""}
+                        {isExpanded && totalRulesForCard > 0 ? ` · ${checkedCount}/${totalRulesForCard} CHECKED` : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      {isExpanded && totalRulesForCard > 0 && (
+                        <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: lc.color }}>
+                          {score}%
+                        </div>
+                      )}
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6, background: "#F1F4F8",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "none",
+                      }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                <button
-                  onClick={clearAll}
-                  style={{
-                    padding: "15px 16px", minHeight: 52, borderRadius: 12,
-                    background: "#FFFFFF", border: "1px solid #E2E8F0",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace",
-                    letterSpacing: "0.06em", color: "#64748B",
-                    cursor: "pointer", transition: "all 0.2s",
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="1 4 1 10 7 10" />
-                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-                  </svg>
-                  RESET
-                </button>
-              </div>
-            )}
-          </>
+                  {/* Expanded body */}
+                  {isExpanded && (
+                    <div>
+                      <div style={{ height: 4, background: `linear-gradient(90deg, ${lc.color}, ${lc.color}44)` }} />
+                      <div style={{ padding: "16px 18px" }}>
+
+                        {/* Reset button */}
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+                          <button onClick={clearAll} style={{
+                            fontSize: 9, fontFamily: "'JetBrains Mono',monospace",
+                            letterSpacing: "0.08em", padding: "5px 10px",
+                            borderRadius: 999, border: "1px solid #E2E8F0",
+                            background: "#F8FAFC", color: "#64748B", cursor: "pointer",
+                          }}>
+                            RESET ALL
+                          </button>
+                        </div>
+
+                        {/* Reference images */}
+                        {Array.isArray(s.referenceImages) && s.referenceImages.length > 0 && (
+                          <div style={{
+                            display: "grid", gridTemplateColumns: "1fr", gap: 14, padding: "12px",
+                            marginBottom: 14, borderRadius: 12, border: "1px solid #E2E8F0",
+                            background: "#F8FAFC", alignItems: "center",
+                          }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
+                              {s.referenceImages.slice(0, 5).map((image, imgIdx) => (
+                                <img
+                                  key={`${s._id || s.name}-${imgIdx}`}
+                                  src={image.url}
+                                  alt={`${s.name} reference ${imgIdx + 1}`}
+                                  onClick={() => setPreviewImageUrl(image.url)}
+                                  style={{
+                                    width: "clamp(110px, 28vw, 160px)", height: "auto",
+                                    aspectRatio: "16/10", objectFit: "cover",
+                                    borderRadius: 10, border: "1px solid #E2E8F0",
+                                    cursor: "zoom-in", flexShrink: 0,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>
+                                SETUP REFERENCES
+                              </div>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                                Compare the live chart with your saved ideal setup examples
+                              </div>
+                              <div style={{ fontSize: 12, color: "#64748B" }}>
+                                Use these screenshots as your visual benchmark before you commit to the trade.
+                              </div>
+                            </div>
+                            <div style={{ padding: "12px", borderRadius: 12, border: "1px solid #E2E8F0", background: "#FFFFFF" }}>
+                              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 8 }}>
+                                VISUAL MATCH CHECK
+                              </div>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                                Is the current chart setup similar to these reference images?
+                              </div>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                {[
+                                  { value: "yes", label: "YES", color: "#0D9E6E", bg: "rgba(13,158,110,0.08)", border: "rgba(13,158,110,0.35)" },
+                                  { value: "partly", label: "PARTLY", color: "#B8860B", bg: "rgba(184,134,11,0.08)", border: "rgba(184,134,11,0.35)" },
+                                  { value: "no", label: "NO", color: "#D63B3B", bg: "rgba(214,59,59,0.08)", border: "rgba(214,59,59,0.35)" },
+                                ].map((option) => {
+                                  const active = setupSimilarity === option.value;
+                                  return (
+                                    <button key={option.value} type="button" onClick={() => setSetupSimilarity(option.value)} style={{
+                                      padding: "10px 18px", minHeight: 42, borderRadius: 999,
+                                      border: active ? `2px solid ${option.color}` : `1px solid ${option.border}`,
+                                      background: active ? option.bg : "#F8FAFC",
+                                      color: option.color, cursor: "pointer",
+                                      fontSize: 11, fontWeight: 800,
+                                      fontFamily: "'JetBrains Mono',monospace",
+                                      letterSpacing: "0.04em", flex: 1,
+                                    }}>
+                                      {option.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rules */}
+                        {rules.length === 0 ? (
+                          <div style={{ fontSize: 12, color: "#94A3B8", padding: "20px 0", textAlign: "center" }}>
+                            No rules defined for this strategy. <Link href="/setups" style={{ color: "#0D9E6E", fontWeight: 700 }}>Add rules →</Link>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                            {rules.map((rule, ruleIdx) => {
+                              const isChecked = !!checked[ruleIdx];
+                              return (
+                                <button key={ruleIdx} onClick={() => toggleRule(ruleIdx)} style={{
+                                  display: "flex", alignItems: "center", gap: 12,
+                                  padding: "12px 14px", borderRadius: 12,
+                                  border: isChecked ? "1.5px solid rgba(13,158,110,0.4)" : "1px solid #E2E8F0",
+                                  background: isChecked ? "rgba(13,158,110,0.04)" : "#FAFAFA",
+                                  cursor: "pointer", textAlign: "left",
+                                  transition: "all 0.2s", width: "100%",
+                                }}>
+                                  <div style={{
+                                    width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                                    border: isChecked ? "2px solid #0D9E6E" : "2px solid #CBD5E1",
+                                    background: isChecked ? "linear-gradient(135deg,#0D9E6E,#22C78E)" : "#FFFFFF",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    transition: "all 0.2s",
+                                    boxShadow: isChecked ? "0 2px 8px rgba(13,158,110,0.3)" : "none",
+                                  }}>
+                                    {isChecked && (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <span style={{
+                                    fontSize: 13, fontWeight: 600,
+                                    color: isChecked ? "#0D9E6E" : "#0F1923",
+                                    textDecoration: isChecked ? "line-through" : "none",
+                                    opacity: isChecked ? 0.7 : 1,
+                                    transition: "all 0.2s",
+                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                  }}>
+                                    {rule.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Confidence meter */}
+                        {totalRules > 0 && (
+                          <div style={{
+                            background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0",
+                            padding: "14px 16px", marginBottom: 14,
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                              <div style={{ fontSize: 9, letterSpacing: "0.14em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                                SETUP CONFIDENCE
+                              </div>
+                              <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: lc.color }}>
+                                {score}%
+                              </div>
+                            </div>
+                            <div style={{ height: 10, background: "#E2E8F0", borderRadius: 10, overflow: "hidden", marginBottom: 10 }}>
+                              <div style={{
+                                height: "100%", borderRadius: 10, width: `${score}%`,
+                                background: `linear-gradient(90deg, ${lc.color}, ${lc.color}99)`,
+                                boxShadow: `0 0 12px ${lc.color}44`,
+                                transition: "width 0.4s cubic-bezier(0.22,1,0.36,1)",
+                              }} />
+                            </div>
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: "10px 12px", borderRadius: 10,
+                              background: lc.bg, border: `1px solid ${lc.border}`,
+                            }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 8, background: `${lc.color}18`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 16, fontWeight: 900, color: lc.color,
+                              }}>
+                                {lc.icon}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 800, color: lc.color, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>
+                                  {lc.label}
+                                </div>
+                                <div style={{ fontSize: 11, color: "#4A5568", marginTop: 2 }}>{lc.sub}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Take trade / Reset */}
+                        {totalRules > 0 && (
+                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                            {score >= 80 ? (
+                              <button onClick={handleTakeTrade} disabled={isSubmitting} style={{
+                                flex: 1, minWidth: 180, padding: "15px 18px", minHeight: 52,
+                                borderRadius: 12, border: "none", cursor: isSubmitting ? "not-allowed" : "pointer",
+                                background: "linear-gradient(135deg, #0D9E6E, #22C78E)", color: "#FFFFFF",
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                                fontSize: 13, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
+                                letterSpacing: "0.06em",
+                                boxShadow: "0 4px 20px rgba(13,158,110,0.35)",
+                                opacity: isSubmitting ? 0.7 : 1,
+                              }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                {isSubmitting ? "LOGGING..." : "TAKE TRADE →"}
+                              </button>
+                            ) : (
+                              <div style={{
+                                flex: 1, minWidth: 180, padding: "15px 18px", minHeight: 52, borderRadius: 12,
+                                background: score >= 50 ? "rgba(184,134,11,0.08)" : "rgba(214,59,59,0.06)",
+                                border: `1px solid ${score >= 50 ? "rgba(184,134,11,0.3)" : "rgba(214,59,59,0.25)"}`,
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                                fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace",
+                                letterSpacing: "0.04em", color: score >= 50 ? "#B8860B" : "#D63B3B",
+                              }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <line x1="15" y1="9" x2="9" y2="15" />
+                                  <line x1="9" y1="9" x2="15" y2="15" />
+                                </svg>
+                                {score >= 50 ? "REVIEW RULES" : "SKIP TRADE"}
+                              </div>
+                            )}
+                            <button onClick={clearAll} style={{
+                              padding: "15px 16px", minHeight: 52, borderRadius: 12,
+                              background: "#FFFFFF", border: "1px solid #E2E8F0",
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                              fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace",
+                              letterSpacing: "0.06em", color: "#64748B", cursor: "pointer",
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                              </svg>
+                              RESET
+                            </button>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
         
         {/* Success Modal */}

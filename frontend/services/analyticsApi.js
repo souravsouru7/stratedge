@@ -66,22 +66,37 @@ const handleResponse = async (res) => {
   return res.json();
 };
 
-const fetchWithRateLimitRetry = async (url, options, maxRetries = 2) => {
+const fetchWithRateLimitRetry = async (url, options, maxRetries = 4) => {
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    const res = await fetch(url, options);
+    // Small random stagger so concurrent requests don't all retry in sync
+    if (attempt > 0) {
+      const delayMs = getRetryDelayMs({ headers: { get: () => null } }, attempt - 1);
+      await sleep(delayMs);
+    }
+
+    let res;
+    try {
+      res = await fetch(url, options);
+    } catch (networkErr) {
+      if (attempt >= maxRetries) throw networkErr;
+      continue;
+    }
+
     if (res.status !== 429) {
       return handleResponse(res);
     }
 
     if (attempt >= maxRetries) {
-      return handleResponse(res);
+      // Return null instead of throwing so one failed endpoint doesn't crash the whole page
+      console.warn(`Rate limit persisted after ${maxRetries} retries for: ${url}`);
+      return null;
     }
 
     const delayMs = getRetryDelayMs(res, attempt);
     await sleep(delayMs);
   }
 
-  throw new Error("Failed to complete request after retries.");
+  return null;
 };
 
 // Basic Analytics

@@ -318,7 +318,7 @@ export default function IndianMarketDashboard() {
         setMounted(true);
         fetchStats();
 
-    }, [router, currentMarket, toggleMarket]);
+    }, [router, currentMarket]);
 
     const profitBull = stats ? parseFloat(stats.netProfit ?? stats.totalProfit) >= 0 : true;
     const winBull = stats ? parseFloat(stats.winRate) >= 50 : true;

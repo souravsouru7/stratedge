@@ -16,7 +16,16 @@ export default function IndianSetupStrategiesPage() {
   const [uploadingByStrategy, setUploadingByStrategy] = useState({});
   const [error, setError] = useState("");
   const [savedAt, setSavedAt] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
   const uploadingCount = Object.values(uploadingByStrategy).reduce((sum, count) => sum + count, 0);
+
+  const toggleExpand = (id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -363,6 +372,7 @@ export default function IndianSetupStrategiesPage() {
               const score = activeRules.length > 0
                 ? Math.round((followedCount / activeRules.length) * 100)
                 : null;
+              const isExpanded = expandedIds.has(strategy.id);
 
               return (
                 <div
@@ -370,39 +380,78 @@ export default function IndianSetupStrategiesPage() {
                   style={{
                     borderRadius: 12,
                     border: "1px solid #E2E8F0",
-                    padding: "10px 12px 10px",
                     background: "linear-gradient(135deg,rgba(248,250,252,0.9),#FFFFFF)",
+                    overflow: "hidden",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                      <label style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                        TRADING SETUP NAME
-                      </label>
-                      <input
-                        type="text"
-                        value={strategy.name}
-                        onChange={e => updateStrategyName(strategy.id, e.target.value)}
-                        placeholder="e.g. NIFTY Opening Range Breakout..."
-                        style={{
-                          borderRadius: 8,
-                          border: "1px solid #E2E8F0",
-                          padding: "7px 10px",
-                          fontSize: 12,
-                          fontFamily: "'Plus Jakarta Sans',sans-serif",
-                          outline: "none",
-                          width: "100%",
-                        }}
-                      />
-                    </div>
-                    <div style={{ textAlign: "right", minWidth: 90 }}>
-                      <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#0D9E6E", fontWeight: 700 }}>
-                        {score !== null ? `${score}% FOLLOWED` : "NO TICKS"}
+                  {/* Collapsed header — always visible, click to expand */}
+                  <div
+                    onClick={() => toggleExpand(strategy.id)}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", marginBottom: 2 }}>
+                        TRADING SETUP
                       </div>
-                      <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                        {activeRules.length} rule{activeRules.length === 1 ? "" : "s"}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: strategy.name ? "#0F1923" : "#A0AEC0", fontFamily: "'Plus Jakarta Sans',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {strategy.name || "Untitled Setup"}
                       </div>
                     </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#0D9E6E", fontWeight: 700 }}>
+                          {score !== null ? `${score}% FOLLOWED` : "NO TICKS"}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
+                          {activeRules.length} rule{activeRules.length === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6, background: "#F1F4F8",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "none",
+                      }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded body */}
+                  {isExpanded && <div style={{ borderTop: "1px solid #F1F4F8", padding: "10px 12px 10px" }}>
+
+                  {/* Name input */}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 9, letterSpacing: "0.12em", color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
+                      TRADING SETUP NAME
+                    </label>
+                    <input
+                      type="text"
+                      value={strategy.name}
+                      onChange={e => updateStrategyName(strategy.id, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      placeholder="e.g. NIFTY Opening Range Breakout..."
+                      style={{
+                        borderRadius: 8,
+                        border: "1px solid #E2E8F0",
+                        padding: "7px 10px",
+                        fontSize: 12,
+                        fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        outline: "none",
+                        width: "100%",
+                        marginTop: 4,
+                      }}
+                    />
                   </div>
 
                   <div style={{ marginBottom: 10 }}>
@@ -610,6 +659,8 @@ export default function IndianSetupStrategiesPage() {
                       </div>
                     )}
                   </div>
+
+                  </div>}
                 </div>
               );
             })}

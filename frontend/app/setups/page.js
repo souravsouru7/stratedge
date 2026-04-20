@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { fetchSetups, saveSetups, uploadSetupReferenceImage } from "@/services/setupApi";
 import { useMarket } from "@/context/MarketContext";
 import { Skeleton } from "@/features/shared";
+import PageHeader from "@/features/shared/components/PageHeader";
+import IndianMarketHeader from "@/components/IndianMarketHeader";
 
 export default function SetupStrategiesPage() {
   const router = useRouter();
@@ -17,6 +19,15 @@ export default function SetupStrategiesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [savedAt, setSavedAt] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
+
+  const toggleExpand = (id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -352,7 +363,22 @@ export default function SetupStrategiesPage() {
           align-items: center;
           justify-content: space-between;
           gap: 10px;
+          cursor: pointer;
+          user-select: none;
         }
+        .sp-card-header:hover { background: #FAFBFC; }
+        .sp-chevron {
+          flex-shrink: 0;
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
+          background: #F1F4F8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: none;
+        }
+        .sp-chevron.open { transform: rotate(180deg); }
         .sp-card-name-wrap {
           flex: 1;
           min-width: 0;
@@ -613,48 +639,47 @@ export default function SetupStrategiesPage() {
         }
       `}</style>
 
-      {/* Header */}
-      <header className="sp-header">
-        <div className="sp-header-left">
-          <button type="button" className="sp-back-btn" onClick={() => router.back()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F1923" strokeWidth="2.5">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <span className="sp-title">Setup / Strategies</span>
+      {currentMarket === "Indian_Market" ? <IndianMarketHeader /> : <PageHeader />}
+
+      {/* Page toolbar */}
+      <div style={{
+        background: "#FFFFFF", borderBottom: "1px solid #E8EDF2",
+        padding: "10px 20px", display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#0F1923" }}>Setup / Strategies</span>
           {getMarketLabel() && (
-            <span className="sp-market-chip">{getMarketLabel()}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#0D9E6E", background: "rgba(13,158,110,0.08)", border: "1px solid rgba(13,158,110,0.2)", padding: "3px 8px", borderRadius: 20 }}>
+              {getMarketLabel()}
+            </span>
           )}
         </div>
-
-        <div className="sp-header-actions">
-          <Link href="/dashboard" className="sp-btn-dashboard">Dashboard</Link>
-          <button
-            type="button"
-            className="sp-btn-save"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                </svg>
-                Saving…
-              </>
-            ) : (
-              <>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
-                </svg>
-                Save Setups
-              </>
-            )}
-          </button>
-        </div>
-      </header>
+        <button
+          type="button"
+          className="sp-btn-save"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+              Saving…
+            </>
+          ) : (
+            <>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              Save Setups
+            </>
+          )}
+        </button>
+      </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
@@ -708,23 +733,42 @@ export default function SetupStrategiesPage() {
             ) : (
               strategies.map(strategy => {
                 const filledRules = strategy.rules.filter(r => r.label?.trim().length > 0).length;
+                const isExpanded = expandedIds.has(strategy.id);
                 return (
                   <div key={strategy.id} className="sp-card">
                     {/* Card header – name */}
-                    <div className="sp-card-header">
+                    <div className="sp-card-header" onClick={() => toggleExpand(strategy.id)}>
                       <div className="sp-card-name-wrap">
                         <div className="sp-field-label">STRATEGY NAME</div>
-                        <input
-                          type="text"
-                          className="sp-name-input"
-                          value={strategy.name}
-                          onChange={e => updateStrategyName(strategy.id, e.target.value)}
-                          placeholder="e.g. London Breakout, NY Reversal…"
-                        />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: strategy.name ? "#0F1923" : "#A0AEC0", fontFamily: "'Inter', sans-serif" }}>
+                          {strategy.name || "Untitled Strategy"}
+                        </div>
                       </div>
-                      <div className="sp-rules-badge">
-                        {filledRules} {filledRules === 1 ? "rule" : "rules"}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div className="sp-rules-badge">
+                          {filledRules} {filledRules === 1 ? "rule" : "rules"}
+                        </div>
+                        <div className={`sp-chevron${isExpanded ? " open" : ""}`}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Collapsible body */}
+                    {isExpanded && <>
+
+                    {/* Name input (inside expanded) */}
+                    <div style={{ padding: "12px 16px", borderBottom: "1px solid #F1F4F8" }} onClick={e => e.stopPropagation()}>
+                      <div className="sp-field-label">STRATEGY NAME</div>
+                      <input
+                        type="text"
+                        className="sp-name-input"
+                        value={strategy.name}
+                        onChange={e => updateStrategyName(strategy.id, e.target.value)}
+                        placeholder="e.g. London Breakout, NY Reversal…"
+                      />
                     </div>
 
                     {/* Reference images */}
@@ -804,6 +848,8 @@ export default function SetupStrategiesPage() {
                         ))
                       )}
                     </div>
+
+                    </>}
                   </div>
                 );
               })

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, Suspense } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 // Market types
@@ -89,7 +89,7 @@ export function MarketProvider({ children }) {
   }, []);
 
   // Save market preference whenever it changes
-  const toggleMarket = (market) => {
+  const toggleMarket = useCallback((market) => {
     if (!Object.values(MARKETS).includes(market)) {
       console.error('Invalid market type:', market);
       return;
@@ -100,15 +100,17 @@ export function MarketProvider({ children }) {
 
     // Dispatch custom event for components that need to react
     window.dispatchEvent(new CustomEvent('marketChanged', { detail: { market } }));
-  };
+  }, []);
 
   // Toggle between Forex and Indian Market
-  const switchMarket = () => {
-    const nextMarket = currentMarket === MARKETS.FOREX
-      ? MARKETS.INDIAN_MARKET
-      : MARKETS.FOREX;
-    toggleMarket(nextMarket);
-  };
+  const switchMarket = useCallback(() => {
+    setCurrentMarket(prev => {
+      const nextMarket = prev === MARKETS.FOREX ? MARKETS.INDIAN_MARKET : MARKETS.FOREX;
+      localStorage.setItem(STORAGE_KEY, nextMarket);
+      window.dispatchEvent(new CustomEvent('marketChanged', { detail: { market: nextMarket } }));
+      return nextMarket;
+    });
+  }, []);
 
   // Get currency symbol for current market
   const getCurrencySymbol = () => {

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { getTrade } from "@/services/tradeApi";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import PageHeader from "@/features/shared/components/PageHeader";
 
 /* ─────────────────────────────────────────
    DESIGN TOKENS — Light Trading Theme
@@ -153,20 +154,21 @@ function StatCard({ label, value, sub, accent, delay = 0 }) {
       background: "#FFFFFF",
       border: "1px solid #E2E8F0",
       borderRadius: 12,
-      padding: "20px",
+      padding: "16px",
       flex: "1 1 140px",
       animation: `fadeUp 0.5s ease ${delay}s both`,
       overflow: "hidden",
+      position: "relative",
       boxShadow: "0 2px 12px rgba(15,25,35,0.06), 0 1px 3px rgba(15,25,35,0.04)",
     }}>
       {accent && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${accent},${accent}22)` }}/>}
-      <div style={{ fontSize: 10, color: "#94A3B8", letterSpacing: "0.14em", marginBottom: 8, fontFamily: "'JetBrains Mono',monospace", fontWeight: 500 }}>
+      <div style={{ fontSize: 10, color: "#94A3B8", letterSpacing: "0.12em", marginBottom: 6, fontFamily: "'JetBrains Mono',monospace", fontWeight: 500, marginTop: accent ? 6 : 0 }}>
         {label}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: accent || "#0F1923", lineHeight: 1.2 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: accent || "#0F1923", lineHeight: 1.2 }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 6, letterSpacing: "0.08em" }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 4, letterSpacing: "0.08em" }}>{sub}</div>}
     </div>
   );
 }
@@ -281,94 +283,7 @@ function TradeDetailContent() {
       <CandlestickBackground/>
       <div style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none", background: "linear-gradient(135deg, rgba(240,238,233,0.82) 0%, rgba(240,238,233,0.75) 100%)" }}/>
 
-      {/* Header */}
-      <header style={{
-        position: "relative",
-        zIndex: 20,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-        height: 60,
-        flexWrap: "wrap",
-        gap: 10,
-        background: "rgba(255,255,255,0.92)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid #E2E8F0",
-        boxShadow: "0 1px 12px rgba(15,25,35,0.06)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 168, height: 44, position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-start" }}><img src="/mainlogo1.png" alt="Edgecipline" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "left center" }} /></div>
-          <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1 }}>
-              {""}
-            </div>
-            <div style={{ fontSize: 9, letterSpacing: "0.18em", color: "#0D9E6E", marginTop: 1, fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>
-              AI JOURNAL
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {/* Market open pill */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            background: "#ECFDF5",
-            border: "1px solid #A7F3D0",
-            borderRadius: 20,
-            padding: "5px 12px",
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#0D9E6E", animation: "blink 1.2s ease-in-out infinite" }}/>
-            <span style={{ fontSize: 10, letterSpacing: "0.1em", color: "#0D9E6E", fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>
-              MARKET OPEN
-            </span>
-          </div>
-
-          <Link href="/trades" style={{
-            fontSize: 12,
-            color: "#4A5568",
-            fontWeight: 600,
-            textDecoration: "none",
-            padding: "5px 10px",
-            borderRadius: 6,
-            transition: "all 0.15s",
-            fontFamily: "'Plus Jakarta Sans',sans-serif",
-            background: "#F8F6F2",
-            border: "1px solid #E2E8F0",
-          }}>
-            ← BACK TO JOURNAL
-          </Link>
-
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              window.location.href = "/login";
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(214,59,59,0.1)",
-              border: "1px solid rgba(214,59,59,0.3)",
-              borderRadius: 6,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 10,
-              letterSpacing: "0.1em",
-              color: "#D63B3B",
-              fontFamily: "'JetBrains Mono',monospace",
-              fontWeight: 600,
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(214,59,59,0.2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(214,59,59,0.1)"; }}
-          >
-            LOGOUT
-          </button>
-        </div>
-      </header>
+      <PageHeader />
 
       <TickerTape/>
 
@@ -376,7 +291,7 @@ function TradeDetailContent() {
       <main style={{
         position: "relative",
         zIndex: 5,
-        padding: "28px 20px",
+        padding: "16px",
         maxWidth: 860,
         margin: "0 auto",
         opacity: mounted ? 1 : 0,
@@ -387,35 +302,29 @@ function TradeDetailContent() {
         {!trade ? <LoadingState/> : (
           <>
             {/* Page title */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 10 }}>
               <div>
-                <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 28, fontWeight: 800, letterSpacing: "0.04em", color: "#0F1923", lineHeight: 1.1 }}>
+                <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: "-0.01em", color: "#0F1923", lineHeight: 1.1 }}>
                   Trade <span style={{ color: profitCol }}>Detail</span>
                 </div>
-                <div style={{ fontSize: 12, color: "#94A3B8", letterSpacing: "0.06em", marginTop: 5, fontFamily: "'JetBrains Mono',monospace" }}>
+                <div style={{ fontSize: 10, color: "#94A3B8", letterSpacing: "0.06em", marginTop: 3, fontFamily: "'JetBrains Mono',monospace" }}>
                   FULL BREAKDOWN — AI JOURNAL ENTRY
                 </div>
               </div>
-              {/* Type badge */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{
-                  fontSize: 11,
-                  letterSpacing: "0.12em",
-                  color: trade.type?.toUpperCase() === "LONG" ? "#0D9E6E" : "#D63B3B",
-                  background: trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)",
-                  border: `1px solid ${trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.3)" : "rgba(214,59,59,0.3)"}`,
-                  borderRadius: 20,
-                  padding: "6px 16px",
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontWeight: 600,
-                }}>
-                  {trade.type?.toUpperCase() === "LONG" ? "▲ LONG" : "▼ SHORT"}
-                </span>
-              </div>
+              <span style={{
+                fontSize: 11, letterSpacing: "0.1em", flexShrink: 0,
+                color: trade.type?.toUpperCase() === "LONG" ? "#0D9E6E" : "#D63B3B",
+                background: trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.1)" : "rgba(214,59,59,0.1)",
+                border: `1px solid ${trade.type?.toUpperCase() === "LONG" ? "rgba(13,158,110,0.3)" : "rgba(214,59,59,0.3)"}`,
+                borderRadius: 20, padding: "5px 14px",
+                fontFamily: "'JetBrains Mono',monospace", fontWeight: 700,
+              }}>
+                {trade.type?.toUpperCase() === "LONG" ? "▲ LONG" : "▼ SHORT"}
+              </span>
             </div>
 
-            {/* Hero stat cards */}
-            <div style={{ display: "flex", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
+            {/* Hero stat cards — 2 per row on mobile, 4 on desktop */}
+            <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               <StatCard
                 label="PAIR"
                 value={trade.pair}
@@ -450,7 +359,8 @@ function TradeDetailContent() {
               border: "1px solid #E2E8F0",
               borderRadius: 14,
               overflow: "hidden",
-              marginBottom: 16,
+              marginBottom: 12,
+              marginTop: 10,
               position: "relative",
               animation: "fadeUp 0.5s ease 0.1s both",
               boxShadow: "0 2px 12px rgba(15,25,35,0.06)",
@@ -708,6 +618,10 @@ function TradeDetailContent() {
         @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
         @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        @media (min-width: 600px) {
+          .stat-grid { grid-template-columns: repeat(4, 1fr) !important; }
+          .main-pad { padding: 24px !important; }
+        }
       `}</style>
     </div>
   );
