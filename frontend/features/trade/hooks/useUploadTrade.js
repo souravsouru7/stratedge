@@ -320,14 +320,15 @@ export function useUploadTrade() {
       addToast("Trade details extracted successfully!", "success");
     } else if (jobStatusQuery.data?.status === "failed") {
       const rawError = jobStatusQuery.data.error || "Processing failed.";
+      const normalizedRawError = String(rawError || "Processing failed.");
       const isNotTradeImage =
-        rawError.toLowerCase().includes("not appear to be a trade") ||
-        rawError.toLowerCase().includes("could not extract any trade") ||
-        rawError.toLowerCase().includes("not a trade");
+        normalizedRawError.toLowerCase().includes("not appear to be a trade") ||
+        normalizedRawError.toLowerCase().includes("could not extract any trade") ||
+        normalizedRawError.toLowerCase().includes("not a trade");
 
       const userMessage = isNotTradeImage
         ? "This doesn't look like a trade screenshot. Please upload a screenshot directly from your broker platform (MT5, Zerodha Kite, etc.) showing the trade details."
-        : rawError;
+        : normalizedRawError;
 
       setError(userMessage);
       setJobId("");
@@ -337,7 +338,12 @@ export function useUploadTrade() {
         removeToast(activeToastId);
         setActiveToastId(null);
       }
-      addToast(isNotTradeImage ? "Not a valid trade screenshot — please upload from your broker app" : rawError, "error");
+      addToast(
+        isNotTradeImage
+          ? "Not a valid trade screenshot — please upload from your broker app"
+          : normalizedRawError,
+        "error"
+      );
     }
   }, [jobStatusQuery.data]);
 
