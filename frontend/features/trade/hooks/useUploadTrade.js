@@ -79,6 +79,50 @@ function detectSessionFromNow() {
   return "New York";
 }
 
+const toNum = (value) => {
+  const n = Number.parseFloat(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : null;
+};
+
+const normalizeText = (value) => String(value ?? "").trim().toUpperCase();
+
+const makeTradeDedupKey = (trade = {}) => {
+  const pair = normalizeText(trade.pair || trade.symbol);
+  const action = normalizeText(trade.action || trade.type);
+  const entry = toNum(trade.entryPrice);
+  const exit = toNum(trade.exitPrice);
+  const pnl = toNum(trade.pnl ?? trade.profit);
+  const quantity = toNum(trade.quantity ?? trade.lotSize);
+  const strike = toNum(trade.strikePrice ?? trade.strike);
+  const optionType = normalizeText(trade.optionType);
+  const tradeDate = normalizeDateForInput(trade.tradeDate);
+
+  return JSON.stringify({
+    pair,
+    action,
+    entry,
+    exit,
+    pnl,
+    quantity,
+    strike,
+    optionType,
+    tradeDate,
+  });
+};
+
+const dedupeParsedTrades = (rawTrades) => {
+  if (!Array.isArray(rawTrades) || rawTrades.length <= 1) return rawTrades || [];
+  const seen = new Set();
+  const unique = [];
+  for (const t of rawTrades) {
+    const key = makeTradeDedupKey(t);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(t);
+  }
+  return unique;
+};
+
 function buildForexTradeTemplate(imageUrl, t = {}) {
   return {
     pair: t.pair || t.symbol || "",
@@ -257,13 +301,15 @@ export function useUploadTrade() {
   // ─ apply parsed data helper ─
   const applyProcessedTradeData = (payload) => {
     const p = payload?.parsedData?.parsedTrade || payload?.parsedTrade || {};
-    const parsedTradesPayload = payload?.parsedData?.parsedTrades || payload?.parsedTrades || [];
+    const parsedTradesPayload = dedupeParsedTrades(
+      payload?.parsedData?.parsedTrades || payload?.parsedTrades || []
+    );
     const imageUrl = payload?.imageUrl || payload?.screenshot || "";
     setExtractedText(payload?.extractedText || "");
 
     if (isInd) {
       const multiTrades = parsedTradesPayload || [];
-      if (multiTrades.length > 0) {
+      if (multiTrades.length > 1) {
         const tradeArr = multiTrades.map(t => applyDefaultSetup(buildIndianTradeTemplate(imageUrl, t), strategies));
         setTrades(tradeArr);
         setSavedTrades(new Array(tradeArr.length).fill(false));
@@ -273,11 +319,13 @@ export function useUploadTrade() {
           setSetupRules(strategies[0].rules.map((r, i) => ({ id: r.id ?? i + 1, label: r.label, followed: false })));
         }
       } else {
-        const pairStr = (p.pair || "").trim().toUpperCase();
-        const ot = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (p.optionType || "CE");
-        const base = { ...buildIndianTradeTemplate(imageUrl, p), optionType: ot.toUpperCase() };
-        setTrade(applyDefaultSetup(base, strategies));
         setTrades([]);
+        setSavedTrades([]);
+        const single = multiTrades[0] || p;
+        const pairStr = (single.pair || "").trim().toUpperCase();
+        const ot = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (single.optionType || "CE");
+        const base = { ...buildIndianTradeTemplate(imageUrl, single), optionType: ot.toUpperCase() };
+        setTrade(applyDefaultSetup(base, strategies));
         if (strategies?.[0]?.rules?.length) {
           setSetupRules(strategies[0].rules.map((r, i) => ({ id: r.id ?? i + 1, label: r.label, followed: false })));
         }
@@ -475,10 +523,12 @@ export function useUploadTrade() {
     handleTradeChange,
     handleMultiTradeStrategyChange,
     saveTrade: () => {
+      if (saveTradeMutation.isPending || saved) return;
       if (!canSaveTrade(trade)) return;
       saveTradeMutation.mutate({ idx: null });
     },
     saveIndianTrade: (idx) => {
+      if (saveTradeMutation.isPending || savedTrades[idx]) return;
       if (!canSaveTrade(trades[idx])) return;
       saveTradeMutation.mutate({ idx });
     },
