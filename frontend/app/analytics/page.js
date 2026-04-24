@@ -279,11 +279,11 @@ function AnalyticsContent() {
           {/* ── Row 1: Core KPIs ───────────────────────────────── */}
           <div className="analytics-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
             {[
-              { label: "Total Trades",  value: has ? String(summary.totalTrades)  : "—", sub: "trades logged",        color: C.primary },
-              { label: "Win Rate",      value: has ? `${summary.winRate}%`          : "—", sub: "of trades profitable", color: summary?.winRate >= 50 ? C.bull : C.bear },
-              { label: "Net P&L",       value: has ? `${bullPnl ? "+" : ""}$${Math.abs(pnl).toFixed(2)}` : "—", sub: "total return", color: bullPnl ? C.bull : C.bear },
-              { label: "Avg Win",       value: has ? `$${parseFloat(summary.avgWin  || 0).toFixed(2)}` : "—", sub: "avg winner",     color: C.bull },
-              { label: "Avg Loss",      value: has ? `$${parseFloat(summary.avgLoss || 0).toFixed(2)}` : "—", sub: "avg loser",      color: C.bear },
+              { label: "Total Trades",  value: has ? String(summary.totalTrades)  : "—", sub: "trades logged",        color: C.primary, tooltip: "Total number of trades you've logged. More trades = more accurate analytics and better AI pattern detection." },
+              { label: "Win Rate",      value: has ? `${summary.winRate}%`          : "—", sub: "of trades profitable", color: summary?.winRate >= 50 ? C.bull : C.bear, tooltip: "Percentage of trades that closed in profit. Above 50% is green. Win rate alone doesn't guarantee profitability — your R:R matters equally." },
+              { label: "Net P&L",       value: has ? `${bullPnl ? "+" : ""}$${Math.abs(pnl).toFixed(2)}` : "—", sub: "total return", color: bullPnl ? C.bull : C.bear, tooltip: "Your total profit or loss across all logged trades. Green = net profitable, red = net loss. This is your real bottom line." },
+              { label: "Avg Win",       value: has ? `$${parseFloat(summary.avgWin  || 0).toFixed(2)}` : "—", sub: "avg winner",     color: C.bull, tooltip: "Average profit per winning trade. Compare with Avg Loss — ideally your wins should be at least 1.5× your losses for a positive edge." },
+              { label: "Avg Loss",      value: has ? `$${parseFloat(summary.avgLoss || 0).toFixed(2)}` : "—", sub: "avg loser",      color: C.bear, tooltip: "Average loss per losing trade. Lower is better. If this is much larger than Avg Win, tighten your stop losses and risk management." },
             ].map((s, i) => <StatCard key={s.label} {...s} loading={loading} delay={i * 0.05} />)}
           </div>
 
@@ -295,20 +295,19 @@ function AnalyticsContent() {
                 value: has ? (performance?.profitFactor || "0.00") : "—",
                 sub: "gross profit / loss",
                 color: parseFloat(performance?.profitFactor || 0) >= 1.5 ? C.bull : C.bear,
+                tooltip: "Gross profit divided by gross loss. Above 1.0 = profitable. 1.5+ is good, 2.0+ is excellent. Below 1.0 means you're losing money overall.",
               },
               {
-                // FIX: was performance?.sharpeRatio — that field doesn't exist.
-                // Correct source: riskReward.riskAdjustedReturn
                 label: "Sharpe Ratio",
                 value: has ? parseFloat(riskReward?.riskAdjustedReturn || 0).toFixed(2) : "—",
                 sub: "risk-adjusted return",
                 color: parseFloat(riskReward?.riskAdjustedReturn || 0) >= 1 ? C.bull : C.bear,
+                tooltip: "Risk-adjusted return — how much reward you earn per unit of risk. Above 1.0 is good, 2.0+ is excellent. Negative means losses outpace your risk.",
               },
-              { label: "Max Drawdown", value: has ? `${drawdown?.maxDrawdown || 0}%`  : "—", sub: "largest equity drop", color: C.bear },
-              { label: "Expectancy",   value: has ? `$${parseFloat(performance?.expectancy || 0).toFixed(2)}` : "—", sub: "per trade expectancy", color: parseFloat(performance?.expectancy || 0) >= 0 ? C.bull : C.bear },
-              // NEW: Streaks — data was collected but never displayed
-              { label: "Best Streak",  value: has ? String(performance?.maxWinStreak || 0) : "—", sub: "win streak record", color: C.gold },
-              { label: "Worst Streak", value: has ? String(performance?.maxLossStreak || 0) : "—", sub: "loss streak record", color: C.bear },
+              { label: "Max Drawdown", value: has ? `${drawdown?.maxDrawdown || 0}%`  : "—", sub: "largest equity drop", color: C.bear, tooltip: "Largest peak-to-trough drop in your cumulative P&L. Lower is better. Keep drawdowns under 20% to stay in the game long-term." },
+              { label: "Expectancy",   value: has ? `$${parseFloat(performance?.expectancy || 0).toFixed(2)}` : "—", sub: "per trade expectancy", color: parseFloat(performance?.expectancy || 0) >= 0 ? C.bull : C.bear, tooltip: "Expected average profit per trade. Formula: (Win Rate × Avg Win) − (Loss Rate × Avg Loss). Positive = you have a statistical edge in the market." },
+              { label: "Best Streak",  value: has ? String(performance?.maxWinStreak || 0) : "—", sub: "win streak record", color: C.gold, tooltip: "Your longest consecutive winning streak on record. A high streak shows consistency, but never use it as a reason to oversize your positions." },
+              { label: "Worst Streak", value: has ? String(performance?.maxLossStreak || 0) : "—", sub: "loss streak record", color: C.bear, tooltip: "Your longest consecutive losing streak. Know this number — if you're approaching it again, pause and review your setups before continuing." },
             ].map((s, i) => <StatCard key={s.label} {...s} loading={loading} delay={i * 0.05} />)}
           </div>
 

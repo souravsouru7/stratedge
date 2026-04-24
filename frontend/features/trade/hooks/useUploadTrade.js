@@ -15,6 +15,8 @@ const getTodayInputValue = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
 };
 
+
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function buildIndianTradeTemplate(imageUrl, t = {}) {
@@ -36,7 +38,7 @@ function buildIndianTradeTemplate(imageUrl, t = {}) {
     strikePrice: strike,
     tradeType: "INTRADAY",
     strategy: "", strategyCustom: "",
-    tradeDate: getTodayInputValue(),
+    tradeDate: normalizeDateForInput(t.tradeDate) || getTodayInputValue(),
     expiryDate: t.expiryDate || "",
     riskRewardRatio: "", riskRewardCustom: "",
     entryBasis: "Plan", entryBasisCustom: "",
@@ -57,24 +59,34 @@ function detectSessionFromNow() {
 }
 
 function buildForexTradeTemplate(imageUrl, t = {}) {
+  const hasParsedCoreFields = Boolean(
+    t.pair ||
+    t.symbol ||
+    t.entryPrice != null ||
+    t.exitPrice != null ||
+    t.pnl != null ||
+    t.profit != null
+  );
+  const fallback = hasParsedCoreFields ? {} : FOREX_DUMMY_DEFAULTS;
+
   return {
-    pair: t.pair || t.symbol || "",
-    action: (t.action || t.type || "buy").toString().toLowerCase(),
-    lotSize: t.lotSize != null ? String(t.lotSize) : "",
-    entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
-    exitPrice: t.exitPrice != null ? String(t.exitPrice) : "",
-    stopLoss: t.stopLoss != null ? String(t.stopLoss) : "",
-    takeProfit: t.takeProfit != null ? String(t.takeProfit) : "",
-    profit: t.profit != null ? String(t.profit) : (t.pnl != null ? String(t.pnl) : ""),
-    commission: t.commission != null ? String(t.commission) : "",
-    swap: t.swap != null ? String(t.swap) : "",
-    balance: t.balance != null ? String(t.balance) : "",
-    session: t.session || detectSessionFromNow(),
+    pair: t.pair || t.symbol || fallback.pair || "",
+    action: (t.action || t.type || fallback.action || "buy").toString().toLowerCase(),
+    lotSize: t.lotSize != null ? String(t.lotSize) : (fallback.lotSize || ""),
+    entryPrice: t.entryPrice != null ? String(t.entryPrice) : (fallback.entryPrice || ""),
+    exitPrice: t.exitPrice != null ? String(t.exitPrice) : (fallback.exitPrice || ""),
+    stopLoss: t.stopLoss != null ? String(t.stopLoss) : (fallback.stopLoss || ""),
+    takeProfit: t.takeProfit != null ? String(t.takeProfit) : (fallback.takeProfit || ""),
+    profit: t.profit != null ? String(t.profit) : (t.pnl != null ? String(t.pnl) : (fallback.profit || "")),
+    commission: t.commission != null ? String(t.commission) : (fallback.commission || ""),
+    swap: t.swap != null ? String(t.swap) : (fallback.swap || ""),
+    balance: t.balance != null ? String(t.balance) : (fallback.balance || ""),
+    session: t.session || fallback.session || detectSessionFromNow(),
     strategy: "", strategyCustom: "",
-    tradeDate: getTodayInputValue(),
+    tradeDate: normalizeDateForInput(t.tradeDate) || getTodayInputValue(),
     notes: "", screenshot: imageUrl,
-    segment: t.segment || "Equity",
-    instrumentType: t.instrumentType || "EQUITY",
+    segment: t.segment || fallback.segment || "Major FX",
+    instrumentType: t.instrumentType || fallback.instrumentType || "Spot",
     quantity: t.quantity != null ? String(t.quantity) : "",
     strikePrice: t.strikePrice != null ? String(t.strikePrice) : "",
     expiryDate: t.expiryDate || "",
@@ -469,8 +481,21 @@ export function useUploadTrade() {
     addSetupRuleMulti: (tIdx) => setTrades(p => p.map((t, i) => i !== tIdx ? t : { ...t, setupRules: [...(t.setupRules || []), { id: Date.now(), label: "", followed: false }] })),
     clearSetupRulesMulti: (tIdx) => setTrades(p => p.map((t, i) => i !== tIdx ? t : { ...t, setupRules: t.setupRules.map(r => ({ ...r, followed: false })) })),
     deleteTrade: (idx) => {
-      setTrades(prev => prev.filter((_, i) => i !== idx));
-      setSavedTrades(prev => prev.filter((_, i) => i !== idx));
+      setTrades(prevTrades => {
+        const nextTrades = prevTrades.filter((_, i) => i !== idx);
+        setSavedTrades(prev => prev.filter((_, i) => i !== idx));
+
+        // When multi-entry drops to a single remaining trade, hydrate single-trade mode
+        // from that remaining row so calculations/UI stay aligned.
+        if (nextTrades.length <= 1) {
+          const remainingTrade = nextTrades[0] || null;
+          setTrade(remainingTrade);
+          setSaved(false);
+          setSetupRules(remainingTrade?.setupRules || DEFAULT_SETUP_RULES);
+        }
+
+        return nextTrades;
+      });
     },
   };
 }

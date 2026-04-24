@@ -37,7 +37,7 @@ npx cap sync android
 
 # 3. Open Android Studio
 npx cap open android
-```
+```ls 'c:\Users\souta\Desktop\new\stratedge\frontend\android\app\build\outputs\apk\debug\'
 
 ### Sync Results:
 ✅ Web assets copied from `out/` to `android/app/src/main/assets/public`

@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function formatMonth(date) {
@@ -46,6 +48,15 @@ function buildCalendar(byDate = {}, activeMonth = new Date()) {
 export default function CalendarPnL({ byDate, activeMonth, onPrevMonth, onNextMonth, currency = "$" }) {
   const { cells, maxAbsProfit, totalProfit, totalTrades } = buildCalendar(byDate, activeMonth);
   const positive = totalProfit >= 0;
+  const lastNavAtRef = useRef(0);
+
+  const guardedNavigate = (direction) => {
+    const now = Date.now();
+    if (now - lastNavAtRef.current < 180) return;
+    lastNavAtRef.current = now;
+    if (direction === "prev") onPrevMonth?.();
+    if (direction === "next") onNextMonth?.();
+  };
 
   return (
     <div className="cal-wrapper">
@@ -221,8 +232,8 @@ export default function CalendarPnL({ byDate, activeMonth, onPrevMonth, onNextMo
           </div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" className="cal-nav-btn" onClick={onPrevMonth}>‹</button>
-          <button type="button" className="cal-nav-btn" onClick={onNextMonth}>›</button>
+          <button type="button" className="cal-nav-btn" onClick={() => guardedNavigate("prev")}>‹</button>
+          <button type="button" className="cal-nav-btn" onClick={() => guardedNavigate("next")}>›</button>
         </div>
       </div>
 

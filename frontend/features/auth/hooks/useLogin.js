@@ -72,9 +72,13 @@ export function useLogin() {
   const googleMutation = useMutation({
     mutationFn: async () => {
       const idToken = await signInWithFirebaseGoogle();
+      if (!idToken) return null;
       return googleLogin(idToken);
     },
-    onSuccess: handleAuthSuccess,
+    onSuccess: (data) => {
+      if (!data) return;
+      handleAuthSuccess(data);
+    },
     onError: (err) => {
       triggerShake();
       alert("Google login failed: " + (err.message || "Could not connect to Google."));

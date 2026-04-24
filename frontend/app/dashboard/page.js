@@ -25,6 +25,7 @@ const NAV_CARDS = [
     sub: "Browse all logged trades",
     color: "#0D9E6E",
     bg: "#F0FDF4",
+    tooltip: "Your complete trade log. View, filter, and review every trade you've entered. The foundation of all your analytics and improvement.",
   },
   {
     href: "/analytics",
@@ -33,6 +34,7 @@ const NAV_CARDS = [
     sub: "In-depth performance charts",
     color: "#B8860B",
     bg: "#FFFBEB",
+    tooltip: "Deep-dive into your trading performance — win rates, drawdowns, R:R analysis, psychology breakdowns, and AI-generated insights.",
   },
   {
     href: "/upload-trade",
@@ -41,6 +43,7 @@ const NAV_CARDS = [
     sub: "Import from screenshot",
     color: "#EC4899",
     bg: "#FDF2F8",
+    tooltip: "Screenshot your broker's trade confirmation and let AI automatically extract and log the trade details for you.",
   },
   {
     href: "/checklist",
@@ -49,6 +52,7 @@ const NAV_CARDS = [
     sub: "Pre-trade rule check",
     color: "#6366F1",
     bg: "#EEF2FF",
+    tooltip: "Run through your personal trading rules before entering a position. Builds discipline and reduces impulsive, emotional trades.",
   },
   {
     href: "/setups",
@@ -57,6 +61,7 @@ const NAV_CARDS = [
     sub: "Strategies & playbooks",
     color: "#14B8A6",
     bg: "#F0FDFA",
+    tooltip: "Document your trading strategies and playbooks. Tag trades with setups to track which ones are actually profitable over time.",
   },
   {
     href: "/weekly-reports?market=Forex",
@@ -65,8 +70,63 @@ const NAV_CARDS = [
     sub: "Weekly coaching insights",
     color: "#0D9E6E",
     bg: "#F0FDF4",
+    tooltip: "Weekly AI-generated coaching reports based on your actual trades, patterns, psychology, and risk management habits.",
   },
 ];
+
+// ── Feature card with tooltip ──────────────────────────────────────────────────
+function FeatureCard({ href, Icon, label, sub, color, bg, tooltip, delay }) {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <Link
+      href={href}
+      className="feat-card"
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+      style={{
+        background: "#FFFFFF",
+        borderRadius: 12,
+        border: "1px solid #E2E8F0",
+        padding: "18px 16px",
+        textDecoration: "none",
+        boxShadow: "0 1px 6px rgba(15,25,35,0.04)",
+        transition: "all 0.2s",
+        animation: `fadeUp 0.35s ease ${delay}s both`,
+        display: "flex", flexDirection: "column", gap: 12,
+        position: "relative",
+      }}
+    >
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", color }}>
+        <Icon size={20} strokeWidth={2} />
+      </div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0F1923", marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.4 }}>{sub}</div>
+      </div>
+      {tooltip && showTip && (
+        <div style={{
+          position: "absolute",
+          bottom: "calc(100% + 8px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#0F1923",
+          color: "#E2E8F0",
+          fontSize: 11,
+          padding: "10px 14px",
+          borderRadius: 10,
+          width: 210,
+          zIndex: 200,
+          lineHeight: 1.6,
+          pointerEvents: "none",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+        }}>
+          {tooltip}
+          <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#0F1923", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+        </div>
+      )}
+    </Link>
+  );
+}
 
 // ── Build KPI cards from API response ─────────────────────────────────────────
 function buildStats(s) {
@@ -81,6 +141,7 @@ function buildStats(s) {
       value: total,
       sub: "trades logged",
       accentColor: "#0D9E6E",
+      tooltip: "Total number of trades you've logged. More trades unlock better analytics, AI insights, and pattern detection.",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -93,6 +154,7 @@ function buildStats(s) {
       value: `${winRate}%`,
       sub: "of trades profitable",
       accentColor: winRate >= 50 ? "#0D9E6E" : "#D63B3B",
+      tooltip: "Percentage of your trades that closed in profit. Above 50% is green. Win rate alone doesn't guarantee profitability — your risk-reward matters equally.",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polyline points="20 6 9 17 4 12"/>
@@ -104,6 +166,7 @@ function buildStats(s) {
       value: `${netPnl >= 0 ? "+" : ""}$${Math.abs(Number(netPnl)).toFixed(2)}`,
       sub: "total return",
       accentColor: netPnl >= 0 ? "#0D9E6E" : "#D63B3B",
+      tooltip: "Your total profit or loss across all logged trades. Green = net profitable, red = net loss. This is your real bottom line.",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="12" y1="1" x2="12" y2="23"/>
@@ -116,6 +179,7 @@ function buildStats(s) {
       value: streak,
       sub: "consecutive wins",
       accentColor: "#B8860B",
+      tooltip: "Your current consecutive winning streak. Resets to zero on the next loss. Use it as context — not as a reason to increase your position size.",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
@@ -260,36 +324,7 @@ function DashboardContent() {
             gap: 14,
           }}>
             {NAV_CARDS.map((c, i) => (
-              <Link key={c.href} href={c.href}
-                className="feat-card"
-                style={{
-                  background: "#FFFFFF",
-                  borderRadius: 12,
-                  border: "1px solid #E2E8F0",
-                  padding: "18px 16px",
-                  textDecoration: "none",
-                  boxShadow: "0 1px 6px rgba(15,25,35,0.04)",
-                  transition: "all 0.2s",
-                  animation: `fadeUp 0.35s ease ${0.3 + i * 0.05}s both`,
-                  display: "flex", flexDirection: "column", gap: 12,
-                }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 10,
-                  background: c.bg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: c.color,
-                }}>
-                  <c.Icon size={20} strokeWidth={2} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0F1923", marginBottom: 3 }}>
-                    {c.label}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.4 }}>
-                    {c.sub}
-                  </div>
-                </div>
-              </Link>
+              <FeatureCard key={c.href} {...c} delay={0.3 + i * 0.05} />
             ))}
           </div>
 

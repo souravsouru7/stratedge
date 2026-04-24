@@ -30,250 +30,111 @@ const getFirebaseConfig = () => {
 };
 
 const getFirebaseApp = () => {
-  if (getApps().length > 0) {
-    return getApp();
-  }
-
+  if (getApps().length > 0) return getApp();
   return initializeApp(getFirebaseConfig());
 };
 
 const getFirebaseAuth = async () => {
   const auth = getAuth(getFirebaseApp());
-
   if (!isCapacitorApp()) {
     await setPersistence(auth, browserLocalPersistence);
   }
-
   return auth;
 };
 
-const isCapacitorApp = () => {
-  return typeof window !== "undefined" && !!window.Capacitor;
-};
-
-const isCapacitorAndroid = () => {
-  return isCapacitorApp() && window.Capacitor?.getPlatform?.() === "android";
-};
-
-const getNativeGoogleAuth = async () => {
-  try {
-    const plugin = await import("@codetrix-studio/capacitor-google-auth");
-    if (plugin?.GoogleAuth?.signIn) {
-      return plugin.GoogleAuth;
-    }
-  } catch (error) {
-    console.warn("GoogleAuth plugin import failed.", error);
-  }
-
-  return null;
-};
-
-const withTimeout = async (promise, ms, message) => {
-  let timeoutId;
-
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(message)), ms);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
-
-const signInWithNativeGoogle = async () => {
-  const GoogleAuth = await getNativeGoogleAuth();
-
-  if (!GoogleAuth) {
-    throw new Error("GoogleAuth native plugin is unavailable.");
-  }
-
-  // The plugin's loadSignInClient() passes clientId directly into both
-  // requestIdToken(clientId) and requestServerAuthCode(clientId).
-  // Both calls require the WEB client ID — never the Android OAuth client ID.
-  // Always set clientId explicitly here so it overrides whatever androidClientId
-  // the plugin would otherwise read from capacitor.config.ts.
-  const webClientId =
-    process.env.NEXT_PUBLIC_FIREBASE_WEB_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-
-  if (!webClientId) {
-    throw new Error("Missing NEXT_PUBLIC_FIREBASE_WEB_CLIENT_ID or NEXT_PUBLIC_GOOGLE_CLIENT_ID.");
-  }
-
-  const initOptions = {
-    clientId: webClientId,
-    scopes: ["profile", "email"],
-    // Do NOT set grantOfflineAccess:true — that maps to requestServerAuthCode(clientId, true)
-    // on Android, which forces a re-consent screen on every sign-in and causes the flow to hang.
-    // We only need the idToken, which comes from requestIdToken(clientId) alone.
-    grantOfflineAccess: false,
-  };
-
-  try {
-    await withTimeout(
-      GoogleAuth.initialize(initOptions),
-      10000,
-      "Google Sign-In initialization timed out."
-    );
-  } catch (err) {
-    console.error("[GoogleAuth] initialize() failed:", err?.message ?? err);
-    throw err;
-  }
-
-  let googleUser;
-  try {
-    // 120 s: enough time for the user to pick an account + complete the OAuth redirect.
-    googleUser = await withTimeout(
-      GoogleAuth.signIn(),
-      120000,
-      "Google Sign-In timed out after 120 s. " +
-        "Check: (1) SHA-1 fingerprint matches Firebase Console, " +
-        "(2) androidClientId in capacitor.config.ts matches google-services.json client_type 1, " +
-        "(3) google-services.json is up-to-date."
-    );
-  } catch (err) {
-    console.error("[GoogleAuth] signIn() failed:", err?.message ?? err);
-    throw err;
-  }
-
-  const idToken = googleUser?.authentication?.idToken;
-
-  if (!idToken) {
-    const authObj = JSON.stringify(googleUser?.authentication ?? {});
-    const err = new Error(
-      `Google sign-in succeeded but returned no ID token. authentication=${authObj}`
-    );
-    console.error("[GoogleAuth]", err.message);
-    throw err;
-  }
-
-  // Exchange the Google ID token for a Firebase ID token on ALL platforms so the
-  // backend always receives a Firebase token that Firebase Admin can verify directly.
-  let firebaseResult;
-  try {
-    const auth = await getFirebaseAuth();
-    const credential = GoogleAuthProvider.credential(idToken);
-    firebaseResult = await withTimeout(
-      signInWithCredential(auth, credential),
-      20000,
-      "Firebase credential exchange timed out. Verify the Firebase web config values."
-    );
-  } catch (err) {
-    console.error(
-      "[GoogleAuth] Firebase signInWithCredential failed — falling back to raw Google token:",
-      err?.message ?? err
-    );
-    // Fall back to the raw Google ID token so the backend can still verify it
-    // via the Google tokeninfo endpoint.
-    return idToken;
-  }
-
-  try {
-    return await withTimeout(
-      firebaseResult.user.getIdToken(),
-      10000,
-      "Fetching Firebase ID token timed out."
-    );
-  } catch (err) {
-    console.error("[GoogleAuth] getIdToken() failed:", err?.message ?? err);
-    throw err;
-  }
-};
+const isCapacitorApp = () => typeof window !== "undefined" && !!window.Capacitor;
+const isCapacitorAndroid = () => isCapacitorApp() && window.Capacitor?.getPlatform?.() === "android";
 
 const isMobileBrowser = () => {
-  if (typeof window === "undefined") return false;
-  if (isCapacitorApp()) return false;
+  if (typeof window === "undefined" || isCapacitorApp()) return false;
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
+// Native Google Sign-In via @capacitor-firebase/authentication
+const signInWithNativeGoogle = async () => {
+  let FirebaseAuthentication;
+  try {
+    const mod = await import("@capacitor-firebase/authentication");
+    FirebaseAuthentication = mod.FirebaseAuthentication;
+  } catch {
+    throw new Error("@capacitor-firebase/authentication plugin is not installed. Run: npm install @capacitor-firebase/authentication && npx cap sync");
+  }
+
+  const result = await FirebaseAuthentication.signInWithGoogle();
+  const idToken = result.credential?.idToken;
+
+  if (!idToken) {
+    throw new Error(
+      "Google Sign-In returned no ID token. " +
+      "Make sure your SHA-1 fingerprint is added in Firebase Console and google-services.json is up to date."
+    );
+  }
+
+  // Exchange Google ID token for Firebase ID token so backend always gets a Firebase token
+  const auth = await getFirebaseAuth();
+  const credential = GoogleAuthProvider.credential(idToken);
+  const firebaseResult = await signInWithCredential(auth, credential);
+  return firebaseResult.user.getIdToken();
+};
+
 const REDIRECT_PENDING_KEY = "firebase_google_redirect_pending";
+const setRedirectPending = () => {
+  try { sessionStorage.setItem(REDIRECT_PENDING_KEY, "1"); } catch { /* ignore */ }
+  try { localStorage.setItem(REDIRECT_PENDING_KEY, "1"); } catch { /* ignore */ }
+};
+const hasRedirectPending = () => {
+  try {
+    if (sessionStorage.getItem(REDIRECT_PENDING_KEY)) return true;
+  } catch { /* ignore */ }
+  try {
+    if (localStorage.getItem(REDIRECT_PENDING_KEY)) return true;
+  } catch { /* ignore */ }
+  return false;
+};
+const clearRedirectPending = () => {
+  try { sessionStorage.removeItem(REDIRECT_PENDING_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(REDIRECT_PENDING_KEY); } catch { /* ignore */ }
+};
 
 const signInWithWebGoogle = async () => {
-  const auth = getAuth(getFirebaseApp());
+  const auth = await getFirebaseAuth();
   const provider = new GoogleAuthProvider();
   provider.addScope("email");
   provider.addScope("profile");
 
   if (isMobileBrowser()) {
-    // Mobile browsers block popups → use redirect flow instead.
-    // The caller must handle the result via handleGoogleRedirectResult() on next page load.
-    sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
+    setRedirectPending();
     await signInWithRedirect(auth, provider);
-    return null; // page will reload; result handled in handleGoogleRedirectResult
+    return null; // page reloads; result handled in handleGoogleRedirectResult
   }
 
-  // Desktop: popup works fine.
-  // IMPORTANT: getAuth() must be called SYNCHRONOUSLY — no await before
-  // signInWithPopup. Any await breaks the user-gesture chain and causes
-  // auth/internal-error or auth/popup-blocked in some browsers.
   const result = await signInWithPopup(auth, provider);
-
   if (!isCapacitorApp()) {
     try { await setPersistence(auth, browserLocalPersistence); } catch { /* non-fatal */ }
   }
-
   return result.user.getIdToken();
 };
 
-/**
- * Call this on page mount (login/register) to collect the idToken after a
- * mobile redirect sign-in. Returns the Firebase idToken string, or null if
- * there is no pending redirect result.
- */
 export const handleGoogleRedirectResult = async () => {
   if (typeof window === "undefined") return null;
-  if (!sessionStorage.getItem(REDIRECT_PENDING_KEY)) return null;
+  if (!hasRedirectPending() && !isMobileBrowser()) return null;
 
   try {
-    const auth = getAuth(getFirebaseApp());
+    const auth = await getFirebaseAuth();
     const result = await getRedirectResult(auth);
-    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    clearRedirectPending();
     if (!result) return null;
-    return await result.user.getIdToken();
+    return result.user.getIdToken();
   } catch (err) {
-    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    clearRedirectPending();
     console.error("[GoogleAuth] redirect result error:", err);
     throw err;
   }
 };
 
 export const signInWithFirebaseGoogle = async () => {
-  if (isCapacitorAndroid()) {
-    try {
-      return await signInWithNativeGoogle();
-    } catch (error) {
-      const msg = String(error?.message || "");
-      const pluginMissing =
-        /plugin is not implemented|not implemented on android|googleauth native plugin is unavailable|googleauth/i.test(msg);
-
-      if (pluginMissing) {
-        throw new Error(
-          "Google Sign-In is not configured for this Android build. " +
-            "Please sync the Capacitor app, rebuild Android, and verify Firebase SHA keys/google-services.json."
-        );
-      }
-
-      throw error;
-    }
+  if (isCapacitorAndroid() || isCapacitorApp()) {
+    return signInWithNativeGoogle();
   }
-
-  if (isCapacitorApp()) {
-    try {
-      return await signInWithNativeGoogle();
-    } catch (error) {
-      const msg = String(error?.message || "");
-      const pluginMissing =
-        /plugin is not implemented|not implemented on android|googleauth native plugin is unavailable|googleauth/i.test(msg);
-
-      if (!pluginMissing) {
-        throw error;
-      }
-
-      console.warn("Native GoogleAuth plugin unavailable, falling back to web sign-in.");
-    }
-  }
-
   return signInWithWebGoogle();
 };

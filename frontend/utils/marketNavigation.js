@@ -1,4 +1,5 @@
 import { MARKETS } from '@/context/MarketContext';
+import { API_URL } from '@/config/api';
 
 /**
  * Get dashboard URL based on current market
@@ -111,7 +112,7 @@ export const toForexPath = (pathname) => {
  * Get base API URL based on market
  */
 export const getApiBaseUrl = (market) => {
-  const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  const BASE_URL = API_URL;
   
   return market === MARKETS.INDIAN_MARKET
     ? `${BASE_URL}/indian`

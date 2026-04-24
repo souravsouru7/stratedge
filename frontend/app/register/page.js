@@ -269,6 +269,7 @@ export default function RegisterPage() {
     setGoogleLoading(true);
     try {
       const idToken = await signInWithFirebaseGoogle();
+      if (!idToken) return;
       const data = await googleLogin(idToken);
       if (data.token) {
         localStorage.setItem("token", data.token);

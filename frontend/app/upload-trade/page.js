@@ -629,6 +629,7 @@ function UploadTradeContent() {
   const router  = useRouter();
   const { isInd, mounted, loading, processingStatus, trade, trades, savedTrades, savingAll, saveAllTrades, tradeCount } = state;
   const visibleTradeCount = trades.length > 1 ? trades.length : tradeCount;
+  const parseProfitValue = (value) => parseFloat(String(value || 0).replace(/,/g, "")) || 0;
 
   // Auto-scroll to psychology section when extraction completes
   const psychologyRef = useRef(null);
@@ -640,9 +641,9 @@ function UploadTradeContent() {
     prevTrade.current = trade;
   }, [trade]);
 
-  const totalPnl = trades.length > 1
-    ? trades.reduce((s, t) => s + (parseFloat(String(t.profit || 0).replace(/,/g, "")) || 0), 0)
-    : 0;
+  const totalPnl = trades.length > 0
+    ? trades.reduce((s, t) => s + parseProfitValue(t?.profit), 0)
+    : parseProfitValue(trade?.profit);
 
   return (
     <div style={{ minHeight: "100vh", background: "#F0EEE9", display: "flex", flexDirection: "column", fontFamily: "'Plus Jakarta Sans',sans-serif", color: "#0F1923", position: "relative" }}>
@@ -699,6 +700,22 @@ function UploadTradeContent() {
             </div>
           )}
 
+          {!loading && visibleTradeCount > 0 && (
+            <SectionCard
+              accentColor={totalPnl >= 0 ? "#0D9E6E" : "#D63B3B"}
+              title="Overall P&L"
+              subtitle={`${totalPnl >= 0 ? "+" : ""}${isInd ? "₹" : "$"}${Math.abs(totalPnl).toFixed(2)} on ${visibleTradeCount} position${visibleTradeCount > 1 ? "s" : ""}`}
+              delay={0.08}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                <span style={{ fontSize: 22, fontWeight: 800, ...monoStyle, color: totalPnl >= 0 ? "#0D9E6E" : "#D63B3B" }}>
+                  {totalPnl >= 0 ? "+" : ""}{isInd ? "₹" : "$"}{Math.abs(totalPnl).toFixed(2)}
+                </span>
+                <span style={{ fontSize: 12, color: "#64748B" }}>Auto-updates after each remove/edit</span>
+              </div>
+            </SectionCard>
+          )}
+
           {/* ── Multi-trade path ──────────────────────────────────────────── */}
           {trades.length > 1 && (
             <>
@@ -708,21 +725,6 @@ function UploadTradeContent() {
                   <img src={trades[0].screenshot} alt="Trade screenshot" style={{ width: "100%", maxWidth: 280, height: "auto", borderRadius: 8, border: "1px solid #E2E8F0" }} />
                 </SectionCard>
               )}
-
-              {/* Overall P&L summary */}
-              <SectionCard
-                accentColor={totalPnl >= 0 ? "#0D9E6E" : "#D63B3B"}
-                title="Overall P&L"
-                subtitle={`${totalPnl >= 0 ? "+" : ""}${isInd ? "₹" : "$"}${Math.abs(totalPnl).toFixed(2)} on ${trades.length} positions`}
-                delay={0.08}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                  <span style={{ fontSize: 22, fontWeight: 800, ...monoStyle, color: totalPnl >= 0 ? "#0D9E6E" : "#D63B3B" }}>
-                    {totalPnl >= 0 ? "+" : ""}{isInd ? "₹" : "$"}{Math.abs(totalPnl).toFixed(2)}
-                  </span>
-                  <span style={{ fontSize: 12, color: "#64748B" }}>Sum of all trades below</span>
-                </div>
-              </SectionCard>
 
               {/* Individual trade cards — collapse to a saved chip once saved */}
               {trades.map((t, i) => {

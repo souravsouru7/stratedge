@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -120,6 +120,40 @@ function SmallStat({ label, value, color, sub, tooltip }) {
       {tooltip && showTip && (
         <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#0F1923", color: "#E2E8F0", fontSize: 10, padding: "8px 12px", borderRadius: 8, width: 200, zIndex: 200, lineHeight: 1.6, pointerEvents: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
           {tooltip}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TipCell({ label, value, color, tip }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} style={{ position: "relative", cursor: "default" }}>
+      <div style={{ color: theme.muted, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+        {label}
+        <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#E2E8F0", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 900, color: "#64748B", cursor: "help", flexShrink: 0 }}>?</span>
+      </div>
+      <div style={{ fontWeight: 700, color: color || "inherit", fontSize: 12 }}>{value}</div>
+      {tip && show && (
+        <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#0F1923", color: "#E2E8F0", fontSize: 10, padding: "8px 12px", borderRadius: 8, width: 200, zIndex: 300, lineHeight: 1.6, pointerEvents: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+          {tip}
+          <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#0F1923", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HoverBox({ tip, style, children }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} style={{ position: "relative", ...style }}>
+      {children}
+      {tip && show && (
+        <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: "#0F1923", color: "#E2E8F0", fontSize: 10, padding: "8px 12px", borderRadius: 8, width: 210, zIndex: 300, lineHeight: 1.6, pointerEvents: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+          {tip}
+          <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#0F1923", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
         </div>
       )}
     </div>
@@ -369,8 +403,15 @@ export default function IndianAnalyticsPage() {
   const { currentMarket } = useMarket();
   const [loading, setLoading] = useState(true);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const prevMonth = () => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-  const nextMonth = () => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+  const lastMonthNavAtRef = useRef(0);
+  const shiftCalendarMonth = (amount) => {
+    const now = Date.now();
+    if (now - lastMonthNavAtRef.current < 220) return;
+    lastMonthNavAtRef.current = now;
+    setCalendarMonth((d) => new Date(d.getFullYear(), d.getMonth() + amount, 1));
+  };
+  const prevMonth = () => shiftCalendarMonth(-1);
+  const nextMonth = () => shiftCalendarMonth(1);
   const [data, setData] = useState({
     summary: null,
     rr: null,
@@ -712,32 +753,17 @@ export default function IndianAnalyticsPage() {
                   Based on your options trades (planned and realized).
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12 }}>
-                  <div title="Your planned risk-to-reward ratio. 1:2 means you risk ₹1 to make ₹2. Higher is better — ideally ≥ 1:1.5 for options.">
-                    <div style={{ color: theme.muted }}>Average R:R</div>
-                    <div style={{ fontWeight: 700 }}>1:{data.rr?.avgRR || "0.0"}</div>
-                  </div>
-                  <div title="What your R:R actually turned out to be after closing trades. Compare this with Average R:R to see if you're hitting your targets.">
-                    <div style={{ color: theme.muted }}>Realized R:R</div>
-                    <div style={{ fontWeight: 700 }}>1:{data.rr?.actualRR || "0.0"}</div>
-                  </div>
-                  <div title="Expected average profit per trade in R units. Formula: (Win Rate × Avg Win) − (Loss Rate × Avg Loss). Positive expectancy = edge in the market.">
-                    <div style={{ color: theme.muted }}>Expectancy</div>
-                    <div style={{ fontWeight: 700 }}>{data.rr?.expectancy || "0.00"} R / trade</div>
-                  </div>
-                  <div title="Average amount of capital at risk per trade (distance from entry to stop loss × lot size). Keep this consistent for good risk management.">
-                    <div style={{ color: theme.muted }}>Risk / Trade</div>
-                    <div style={{ fontWeight: 700 }}>
-                      {currency}
-                      {parseFloat(data.rr?.riskPerTrade || 0).toFixed(2)}
-                    </div>
-                  </div>
+                  <TipCell label="Average R:R" value={`1:${data.rr?.avgRR || "0.0"}`} tip="Your planned risk-to-reward ratio. 1:2 means you risk ₹1 to make ₹2. Higher is better — ideally ≥ 1:1.5 for options." />
+                  <TipCell label="Realized R:R" value={`1:${data.rr?.actualRR || "0.0"}`} tip="What your R:R actually turned out to be after closing trades. Compare with Average R:R to see if you're hitting your planned targets." />
+                  <TipCell label="Expectancy" value={`${data.rr?.expectancy || "0.00"} R / trade`} tip="Expected average profit per trade in R units. Formula: (Win Rate × Avg Win) − (Loss Rate × Avg Loss). Positive = edge in the market." />
+                  <TipCell label="Risk / Trade" value={`${currency}${parseFloat(data.rr?.riskPerTrade || 0).toFixed(2)}`} tip="Average capital at risk per trade (entry to stop loss × lot size). Keep this consistent — erratic sizing destroys your edge." />
                 </div>
-                <div style={{ marginTop: 12, fontSize: 11, color: theme.muted }} title="Total net profit divided by total risk taken. Higher positive value = better returns for the risk you accepted.">
+                <HoverBox tip="Total net profit divided by total risk taken. Higher positive value = better returns for the risk you accepted." style={{ marginTop: 12, fontSize: 11, color: theme.muted }}>
                   Risk-adjusted return:{" "}
                   <span style={{ fontWeight: 700, color: parseFloat(data.rr?.riskAdjustedReturn || 0) >= 0 ? theme.bull : theme.bear }}>
                     {data.rr?.riskAdjustedReturn}
                   </span>
-                </div>
+                </HoverBox>
               </div>
 
               <div
@@ -754,33 +780,10 @@ export default function IndianAnalyticsPage() {
                   How deep your options P&L dipped from peak.
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12 }}>
-                  <div title="The largest peak-to-trough drop in your cumulative P&L. E.g., if you hit ₹10,000 peak then fell to ₹7,000, max drawdown is ₹3,000 (30%). Keep this manageable.">
-                    <div style={{ color: theme.muted }}>Max Drawdown</div>
-                    <div style={{ fontWeight: 700, color: theme.bear }}>
-                      {currency}
-                      {parseFloat(data.drawdown?.maxDrawdown || 0).toFixed(2)} ({data.drawdown?.maxDrawdownPercent || "0.0"}%)
-                    </div>
-                  </div>
-                  <div title="How far you currently are below your all-time equity peak. If zero, you're at a new high. Any positive value means you're in a drawdown right now.">
-                    <div style={{ color: theme.muted }}>Current Drawdown</div>
-                    <div style={{ fontWeight: 700, color: theme.bear }}>
-                      {currency}
-                      {parseFloat(data.drawdown?.currentDrawdown || 0).toFixed(2)} (
-                      {data.drawdown?.currentDrawdownPercent || "0.0"}%)
-                    </div>
-                  </div>
-                  <div title="Net profit divided by max drawdown. E.g., if you made ₹5,000 but your max drawdown was ₹2,000, recovery factor = 2.5. Higher means you earn more per unit of risk absorbed.">
-                    <div style={{ color: theme.muted }}>Recovery Factor</div>
-                    <div style={{ fontWeight: 700 }}>{data.drawdown?.recoveryFactor || "0.00"}</div>
-                  </div>
-                  <div title="Your highest cumulative P&L ever (peak) vs. your current cumulative P&L. If current < peak, you're in a drawdown and working to recover.">
-                    <div style={{ color: theme.muted }}>Peak vs Current</div>
-                    <div style={{ fontWeight: 700 }}>
-                      {currency}
-                      {parseFloat(data.drawdown?.peakBalance || 0).toFixed(0)} → {currency}
-                      {parseFloat(data.drawdown?.currentBalance || 0).toFixed(0)}
-                    </div>
-                  </div>
+                  <TipCell label="Max Drawdown" value={`${currency}${parseFloat(data.drawdown?.maxDrawdown || 0).toFixed(2)} (${data.drawdown?.maxDrawdownPercent || "0.0"}%)`} color={theme.bear} tip="The largest peak-to-trough drop in your P&L. E.g., peak ₹10k → drop to ₹7k = 30% drawdown. Keep this manageable to stay in the game." />
+                  <TipCell label="Current Drawdown" value={`${currency}${parseFloat(data.drawdown?.currentDrawdown || 0).toFixed(2)} (${data.drawdown?.currentDrawdownPercent || "0.0"}%)`} color={theme.bear} tip="How far you are below your all-time equity peak right now. If zero, you're at a new high. Any positive value means you're in an active drawdown." />
+                  <TipCell label="Recovery Factor" value={data.drawdown?.recoveryFactor || "0.00"} tip="Net profit divided by max drawdown. E.g., ₹5k profit with ₹2k max drawdown = 2.5. Higher = you earn more relative to the risk you absorbed." />
+                  <TipCell label="Peak vs Current" value={`${currency}${parseFloat(data.drawdown?.peakBalance || 0).toFixed(0)} → ${currency}${parseFloat(data.drawdown?.currentBalance || 0).toFixed(0)}`} tip="Your highest ever cumulative P&L vs. where you are now. If current < peak, you're in a drawdown and working to recover that high." />
                 </div>
               </div>
             </div>
@@ -888,7 +891,7 @@ export default function IndianAnalyticsPage() {
 
                 {data.time ? (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div title="The day of the week (Mon–Fri) where your average profit and win rate is highest across all logged trades. Focus more trades on this day." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <HoverBox tip="The weekday (Mon–Fri) where your average profit and win rate is highest. Focus more trades on this day to maximise your edge." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Day</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.bestDay?.name || "—"}
@@ -900,9 +903,9 @@ export default function IndianAnalyticsPage() {
                       <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.bestDay?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
                         {data.time.bestDay?.winRate != null ? `${data.time.bestDay.winRate}% WR` : "—"}
                       </div>
-                    </div>
+                    </HoverBox>
 
-                    <div title="The hour of day (IST, 24h) where your average profit and win rate is highest. E.g., '10h' = trades entered between 10:00–10:59 IST performed best." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <HoverBox tip="The hour (IST, 24h) where your profit and win rate is highest. E.g., '10h' = trades entered 10:00–10:59 IST performed best. Concentrate entries in this window." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Hour</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.bestHour?.hour != null ? `${data.time.bestHour.hour}h` : "—"}
@@ -914,9 +917,9 @@ export default function IndianAnalyticsPage() {
                       <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.bestHour?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
                         {data.time.bestHour?.winRate != null ? `${data.time.bestHour.winRate}% WR` : "—"}
                       </div>
-                    </div>
+                    </HoverBox>
 
-                    <div title="Market session (Opening 9:15–10:30, Midday 10:30–13:00, Closing 13:00–15:30) where you performed best. Helps identify your strongest time window." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <HoverBox tip="Market session (Opening 9:15–10:30 / Midday 10:30–13:00 / Closing 13:00–15:30) where you performed best. Identifies your strongest time window." style={{ background: "#F8FAFC", border: `1px solid ${theme.border}`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Best Session</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.bestSession?.name || "—"}
@@ -927,9 +930,9 @@ export default function IndianAnalyticsPage() {
                       <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.bestSession?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
                         {data.time.bestSession?.winRate != null ? `${data.time.bestSession.winRate}% WR` : "—"}
                       </div>
-                    </div>
+                    </HoverBox>
 
-                    <div title="The day of the week where your average profit is lowest / most negative. Consider reducing position size or skipping trades on this day." style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12, minHeight: 106 }}>
+                    <HoverBox tip="The weekday where your average profit is lowest or most negative. Consider reducing size or skipping trades on this day entirely." style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12, minHeight: 106 }}>
                       <div style={{ fontSize: 10, fontWeight: 900, color: theme.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Worst Day</div>
                       <div style={{ fontSize: 18, fontWeight: 900, color: theme.bear, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.time.worstDay?.name || "—"}
@@ -941,7 +944,7 @@ export default function IndianAnalyticsPage() {
                       <div style={{ fontSize: 11, fontWeight: 900, color: parseFloat(data.time.worstDay?.winRate || 0) >= 50 ? theme.bull : theme.bear, marginTop: 6 }}>
                         {data.time.worstDay?.winRate != null ? `${data.time.worstDay.winRate}% WR` : "—"}
                       </div>
-                    </div>
+                    </HoverBox>
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: theme.muted, lineHeight: 1.6 }}>Not enough data to compute timing edge yet.</div>
@@ -1003,7 +1006,7 @@ export default function IndianAnalyticsPage() {
 
                 {data.ai?.behaviorDiscipline?.ruleEmotion && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-                    <div title="% of your trades entered based on a pre-planned setup vs. emotional impulse. Higher plan% = better discipline. Target: ≥ 70% plan-based entries." style={{ background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 12 }}>
+                    <HoverBox tip="% of your trades entered based on a pre-planned setup vs. emotional impulse. Higher plan% = better discipline. Target: ≥ 70% plan-based entries." style={{ background: `${theme.bull}08`, border: `1px solid ${theme.bull}44`, borderRadius: 12, padding: 12 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em" }}>PLAN VS EMOTION</div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {parseFloat(data.ai.behaviorDiscipline.ruleEmotion.planPct || 0).toFixed(1)}%
@@ -1011,9 +1014,9 @@ export default function IndianAnalyticsPage() {
                       <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>
                         Emotion: {parseFloat(data.ai.behaviorDiscipline.ruleEmotion.emotionPct || 0).toFixed(1)}%
                       </div>
-                    </div>
+                    </HoverBox>
 
-                    <div title="Number of trades where you increased position size immediately after a loss — a classic revenge trading pattern. Even 1–2 revenge trades can wipe out days of gains." style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12 }}>
+                    <HoverBox tip="Trades where you increased position size right after a loss — classic revenge trading. Even 1–2 revenge trades can erase days of disciplined gains." style={{ background: `${theme.bear}08`, border: `1px solid ${theme.bear}44`, borderRadius: 12, padding: 12 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: theme.muted, letterSpacing: "0.08em" }}>REVENGE TRADES</div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: theme.primary, fontFamily: "'JetBrains Mono',monospace", marginTop: 6 }}>
                         {data.ai.behaviorDiscipline.revengeTradesCount || 0}
@@ -1021,7 +1024,7 @@ export default function IndianAnalyticsPage() {
                       <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>
                         Count of size-up right after a loss
                       </div>
-                    </div>
+                    </HoverBox>
                   </div>
                 )}
 

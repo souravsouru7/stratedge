@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueries } from "@tanstack/react-query";
 import {
@@ -29,6 +29,15 @@ import {
 export function useAnalytics() {
   const router = useRouter();
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const didAutoSetCalendarMonth = useRef(false);
+  const didUserNavigateCalendar = useRef(false);
+  const lastMonthNavAtRef = useRef(0);
+
+  const shiftMonthSafe = (date, amount) => {
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    return new Date(y, m + amount, 1);
+  };
 
   // SEQUENTIAL: Core analytics first (immediate KPIs)
   const coreResults = useQueries({
@@ -91,15 +100,25 @@ export function useAnalytics() {
   // Auto-navigate calendar to the most recent month with trades
   const timeAnalysis = data.timeAnalysis;
   useEffect(() => {
+    if (didUserNavigateCalendar.current) return;
+    if (didAutoSetCalendarMonth.current) return;
     const dateKeys = Object.keys(timeAnalysis?.byDate || {});
     if (dateKeys.length === 0) return;
     const latestKey = [...dateKeys].sort().slice(-1)[0];
     const [year, month] = latestKey.split("-").map(Number);
-    if (year && month) setCalendarMonth(new Date(year, month - 1, 1));
+    if (year && month) {
+      setCalendarMonth(new Date(year, month - 1, 1));
+      didAutoSetCalendarMonth.current = true;
+    }
   }, [timeAnalysis]);
 
-  const shiftMonth = (amount) =>
-    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + amount, 1));
+  const shiftMonth = (amount) => {
+    const now = Date.now();
+    if (now - lastMonthNavAtRef.current < 220) return;
+    lastMonthNavAtRef.current = now;
+    didUserNavigateCalendar.current = true;
+    setCalendarMonth((prev) => shiftMonthSafe(prev, amount));
+  };
 
   return {
     loading,

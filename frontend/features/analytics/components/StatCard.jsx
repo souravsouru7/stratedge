@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Skeleton } from "@/features/shared";
 
 const colors = {
@@ -8,20 +9,18 @@ const colors = {
   bg: "#F0EEE9", card: "#FFFFFF", border: "#E2E8F0",
 };
 
-/**
- * StatCard (Analytics)
- * Displays a single KPI metric with label, value, sub-text and optional icon.
- * Supports a layout-stable loading state via Skeleton components.
- */
-export default function StatCard({ 
-  label, 
-  value, 
-  sub, 
-  color = colors.primary, 
-  icon, 
+export default function StatCard({
+  label,
+  value,
+  sub,
+  color = colors.primary,
+  icon,
   delay = 0,
-  loading = false 
+  loading = false,
+  tooltip
 }) {
+  const [showTip, setShowTip] = useState(false);
+
   if (loading) {
     return (
       <div style={{
@@ -41,7 +40,6 @@ export default function StatCard({
     );
   }
 
-  // Fix "$-41.28" → "-$41.28" display format
   const formattedValue = typeof value === "string" && value.startsWith("$-")
     ? "-$" + value.substring(2)
     : value;
@@ -50,24 +48,31 @@ export default function StatCard({
   const isInfinite = cleanValue === "∞";
 
   return (
-    <div style={{
-      background: colors.card, borderRadius: 12, border: `1px solid ${colors.border}`,
-      padding: "20px", boxShadow: "0 2px 12px rgba(15,25,35,0.06)",
-      animation: `fadeUp 0.5s ease ${delay}s both`, flex: "1 1 180px", minWidth: 160,
-      transition: "transform 0.2s, box-shadow 0.2s",
-      cursor: "default"
-    }}
-    onMouseEnter={e => {
-      e.currentTarget.style.transform = "translateY(-2px)";
-      e.currentTarget.style.boxShadow = "0 8px 16px rgba(15,25,35,0.08)";
-    }}
-    onMouseLeave={e => {
-      e.currentTarget.style.transform = "translateY(0)";
-      e.currentTarget.style.boxShadow = "0 2px 12px rgba(15,25,35,0.06)";
-    }}>
+    <div
+      style={{
+        background: colors.card, borderRadius: 12, border: `1px solid ${colors.border}`,
+        padding: "20px", boxShadow: "0 2px 12px rgba(15,25,35,0.06)",
+        animation: `fadeUp 0.5s ease ${delay}s both`, flex: "1 1 180px", minWidth: 160,
+        transition: "transform 0.2s, box-shadow 0.2s",
+        cursor: "default", position: "relative", overflow: "visible",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 8px 16px rgba(15,25,35,0.08)";
+        setShowTip(true);
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 2px 12px rgba(15,25,35,0.06)";
+        setShowTip(false);
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-        <span style={{ fontSize: 10, color: colors.muted, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+        <span style={{ fontSize: 10, color: colors.muted, letterSpacing: "0.12em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
           {label}
+          {tooltip && (
+            <span style={{ width: 13, height: 13, borderRadius: "50%", background: "#E2E8F0", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900, color: "#64748B", cursor: "help", flexShrink: 0 }}>?</span>
+          )}
         </span>
         {icon && (
           <div style={{ width: 28, height: 28, borderRadius: 6, background: `${color}12`, display: "flex", alignItems: "center", justifyContent: "center", color }}>
@@ -81,6 +86,27 @@ export default function StatCard({
       {sub && (
         <div style={{ fontSize: 10, color: label?.toLowerCase().includes("profit factor") && isInfinite ? colors.bull : colors.muted, letterSpacing: "0.06em", fontWeight: isInfinite ? 700 : 500 }}>
           {label?.toLowerCase().includes("profit factor") && isInfinite ? "Perfect Edge" : sub}
+        </div>
+      )}
+      {tooltip && showTip && (
+        <div style={{
+          position: "absolute",
+          bottom: "calc(100% + 8px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#0F1923",
+          color: "#E2E8F0",
+          fontSize: 11,
+          padding: "10px 14px",
+          borderRadius: 10,
+          width: 220,
+          zIndex: 200,
+          lineHeight: 1.6,
+          pointerEvents: "none",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+        }}>
+          {tooltip}
+          <div style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#0F1923", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
         </div>
       )}
     </div>

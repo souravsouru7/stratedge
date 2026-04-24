@@ -17,6 +17,7 @@ export function useTrades() {
   const [period, setPeriod]             = useState("1m");
   const [search, setSearch]             = useState("");
   const [mounted, setMounted]           = useState(false);
+  const [hasToken, setHasToken]         = useState(false);
 
   // 1. Data Fetching via useQuery
   const { data: trades = [], isLoading: loading, error } = useQuery({
@@ -25,8 +26,8 @@ export function useTrades() {
       const data = await getTrades("Forex", { period });
       return Array.isArray(data) ? data : [];
     },
-    // Only fetch if authenticated (simple check)
-    enabled: typeof window !== "undefined" && !!localStorage.getItem("token"),
+    // Start only after client auth check to avoid hydration mismatch.
+    enabled: mounted && hasToken,
   });
 
   // 2. Data Deletion via useMutation
@@ -49,6 +50,7 @@ export function useTrades() {
       router.push("/login");
       return;
     }
+    setHasToken(true);
     setMounted(true);
   }, [router]);
 
