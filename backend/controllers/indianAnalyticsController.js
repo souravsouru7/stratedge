@@ -592,11 +592,17 @@ exports.getTradeQuality = async (req, res) => {
       { label: "2-3R", min: 2, max: 3, trades: [] },
       { label: "3R+", min: 3, max: Infinity, trades: [] }
     ];
+    let rrSum = 0;
+    let rrCount = 0;
     trades.forEach(t => {
       if (t.stopLoss && t.takeProfit && t.entryPrice) {
         const risk = Math.abs(t.entryPrice - t.stopLoss);
         const reward = Math.abs(t.takeProfit - t.entryPrice);
         const rr = risk > 0 ? reward / risk : 0;
+        if (rr > 0) {
+          rrSum += rr;
+          rrCount += 1;
+        }
         rrRanges.forEach(range => {
           if (rr >= range.min && rr < range.max) range.trades.push({ profit: t.profit, win: t.profit > 0 });
         });
@@ -620,7 +626,7 @@ exports.getTradeQuality = async (req, res) => {
       if (t.profit > 0 && (t.brokerage || 0) + (t.sttTaxes || 0) > t.profit) costImpactedTrades++;
     });
     const winningTrades = trades.filter(t => t.profit > 0).length;
-    const avgRR = rrAnalysis.length > 0 ? rrAnalysis.reduce((a, r) => a + parseFloat(r.label), 0) / rrAnalysis.length : 0;
+    const avgRR = rrCount > 0 ? rrSum / rrCount : 0;
     const qualityScore = Math.min(100, Math.max(0, (winningTrades / Math.max(1, trades.length)) * 50 + (100 - parseFloat(breakevenRate)) * 0.3 + Math.min(20, avgRR * 5))).toFixed(0);
 
     res.json({
