@@ -9,8 +9,6 @@
     "dev:all": "concurrently -n api,worker -c blue,green \"npm run dev\" \"npm run worker\"",
     "start": "node server.js",
     "worker": "node workers/ocrWorker.js",
-    "seed:admin": "node scripts/seedAdmin.js",
-    "seed:forex-demo": "node scripts/seedForexDummyData.js",
     "cleanup:analyze": "node scripts/runDataCleanup.js analyze",
     "cleanup:dry-run": "node scripts/runDataCleanup.js dry-run",
     "cleanup:run": "node scripts/runDataCleanup.js cleanup",

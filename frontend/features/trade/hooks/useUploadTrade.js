@@ -15,6 +15,27 @@ const getTodayInputValue = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
 };
 
+const normalizeDateForInput = (value) => {
+  if (!value) return "";
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getTime() - value.getTimezoneOffset() * 60000)
+      .toISOString()
+      .split("T")[0];
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
+};
+
 
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -59,34 +80,24 @@ function detectSessionFromNow() {
 }
 
 function buildForexTradeTemplate(imageUrl, t = {}) {
-  const hasParsedCoreFields = Boolean(
-    t.pair ||
-    t.symbol ||
-    t.entryPrice != null ||
-    t.exitPrice != null ||
-    t.pnl != null ||
-    t.profit != null
-  );
-  const fallback = hasParsedCoreFields ? {} : FOREX_DUMMY_DEFAULTS;
-
   return {
-    pair: t.pair || t.symbol || fallback.pair || "",
-    action: (t.action || t.type || fallback.action || "buy").toString().toLowerCase(),
-    lotSize: t.lotSize != null ? String(t.lotSize) : (fallback.lotSize || ""),
-    entryPrice: t.entryPrice != null ? String(t.entryPrice) : (fallback.entryPrice || ""),
-    exitPrice: t.exitPrice != null ? String(t.exitPrice) : (fallback.exitPrice || ""),
-    stopLoss: t.stopLoss != null ? String(t.stopLoss) : (fallback.stopLoss || ""),
-    takeProfit: t.takeProfit != null ? String(t.takeProfit) : (fallback.takeProfit || ""),
-    profit: t.profit != null ? String(t.profit) : (t.pnl != null ? String(t.pnl) : (fallback.profit || "")),
-    commission: t.commission != null ? String(t.commission) : (fallback.commission || ""),
-    swap: t.swap != null ? String(t.swap) : (fallback.swap || ""),
-    balance: t.balance != null ? String(t.balance) : (fallback.balance || ""),
-    session: t.session || fallback.session || detectSessionFromNow(),
+    pair: t.pair || t.symbol || "",
+    action: (t.action || t.type || "buy").toString().toLowerCase(),
+    lotSize: t.lotSize != null ? String(t.lotSize) : "",
+    entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
+    exitPrice: t.exitPrice != null ? String(t.exitPrice) : "",
+    stopLoss: t.stopLoss != null ? String(t.stopLoss) : "",
+    takeProfit: t.takeProfit != null ? String(t.takeProfit) : "",
+    profit: t.profit != null ? String(t.profit) : (t.pnl != null ? String(t.pnl) : ""),
+    commission: t.commission != null ? String(t.commission) : "",
+    swap: t.swap != null ? String(t.swap) : "",
+    balance: t.balance != null ? String(t.balance) : "",
+    session: t.session || detectSessionFromNow(),
     strategy: "", strategyCustom: "",
     tradeDate: normalizeDateForInput(t.tradeDate) || getTodayInputValue(),
     notes: "", screenshot: imageUrl,
-    segment: t.segment || fallback.segment || "Major FX",
-    instrumentType: t.instrumentType || fallback.instrumentType || "Spot",
+    segment: t.segment || "Major FX",
+    instrumentType: t.instrumentType || "Spot",
     quantity: t.quantity != null ? String(t.quantity) : "",
     strikePrice: t.strikePrice != null ? String(t.strikePrice) : "",
     expiryDate: t.expiryDate || "",
