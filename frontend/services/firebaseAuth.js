@@ -51,11 +51,11 @@ const isMobileBrowser = () => {
 };
 
 const shouldUseRedirectForWebGoogle = () => {
-  // Production popup flows can fail under COOP policies; prefer redirect unless explicitly disabled.
+  // Use env override only; default popup keeps compatibility with Google secure-browser checks.
   const envOverride = process.env.NEXT_PUBLIC_FIREBASE_GOOGLE_WEB_FLOW;
   if (envOverride === "popup") return false;
   if (envOverride === "redirect") return true;
-  return process.env.NODE_ENV === "production";
+  return false;
 };
 
 // Native Google Sign-In via @capacitor-firebase/authentication
