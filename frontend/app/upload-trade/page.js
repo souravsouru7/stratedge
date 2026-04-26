@@ -16,7 +16,7 @@ import { FormSelect }        from "@/features/trade/components/FormSelect";
 import { useUploadTrade }    from "@/features/trade/hooks/useUploadTrade";
 
 // ── shared form constants ─────────────────────────────────────────────────────
-const ENTRY_BASIS  = ["Plan", "Impulse", "Emotion", "FOMO", "Custom"];
+const ENTRY_BASIS  = ["Plan", "Impulsive", "Emotion", "Custom"];
 const MOODS        = [
   { v: 1, e: "😤", label: "Stressed"   },
   { v: 2, e: "😟", label: "Anxious"    },

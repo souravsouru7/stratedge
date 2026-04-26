@@ -9,7 +9,7 @@ import MarketSwitcher from "@/components/MarketSwitcher";
 const NAV_ITEMS = [
   { href: "/indian-market/dashboard", label: "Dashboard" },
   { href: "/indian-market/trades",    label: "Journal"   },
-  { href: "/indian-market/add-trade", label: "Log Trade" },
+  { href: "/indian-market/add-trade",    label: "Log Trade"    },
   { href: "/indian-market/analytics", label: "Analytics" },
   { href: "/indian-market/setups",    label: "Setups"    },
   { href: "/profile",                 label: "Profile"   },

@@ -41,6 +41,9 @@
 
     <!-- Camera and storage for trade screenshot upload -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Camera is optional — app works without it (gallery upload still available) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <!-- Android 13+ image picker -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- Android 12 and below -->

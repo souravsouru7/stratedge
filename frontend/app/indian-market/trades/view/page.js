@@ -402,12 +402,12 @@ function IndianTradeDetailContent() {
 
         {/* ── Trade Details ── */}
         <SectionCard title="TRADE DETAILS" icon="📋" accent={C.ink2} className="section-card">
-          <StatRow label="Underlying"    value={trade.underlying || "—"} />
-          <StatRow label="Strike Price"  value={trade.strikePrice != null ? `₹${trade.strikePrice}` : "—"} mono />
-          <StatRow label="Option Type"   value={optType === "CE" ? "🟢 Call (CE)" : "🔴 Put (PE)"} />
-          <StatRow label="Lots"          value={lots > 0 ? `${lots} lot${lots !== 1 ? "s" : ""}` : "—"} mono />
-          <StatRow label="Lot Size"      value={lotSize ? `${lotSize} qty/lot` : "—"} mono />
-          <StatRow label="Total Qty"     value={totalQty > 0 ? String(totalQty) : "—"} mono />
+          <StatRow label="Underlying"  value={trade.underlying || "—"} />
+          <StatRow label="Strike Price" value={trade.strikePrice != null ? `₹${trade.strikePrice}` : "—"} mono />
+          <StatRow label="Option Type"  value={optType === "CE" ? "🟢 Call (CE)" : "🔴 Put (PE)"} />
+          <StatRow label="Lots"      value={lots > 0 ? `${lots} lot${lots !== 1 ? "s" : ""}` : "—"} mono />
+          <StatRow label="Lot Size"  value={lotSize ? `${lotSize} qty/lot` : "—"} mono />
+          <StatRow label="Total Qty" value={totalQty > 0 ? String(totalQty) : "—"} mono />
           <StatRow label="Trade Type"    value={trade.tradeType || "—"} />
           <StatRow label="Entry Basis"
             value={trade.entryBasis === "Custom" && trade.entryBasisCustom ? trade.entryBasisCustom : (trade.entryBasis || "—")}

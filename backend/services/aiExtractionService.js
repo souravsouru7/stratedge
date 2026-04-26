@@ -5,12 +5,140 @@ const { appConfig } = require("../config");
 
 const GEMINI_EXTRACTION_TIMEOUT_MS = Math.max(TIMEOUT_CONFIG.aiTimeout, 90_000);
 
-async function callAIForTradeExtraction(prompt, timeoutMs = TIMEOUT_CONFIG.aiTimeout) {
+const FOREX_VISION_PROMPT = `You are a trading data extraction specialist analyzing a broker screenshot.
+Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
+
+FIELD EXTRACTION RULES:
+- pair: currency/instrument symbol (e.g. EURUSD, XAUUSD, US30, BTCUSD). Normalize: remove spaces, slashes.
+- type: exactly "BUY" or "SELL". Look for: Buy/Sell labels, green/red color indicators, Long/Short labels, B/S abbreviations.
+- quantity: lot size or volume (e.g. 0.01, 1.00). Look for: "Lots", "Vol", "Volume", "Size" columns.
+- entryPrice: opening price. Look for: "Open", "Entry", "Open Price", "Price" columns.
+- exitPrice: closing price. Look for: "Close", "Exit", "Close Price", "Current" columns.
+- profit: net P&L in account currency. Look for: "Profit", "P&L", "Net P&L", "Realized P&L" columns. Negative if shown in red or with minus sign.
+- stopLoss: SL value. Look for: "S/L", "Stop Loss", "SL" columns.
+- takeProfit: TP value. Look for: "T/P", "Take Profit", "TP" columns.
+- broker: platform name visible in logo or title (MetaTrader 4, MetaTrader 5, cTrader, TradingView, etc.)
+
+NUMBER FORMAT: Return raw numbers only. Remove currency symbols ($, €, £). Profit is negative if the trade is a loss.
+
+JSON: {"pair":"EURUSD","type":"BUY","quantity":0.01,"entryPrice":1.08500,"exitPrice":1.09000,"profit":50.00,"stopLoss":1.08000,"takeProfit":1.09500,"broker":"MetaTrader 5"}`;
+
+const INDIAN_VISION_PROMPT = `You are a trading data extraction specialist analyzing an Indian broker screenshot (Zerodha, Upstox, Angel One, Groww, Dhan, Fyers, 5paisa, ICICI Direct, Kotak Neo, Paytm Money, Motilal Oswal, Sharekhan).
+Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
+
+FIELD EXTRACTION RULES:
+- pair: full instrument name including expiry and strike (e.g. "NIFTY 26000 PE 25JAN", "BANKNIFTY 48000 CE").
+- underlying: index or stock name only (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, or stock ticker like RELIANCE, TCS).
+- optionType: exactly "CE" or "PE". CE = Call = bullish. PE = Put = bearish.
+- strikePrice: strike price number only (e.g. 26000, 48000).
+- quantity: number of lots or units traded.
+- entryPrice: avg buy price. Look for: "Avg. Price", "Avg Price", "Buy Avg", "Entry", "Buy Price".
+- exitPrice: avg sell price. Look for: "Sell Avg", "Exit Price", "LTP" (if closed), "Close".
+- profit: net realized P&L. Look for: "P&L", "Net P&L", "Realized P&L", "Total P&L".
+  CRITICAL: negative profit shown as "-₹500", "₹-500", "(500)", red color, or with minus sign.
+  Indian rupee: ₹ symbol, or "Rs.", or "INR". Strip the symbol, return just the number.
+  Indian lakh format: "1,23,456" = 123456. Remove all commas, parse as plain number.
+- broker: platform name from logo/title.
+
+If MULTIPLE trades are visible (positions list, trade history), extract ALL of them into "trades" array.
+Set top-level fields to the first/main/most recent trade.
+
+JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha"}]}`;
+
+async function extractTradeWithGeminiVision(imageUrl, options = {}) {
+  const geminiKey = appConfig.ai.geminiApiKey;
+  if (!geminiKey || !imageUrl) return null;
+
+  const marketType = options.marketType || "Forex";
+  const isIndian = marketType === "Indian_Market";
+  const timeoutMs = Math.max(TIMEOUT_CONFIG.aiTimeout || 45000, GEMINI_EXTRACTION_TIMEOUT_MS);
+
+  try {
+    // Download image and convert to base64 for Gemini inline data
+    const imgResponse = await withTimeout(fetch(imageUrl), "Image download for Gemini Vision", 15000);
+    if (!imgResponse.ok) {
+      logger.warn("Gemini Vision: failed to download image", { imageUrl, status: imgResponse.status });
+      return null;
+    }
+    const buffer = await imgResponse.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    const mimeType = imgResponse.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({
+      model: appConfig.ai.geminiTradeModel,
+      generationConfig: { temperature: 0, maxOutputTokens: 2048 },
+    });
+
+    const prompt = isIndian ? INDIAN_VISION_PROMPT : FOREX_VISION_PROMPT;
+    const visionPromise = model.generateContent([
+      { inlineData: { data: base64, mimeType } },
+      { text: prompt },
+    ]);
+
+    const result = await withTimeout(visionPromise, "Gemini Vision call", timeoutMs);
+    const rawText = result?.response?.text?.()?.trim();
+    if (!rawText) return null;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(stripJsonEnvelope(rawText));
+    } catch {
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (!match) {
+        logger.warn("Gemini Vision: no JSON in response", { snippet: rawText.slice(0, 200) });
+        return null;
+      }
+      parsed = JSON.parse(stripJsonEnvelope(match[0]));
+    }
+
+    logger.info("Gemini Vision extraction succeeded", { marketType, imageUrl });
+
+    if (isIndian) {
+      const mapOne = (item) => ({
+        pair: item.pair ?? null,
+        profit: toNumberOrNull(item.profit),
+        quantity: toNumberOrNull(item.quantity),
+        strikePrice: toNumberOrNull(item.strikePrice),
+        optionType: item.optionType === "PE" || item.optionType === "CE" ? item.optionType : null,
+        underlying: item.underlying ?? null,
+        entryPrice: toNumberOrNull(item.entryPrice),
+        exitPrice: toNumberOrNull(item.exitPrice),
+        broker: item.broker ?? null,
+      });
+      const main = mapOne(parsed);
+      const trades = Array.isArray(parsed.trades) ? parsed.trades.map(mapOne) : [];
+      return { ...main, trades, rawResponse: rawText };
+    }
+
+    return {
+      pair: parsed.pair ?? null,
+      type: parsed.type === "BUY" || parsed.type === "SELL" ? parsed.type : null,
+      quantity: toNumberOrNull(parsed.quantity),
+      entryPrice: toNumberOrNull(parsed.entryPrice),
+      exitPrice: toNumberOrNull(parsed.exitPrice),
+      profit: toNumberOrNull(parsed.profit),
+      stopLoss: toNumberOrNull(parsed.stopLoss),
+      takeProfit: toNumberOrNull(parsed.takeProfit),
+      broker: parsed.broker ?? null,
+      strikePrice: toNumberOrNull(parsed.strikePrice),
+      optionType: parsed.optionType === "PE" || parsed.optionType === "CE" ? parsed.optionType : null,
+      underlying: parsed.underlying ?? null,
+      rawResponse: rawText,
+    };
+  } catch (err) {
+    logger.warn("Gemini Vision extraction failed", { error: err.message, imageUrl });
+    return null;
+  }
+}
+
+async function callAIForTradeExtraction(prompt, timeoutMs = TIMEOUT_CONFIG.aiTimeout, { preferGemini = false } = {}) {
   const openaiKey = appConfig.ai.openaiApiKey;
   const geminiKey = appConfig.ai.geminiApiKey;
 
-  // Prefer OpenAI if configured, otherwise fall back to Gemini.
-  if (openaiKey) {
+  // For Indian market data, Gemini has stronger knowledge of Indian broker formats.
+  // preferGemini=true skips OpenAI and goes straight to Gemini.
+  if (openaiKey && !preferGemini) {
     try {
       const fetchPromise = fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -114,16 +242,26 @@ function stripJsonEnvelope(content) {
 }
 
 function toNumberOrNull(value) {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  let s = value.trim();
+  if (!s) return null;
+
+  // Bracket-negative: (1,234.50) → -1234.50
+  const bracketNeg = s.match(/^\(([^)]+)\)$/);
+  if (bracketNeg) s = "-" + bracketNeg[1];
+
+  // Strip currency symbols and whitespace: ₹, Rs., INR, $, €, £
+  s = s.replace(/[₹$€£]|Rs\.|INR/gi, "").trim();
+
+  // Indian lakh format: 1,23,456 — commas at non-standard positions
+  // Standard: 1,234,567 — works fine with simple comma removal
+  // Both handled by just removing all commas
+  s = s.replace(/,/g, "");
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
 }
 
 function mapIndianTradePayload(parsed) {
@@ -160,30 +298,34 @@ async function extractIndianTradeWithAI(extractedText, options = {}) {
   const multiHint = options.expectedMultiple
     ? "The screenshot may contain multiple trades. Return every detected trade in the trades array.\n"
     : "";
-  const prompt = options.improvedPrompt
-    ? `You are extracting structured Indian broker trade data from noisy OCR. Clean OCR mistakes mentally and return ONLY valid JSON.
-${brokerHint}${multiHint}Required fields per trade: pair, quantity, entryPrice, profit.
-Optional fields per trade: strikePrice, optionType, underlying, exitPrice, broker.
-Detect broker-specific formats such as Zerodha, Upstox, Angel One, Groww, Dhan, Fyers, 5paisa, ICICI Direct, Kotak, Paytm Money.
-If there are multiple positions, return all of them in "trades". If only one trade exists, "trades" may contain one item.
-Never include markdown. Never include explanations. Use null for missing fields.
+  const ocrSlice = String(textWithoutPercents).slice(0, options.improvedPrompt ? 5000 : 4000);
+  const prompt = `You are extracting Indian F&O/options trade data from broker OCR text. Return ONLY valid JSON, no markdown, no explanation.
+${brokerHint}${multiHint}
+EXTRACTION RULES:
+- pair: full instrument string e.g. "NIFTY 26000 PE", "BANKNIFTY 48000 CE 30JAN". Include expiry if visible.
+- underlying: index/stock only — NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, or stock ticker.
+- optionType: "CE" (Call/bullish) or "PE" (Put/bearish). Never null if visible.
+- strikePrice: number only e.g. 26000.
+- quantity: number of lots.
+- entryPrice: avg buy price. Look for "Avg. Price", "Avg Price", "Buy Avg", "Entry".
+- exitPrice: avg sell price. Look for "Sell Avg", "Exit", "LTP".
+- profit: realized P&L as signed number. Negative = loss.
+  Formats: "-₹500", "₹-500", "(500)", red/minus sign all mean -500.
+  Indian lakh: "1,23,456" = 123456 (remove all commas).
+  ₹ / Rs. / INR prefix — strip it, return number only.
+- broker: Zerodha/Upstox/Angel One/Groww/Dhan/Fyers/5paisa/ICICI Direct/Kotak/Paytm Money.
+
+COMMON OCR ERRORS: "PE"→"P E"/"FE"/"Re", "CE"→"GE"/"OE", ₹→"T"/"F"/"Rs", minus→"="/"~".
+
+Return ALL visible trades in "trades". Set top-level to first/main trade. Use null for missing.
 
 OCR text:
-${String(textWithoutPercents).slice(0, 5000)}
+${ocrSlice}
 
-JSON format:
-{"pair":"NIFTY 26000 PE","quantity":0,"entryPrice":0,"exitPrice":0,"profit":0,"strikePrice":0,"optionType":"CE|PE","underlying":"NIFTY","broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","quantity":0,"entryPrice":0,"exitPrice":0,"profit":0,"strikePrice":0,"optionType":"PE","underlying":"NIFTY","broker":"Zerodha"}]}`
-    : `Extract Indian options/F&O trade data from this OCR text. Return ONLY valid JSON, no markdown.
-${brokerHint}${multiHint}Fields per trade: pair (e.g. "NIFTY 26000 PE"), profit (number), quantity (lots, number), strikePrice (number), optionType ("CE" or "PE"), underlying (e.g. "NIFTY"), entryPrice, exitPrice, broker.
-Return every visible trade inside "trades". Also set top-level fields to the best first/main trade.
+JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha"}]}`;
 
-OCR text:
-${String(textWithoutPercents).slice(0, 4000)}
-
-JSON format: {"pair": "...", "profit": 0, "quantity": 0, "entryPrice": 0, "exitPrice": 0, "strikePrice": 0, "optionType": "CE|PE", "underlying": "...", "broker": "...", "trades": [{"pair": "...", "profit": 0, "quantity": 0, "entryPrice": 0, "exitPrice": 0, "strikePrice": 0, "optionType": "CE|PE", "underlying": "...", "broker": "..."}]}
-Use null for missing values.`;
-
-  const data = await callAIForTradeExtraction(prompt);
+  // Gemini preferred for Indian market — stronger knowledge of Indian broker formats
+  const data = await callAIForTradeExtraction(prompt, TIMEOUT_CONFIG.aiTimeout, { preferGemini: true });
   const content = data?.choices?.[0]?.message?.content?.trim();
   if (!content) return null;
 
@@ -218,17 +360,25 @@ async function extractTradeWithAI(extractedText, options = {}) {
   }
 
   const marketType = options.marketType || "Forex";
-  const prompt = `Extract structured ${marketType} trade data from noisy OCR text. Return ONLY valid JSON.
-Required fields: pair, quantity, entryPrice, profit.
-Optional fields: type, exitPrice, stopLoss, takeProfit, broker, strikePrice, optionType, underlying.
-If a number is uncertain, still return the best numeric guess or null.
-No markdown. No explanation.
+  const prompt = `You are extracting ${marketType} trade data from broker OCR text. Return ONLY valid JSON, no markdown, no explanation.
+
+EXTRACTION RULES:
+- pair: instrument symbol. Forex: EURUSD, GBPUSD, XAUUSD, BTCUSD. Remove spaces/slashes.
+- type: exactly "BUY" or "SELL". Look for: Buy/Sell, Long/Short, B/S labels.
+- quantity: lot size or volume e.g. 0.01, 1.00.
+- entryPrice: open price. Look for "Open", "Entry", "Price".
+- exitPrice: close price. Look for "Close", "Exit", "Current".
+- profit: net P&L. Negative = loss. Strip $ € £ symbols. Return signed number.
+- stopLoss: S/L value.
+- takeProfit: T/P value.
+- broker: platform name (MetaTrader 4, MetaTrader 5, cTrader, TradingView, etc.)
+
+Use null for missing fields. Return the best numeric value you can — don't leave numbers as strings.
 
 OCR text:
 ${String(extractedText).slice(0, 5000)}
 
-JSON format:
-{"pair":"...","type":"BUY|SELL","quantity":0,"entryPrice":0,"exitPrice":0,"profit":0,"stopLoss":0,"takeProfit":0,"broker":"...","strikePrice":0,"optionType":"CE|PE","underlying":"..."}`;
+JSON: {"pair":"EURUSD","type":"BUY","quantity":0.01,"entryPrice":1.08500,"exitPrice":1.09000,"profit":50.00,"stopLoss":1.08000,"takeProfit":1.09500,"broker":"MetaTrader 5"}`;
 
   const data = await callAIForTradeExtraction(prompt);
   const content = data?.choices?.[0]?.message?.content?.trim();
@@ -258,4 +408,4 @@ JSON format:
   }
 }
 
-module.exports = { extractIndianTradeWithAI, extractTradeWithAI };
+module.exports = { extractIndianTradeWithAI, extractTradeWithAI, extractTradeWithGeminiVision };

@@ -9,8 +9,7 @@ export default function MarketSwitcher() {
   const pathname = usePathname();
 
   const handleSwitch = () => {
-    // Navigate to appropriate page based on new market
-    // The MarketContext will automatically sync currentMarket when the pathname changes
+    
 
     // Map current path to new market equivalent
     let newPath = pathname;
@@ -50,30 +49,29 @@ export default function MarketSwitcher() {
           display: 'flex',
           alignItems: 'center',
           background: '#FFFFFF',
-          border: `2px solid ${isForex ? '#0D9E6E' : '#2E7D32'}`,
+          border: '2px solid #0D9E6E',
           borderRadius: '24px',
           padding: '4px',
           cursor: 'pointer',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: isForex
-            ? '0 2px 8px rgba(13, 158, 110, 0.2)'
-            : '0 2px 8px rgba(46, 125, 50, 0.2)',
-          minWidth: '120px',
+          boxShadow: '0 2px 8px rgba(13, 158, 110, 0.2)',
+          width: '168px',
           height: '36px',
+          flexShrink: 0,
         }}
         title={`Switch to ${isForex ? 'Indian Market' : 'Forex'}`}
       >
-        {/* Sliding Background */}
+        {/* Sliding pill */}
         <div
           style={{
             position: 'absolute',
-            left: isForex ? '4px' : 'calc(50% - 2px)',
-            width: 'calc(50% - 4px)',
-            height: '32px',
-            background: `linear-gradient(135deg, ${isForex ? '#0D9E6E' : '#2E7D32'} 0%, ${isForex ? '#22C78E' : '#43A047'} 100%)`,
-            borderRadius: '20px',
+            left: isForex ? '4px' : 'calc(50% + 2px)',
+            width: 'calc(50% - 6px)',
+            height: '24px',
+            background: 'linear-gradient(135deg, #0D9E6E 0%, #22C78E 100%)',
+            borderRadius: '16px',
             transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 2px 6px rgba(13,158,110,0.35)',
           }}
         />
 
@@ -84,17 +82,17 @@ export default function MarketSwitcher() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
+            gap: '5px',
             zIndex: 1,
             transition: 'color 0.3s ease',
-            color: isForex ? '#FFFFFF' : '#4A5568',
+            color: isForex ? '#FFFFFF' : '#94A3B8',
             fontSize: '11px',
             fontWeight: '700',
             fontFamily: "'JetBrains Mono', monospace",
-            letterSpacing: '0.05em',
+            letterSpacing: '0.04em',
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <circle cx="12" cy="12" r="10" />
             <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
             <line x1="12" y1="18" x2="12" y2="2" />
@@ -109,22 +107,17 @@ export default function MarketSwitcher() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
             zIndex: 1,
             transition: 'color 0.3s ease',
-            color: !isForex ? '#FFFFFF' : '#4A5568',
-            fontSize: '11px',
+            color: !isForex ? '#FFFFFF' : '#94A3B8',
+            fontSize: '10px',
             fontWeight: '700',
             fontFamily: "'JetBrains Mono', monospace",
-            letterSpacing: '0.05em',
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M3 9h18" />
-            <path d="M9 21V9" />
-          </svg>
-          NIFTY
+          INDIA MKT
         </div>
       </button>
 
@@ -137,9 +130,9 @@ export default function MarketSwitcher() {
           justifyContent: 'center',
           width: '34px',
           height: '34px',
-          background: `linear-gradient(135deg, ${isForex ? '#0D9E6E' : '#2E7D32'} 0%, ${isForex ? '#22C78E' : '#43A047'} 100%)`,
+          background: 'linear-gradient(135deg, #0D9E6E 0%, #22C78E 100%)',
           borderRadius: '10px',
-          boxShadow: `0 2px 8px ${isForex ? 'rgba(13, 158, 110, 0.3)' : 'rgba(46, 125, 50, 0.3)'}`,
+          boxShadow: '0 2px 8px rgba(13, 158, 110, 0.3)',
           color: '#FFFFFF',
           fontSize: '16px',
           fontWeight: '700',
@@ -158,11 +151,11 @@ export default function MarketSwitcher() {
           fontSize: '10px',
           fontWeight: '600',
           fontFamily: "'Plus Jakarta Sans', sans-serif",
-          color: isForex ? '#0D9E6E' : '#2E7D32',
-          background: isForex ? 'rgba(13, 158, 110, 0.1)' : 'rgba(46, 125, 50, 0.1)',
+          color: '#0D9E6E',
+          background: 'rgba(13, 158, 110, 0.08)',
           padding: '6px 12px',
           borderRadius: '8px',
-          border: `1px solid ${isForex ? 'rgba(13, 158, 110, 0.3)' : 'rgba(46, 125, 50, 0.3)'}`,
+          border: '1px solid rgba(13, 158, 110, 0.25)',
           whiteSpace: 'nowrap',
           transition: 'all 0.3s ease',
         }}

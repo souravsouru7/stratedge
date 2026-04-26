@@ -199,7 +199,7 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
             {isLong ? "▲ BUY" : "▼ SELL"}
           </span>
 
-          {/* CE/PE */}
+          {/* CE/PE badge */}
           <span style={{
             fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", fontFamily: C.mono,
             color: optType === "CE" ? C.bull : C.bear,
@@ -503,7 +503,7 @@ export default function IndianTradesPage() {
             <h1 style={{ fontSize: 26, fontWeight: 900, color: C.ink, margin: 0, letterSpacing: "-0.02em" }}>
               Options Journal
             </h1>
-            <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0", fontFamily: C.mono }}>NSE / BSE · F&O Trades</p>
+            <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0", fontFamily: C.mono }}>NSE / BSE · Options</p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <Link href="/indian-market/upload-trade" style={{

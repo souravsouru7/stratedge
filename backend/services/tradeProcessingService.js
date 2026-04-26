@@ -3,7 +3,8 @@ const ExtractionLog = require("../models/ExtractionLog");
 const { clearUserCache } = require("../utils/cacheUtils");
 const { buildCacheKey, setCache } = require("../utils/cache");
 const { extractText } = require("./ocrService");
-const { extractIndianTradeWithAI, extractTradeWithAI } = require("./aiExtractionService");
+const { extractTextWithVision, isVisionAvailable } = require("./visionOcrService");
+const { extractIndianTradeWithAI, extractTradeWithAI, extractTradeWithGeminiVision } = require("./aiExtractionService");
 const {
   parseTrade,
   parseIndianTrade,
@@ -167,19 +168,47 @@ function safeParseForexTradesFromOCR(text) {
   }
 }
 
-async function runOcrWithRetry(imagePath) {
-  let lastError = null;
+async function downloadImageBuffer(imageUrl) {
+  const res = await withTimeout(fetch(imageUrl), "Image download", 15000);
+  if (!res.ok) throw new Error(`Image download failed: ${res.status}`);
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
 
+async function runOcrWithRetry(imagePath) {
+  // 1. Google Cloud Vision — most accurate, handles complex broker UIs
+  if (isVisionAvailable()) {
+    try {
+      logger.info("OCR: trying Google Cloud Vision (primary)");
+      const buffer = await downloadImageBuffer(imagePath);
+      const result = await withTimeout(
+        extractTextWithVision(buffer),
+        "Google Vision OCR timeout",
+        PROCESSING_TIMEOUT_MS
+      );
+      if (result?.text && result.text.trim().length > 20) {
+        logger.info("OCR: Google Cloud Vision succeeded", { textLength: result.text.length });
+        return result.text;
+      }
+      logger.warn("OCR: Google Cloud Vision returned empty text, falling back to Tesseract");
+    } catch (error) {
+      logger.warn("OCR: Google Cloud Vision failed, falling back to Tesseract", {
+        error: error.message,
+      });
+    }
+  }
+
+  // 2. Tesseract — last resort
+  let lastError = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      logger.info(`OCR attempt ${attempt} started`);
+      logger.info(`OCR: Tesseract attempt ${attempt}`);
       return await withTimeout(extractText(imagePath), "Processing timeout");
     } catch (error) {
       lastError = error;
-      logger.error(`OCR attempt ${attempt} failed`, {
+      logger.error(`OCR: Tesseract attempt ${attempt} failed`, {
         attempt,
         error: error.message,
-        stack: error.stack,
       });
     }
   }
@@ -473,53 +502,78 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
     let aiRawResponse = "";
     let parsedTrade = {};
     let parsedTrades = [];
+    let geminiVisionUsed = false;
 
-    if (marketType === "Indian_Market" && !weakOcr) {
-      parsedTrade = safeParseIndianTrade(cleanedText, { broker });
-      parsedTrades = safeParseTradesFromOCR(cleanedText, { broker });
-    } else if (!weakOcr) {
-      parsedTrade = safeParseTrade(cleanedText);
-      parsedTrades = safeParseForexTradesFromOCR(cleanedText);
-    } else {
-      logger.warn(`Weak OCR detected | tradeId=${tradeId} | switching to AI fallback mode`, {
-        tradeId,
-        textLength: cleanedText.length,
+    // ── Primary extraction: Gemini Vision reads the image directly ──────────
+    // Runs on every upload regardless of OCR quality. Direct image → JSON is
+    // more accurate than OCR text → AI because it avoids all OCR corruption.
+    try {
+      const visionData = await withTimeout(
+        extractTradeWithGeminiVision(sourceImage, { marketType }),
+        "Gemini Vision timeout"
+      ).catch((err) => {
+        logger.warn(`Gemini Vision failed | tradeId=${tradeId}`, { error: err.message });
+        return null;
       });
+
+      if (visionData) {
+        aiData = visionData;
+        aiRawResponse = visionData.rawResponse || "";
+        geminiVisionUsed = true;
+        logger.info(`Gemini Vision primary extraction succeeded | tradeId=${tradeId}`, { tradeId, marketType });
+
+        if (marketType === "Indian_Market") {
+          parsedTrade = mergeIndianAiData({}, aiData);
+          parsedTrades = mergeIndianAiTrades([], aiData?.trades || [], broker || aiData.broker || "");
+        } else {
+          parsedTrade = mergeGenericAiData({}, aiData);
+        }
+
+        logExtractedTrades({ tradeId, stage: "Gemini Vision extraction", parsedTrade, parsedTrades });
+      }
+    } catch (err) {
+      logger.warn(`Gemini Vision step error | tradeId=${tradeId}`, { error: err.message });
     }
 
-    logExtractedTrades({
-      tradeId,
-      stage: "Initial extraction",
-      parsedTrade,
-      parsedTrades,
-    });
+    // ── OCR-based parsing (runs when Gemini Vision unavailable or failed) ───
+    if (!geminiVisionUsed) {
+      if (marketType === "Indian_Market" && !weakOcr) {
+        parsedTrade = safeParseIndianTrade(cleanedText, { broker });
+        parsedTrades = safeParseTradesFromOCR(cleanedText, { broker });
+      } else if (!weakOcr) {
+        parsedTrade = safeParseTrade(cleanedText);
+        parsedTrades = safeParseForexTradesFromOCR(cleanedText);
+      } else {
+        logger.warn(`Weak OCR detected | tradeId=${tradeId} | switching to text AI fallback`, {
+          tradeId,
+          textLength: cleanedText.length,
+        });
+      }
+
+      logExtractedTrades({ tradeId, stage: "OCR-based extraction", parsedTrade, parsedTrades });
+    }
 
     let quality = marketType === "Indian_Market"
-      ? calculateIndianConfidenceScore({
-          parsedTrade,
-          parsedTrades,
-          ocrText: cleanedText,
-          broker,
-        })
-      : calculateConfidenceScore({
-          parsedTrade,
-          ocrText: cleanedText,
-        });
+      ? calculateIndianConfidenceScore({ parsedTrade, parsedTrades, ocrText: cleanedText, broker })
+      : calculateConfidenceScore({ parsedTrade, ocrText: cleanedText });
 
     logger.info(`Confidence score | tradeId=${tradeId}`, {
       tradeId,
       score: quality.score,
       isValid: quality.validation.isValid,
       isLowConfidence: quality.isLowConfidence,
+      source: geminiVisionUsed ? "gemini-vision" : "ocr",
     });
 
-    const shouldUseAi =
-      weakOcr ||
-      (marketType === "Indian_Market" ? isIndianExtractionWeak({ parsedTrade, parsedTrades }) : false) ||
-      !quality.validation.isValid ||
-      quality.isLowConfidence;
+    // ── Text AI fallback (only when Gemini Vision failed AND quality is low) ─
+    const shouldUseTextAi =
+      !geminiVisionUsed &&
+      (weakOcr ||
+        (marketType === "Indian_Market" ? isIndianExtractionWeak({ parsedTrade, parsedTrades }) : false) ||
+        !quality.validation.isValid ||
+        quality.isLowConfidence);
 
-    if (shouldUseAi) {
+    if (shouldUseTextAi) {
       try {
         aiData = await runAiWithRetry({
           marketType,
@@ -529,11 +583,11 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
           expectedMultiple: marketType === "Indian_Market" && ((parsedTrades && parsedTrades.length > 1) || /POSITIONS|HOLDINGS|CLOSED/i.test(cleanedText)),
         });
         aiRawResponse = aiData?.rawResponse || "";
-        
+
         if (aiRawResponse.length < 1000) {
-          logger.info(`AI output | tradeId=${tradeId}`, { response: aiRawResponse });
+          logger.info(`Text AI output | tradeId=${tradeId}`, { response: aiRawResponse });
         } else {
-          logger.info(`AI output | tradeId=${tradeId}`, { response: aiRawResponse.slice(0, 1000) });
+          logger.info(`Text AI output | tradeId=${tradeId}`, { response: aiRawResponse.slice(0, 1000) });
         }
 
         if (marketType === "Indian_Market") {
@@ -548,38 +602,24 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
           parsedTrades = safeParseForexTradesFromOCR(cleanedText);
         }
 
-        logExtractedTrades({
-          tradeId,
-          stage: "Post-AI extraction",
-          parsedTrade,
-          parsedTrades,
-        });
+        logExtractedTrades({ tradeId, stage: "Text AI extraction", parsedTrade, parsedTrades });
       } catch (error) {
         logger.error(`AI failure | tradeId=${tradeId}`, {
           tradeId,
           reason: error.message,
           stack: error.stack,
         });
-        // Preserve the real underlying error message (e.g. missing API key / empty response)
-        throw error.message === "Processing timeout" ? error : error;
+        throw error;
       }
 
       quality = marketType === "Indian_Market"
-        ? calculateIndianConfidenceScore({
-            parsedTrade,
-            parsedTrades,
-            ocrText: cleanedText,
-            broker,
-          })
-        : calculateConfidenceScore({
-            parsedTrade,
-            ocrText: cleanedText,
-          });
-      logger.info(`Confidence score after AI | tradeId=${tradeId}`, {
+        ? calculateIndianConfidenceScore({ parsedTrade, parsedTrades, ocrText: cleanedText, broker })
+        : calculateConfidenceScore({ parsedTrade, ocrText: cleanedText });
+
+      logger.info(`Confidence score after text AI | tradeId=${tradeId}`, {
         tradeId,
         score: quality.score,
         isValid: quality.validation.isValid,
-        isLowConfidence: quality.isLowConfidence,
       });
     }
 

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm run dev:watch)",
+      "Bash(npm run dev:all)",
+      "Bash(npm run worker)",
+      "Bash(adb devices)"
+    ],
+    "deny": []
+  }
+}

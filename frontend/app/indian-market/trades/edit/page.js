@@ -25,11 +25,11 @@ const C = {
   sans: "'Plus Jakarta Sans',sans-serif",
 };
 
-function InputField({ label, name, value, onChange, type = "text", options = null, placeholder = "" }) {
+function InputField({ label, name, value, onChange, type = "text", options = null, placeholder = "", required = false }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <label style={{ display: "block", fontSize: 10, letterSpacing: "0.14em", color: "#4A5568", marginBottom: 8, fontFamily: C.mono, fontWeight: 600 }}>
-        {label}
+        {label}{required && <span style={{ color: "#D63B3B", marginLeft: 2 }}>*</span>}
       </label>
       {options ? (
         <select
@@ -153,6 +153,23 @@ function IndianEditTradeContent() {
       alert("Trade date is required.");
       return;
     }
+    if (!formData.riskRewardRatio) {
+      alert("Select risk : reward ratio.");
+      return;
+    }
+    if (!formData.mood) {
+      alert("Select your mood.");
+      return;
+    }
+    if (!formData.confidence) {
+      alert("Select your confidence level.");
+      return;
+    }
+    const _emotionalTagsArr = String(formData.emotionalTags || "").split(",").map(t => t.trim()).filter(Boolean);
+    if (_emotionalTagsArr.length === 0) {
+      alert("Add at least one emotional tag.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -162,10 +179,9 @@ function IndianEditTradeContent() {
           followed: Boolean(rule.followed),
         }))
         .filter((rule) => rule.label);
-      const derivedPair =
-        formData.underlying && formData.strikePrice && formData.optionType
-          ? `${String(formData.underlying).trim()} ${String(formData.strikePrice).trim()} ${String(formData.optionType).trim()}`
-          : formData.pair;
+      const derivedPair = formData.underlying && formData.strikePrice && formData.optionType
+        ? `${String(formData.underlying).trim()} ${String(formData.strikePrice).trim()} ${String(formData.optionType).trim()}`
+        : formData.pair;
 
       await updateTrade(
         id,
@@ -239,8 +255,8 @@ function IndianEditTradeContent() {
 
           <form onSubmit={handleSubmit} style={{ padding: "24px 20px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="SYMBOL / PAIR" name="pair" value={formData.pair} onChange={handleChange} />
-              <InputField label="TRADE DATE" name="tradeDate" type="date" value={formData.tradeDate} onChange={handleChange} />
+              <InputField label="UNDERLYING / SYMBOL" name="underlying" value={formData.underlying} onChange={handleChange} />
+              <InputField label="TRADE DATE" name="tradeDate" type="date" value={formData.tradeDate} onChange={handleChange} required />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -249,18 +265,18 @@ function IndianEditTradeContent() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="UNDERLYING" name="underlying" value={formData.underlying} onChange={handleChange} />
               <InputField label="STRIKE PRICE" name="strikePrice" type="number" value={formData.strikePrice} onChange={handleChange} />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="QUANTITY" name="quantity" type="number" value={formData.quantity} onChange={handleChange} />
               <InputField label="LOT SIZE" name="lotSize" type="number" value={formData.lotSize} onChange={handleChange} />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="ENTRY PRICE" name="entryPrice" type="number" value={formData.entryPrice} onChange={handleChange} />
-              <InputField label="EXIT PRICE" name="exitPrice" type="number" value={formData.exitPrice} onChange={handleChange} />
+              <InputField label="QUANTITY (LOTS)" name="quantity" type="number" value={formData.quantity} onChange={handleChange} />
+              <InputField label="PROFIT / LOSS" name="profit" type="number" value={formData.profit} onChange={handleChange} />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <InputField label="ENTRY PRICE (PREMIUM)" name="entryPrice" type="number" value={formData.entryPrice} onChange={handleChange} />
+              <InputField label="EXIT PRICE (PREMIUM)" name="exitPrice" type="number" value={formData.exitPrice} onChange={handleChange} />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -269,14 +285,11 @@ function IndianEditTradeContent() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="PROFIT / LOSS" name="profit" type="number" value={formData.profit} onChange={handleChange} />
-              <InputField label="EXPIRY DATE" name="expiryDate" type="date" value={formData.expiryDate} onChange={handleChange} />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <InputField label="TRADE TYPE" name="tradeType" value={formData.tradeType} onChange={handleChange} options={[{ value: "INTRADAY", label: "INTRADAY" }, { value: "DELIVERY", label: "DELIVERY" }, { value: "SWING", label: "SWING" }]} />
               <InputField label="ENTRY BASIS" name="entryBasis" value={formData.entryBasis} onChange={handleChange} options={[{ value: "Plan", label: "Plan" }, { value: "Emotion", label: "Emotion" }, { value: "Impulsive", label: "Impulsive" }, { value: "Custom", label: "Custom" }, { value: "", label: "None" }]} />
             </div>
+
+            <InputField label="EXPIRY DATE" name="expiryDate" type="date" value={formData.expiryDate} onChange={handleChange} />
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <InputField label="ENTRY BASIS CUSTOM" name="entryBasisCustom" value={formData.entryBasisCustom} onChange={handleChange} />
@@ -284,7 +297,7 @@ function IndianEditTradeContent() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="RISK : REWARD" name="riskRewardRatio" value={formData.riskRewardRatio} onChange={handleChange} options={[{ value: "", label: "None" }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]} />
+              <InputField label="RISK : REWARD" name="riskRewardRatio" value={formData.riskRewardRatio} onChange={handleChange} options={[{ value: "", label: "Select…" }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]} required />
               <InputField label="CUSTOM R:R" name="riskRewardCustom" value={formData.riskRewardCustom} onChange={handleChange} />
             </div>
 
@@ -303,13 +316,14 @@ function IndianEditTradeContent() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: `1px solid ${C.purple}20`, background: `${C.purple}08` }}>
                 <span style={{ fontSize: 15 }}>🧠</span>
                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: C.purple, fontFamily: C.mono }}>PSYCHOLOGY</span>
+                <span style={{ fontSize: 9, color: "#D63B3B", fontWeight: 700, fontFamily: C.mono, letterSpacing: "0.08em", background: "#FFF0F0", padding: "2px 6px", borderRadius: 4 }}>REQUIRED</span>
               </div>
 
               <div style={{ padding: "16px" }}>
                 {/* Mood */}
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#4A5568", marginBottom: 10, fontFamily: C.mono, fontWeight: 600 }}>
-                    MOOD
+                    MOOD <span style={{ color: "#D63B3B" }}>*</span>
                   </div>
                   {(() => {
                     const moodLabels = ["", "Stressed", "Anxious", "Neutral", "Focused", "Peak Focus"];
@@ -353,7 +367,7 @@ function IndianEditTradeContent() {
 
                 {/* Confidence */}
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#4A5568", marginBottom: 10, fontFamily: C.mono, fontWeight: 600 }}>CONFIDENCE</div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#4A5568", marginBottom: 10, fontFamily: C.mono, fontWeight: 600 }}>CONFIDENCE <span style={{ color: "#D63B3B" }}>*</span></div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {[
                       { value: "Low",           color: C.bear   },
@@ -416,7 +430,7 @@ function IndianEditTradeContent() {
 
                 {/* Emotional Tags */}
                 <div>
-                  <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#4A5568", marginBottom: 10, fontFamily: C.mono, fontWeight: 600 }}>EMOTIONAL TAGS</div>
+                  <div style={{ fontSize: 10, letterSpacing: "0.14em", color: "#4A5568", marginBottom: 10, fontFamily: C.mono, fontWeight: 600 }}>EMOTIONAL TAGS <span style={{ color: "#D63B3B" }}>*</span></div>
                   {/* Quick-tap common tags */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                     {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Rushed", "Focused", "Frustrated", "Disciplined", "Impulsive"].map(tag => {

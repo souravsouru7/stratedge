@@ -1,8 +1,7 @@
 const mongoose = require("mongoose");
 
 /**
- * Indian Market — Options only (NSE/BSE F&O).
- * CE/PE, underlying, strike, expiry, premium, lots. Fully separate from Forex.
+ * Indian Market — Options (F&O) trades (NSE/BSE).
  */
 const indianTradeSchema = new mongoose.Schema(
   {
@@ -56,7 +55,6 @@ const indianTradeSchema = new mongoose.Schema(
     riskRewardCustom: { type: String, default: "" },
     screenshot: { type: String, default: "" },
 
-    // Options: F&O / OPTION (allow "" for legacy docs)
     segment: { type: String, enum: ["F&O", ""], default: "F&O" },
     instrumentType: { type: String, enum: ["OPTION", ""], default: "OPTION" },
 

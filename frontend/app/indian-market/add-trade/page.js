@@ -164,6 +164,26 @@ export default function IndianOptionsAddTradePage() {
       alert("Select trade date.");
       return;
     }
+    if (!trade.riskRewardRatio) {
+      alert("Select planned risk : reward ratio.");
+      return;
+    }
+    if (trade.riskRewardRatio === "custom" && !trade.riskRewardCustom?.trim()) {
+      alert("Enter your custom risk : reward ratio.");
+      return;
+    }
+    if (!trade.mood) {
+      alert("Select how you're feeling (mood).");
+      return;
+    }
+    if (!trade.confidence) {
+      alert("Select your confidence level.");
+      return;
+    }
+    if (!trade.emotionalTags || trade.emotionalTags.length === 0) {
+      alert("Select at least one emotional tag.");
+      return;
+    }
 
     const pair = `${underlyingLabel.trim()} ${strike} ${trade.optionType}`;
     const tradeData = {
@@ -171,6 +191,8 @@ export default function IndianOptionsAddTradePage() {
       underlying: underlyingLabel.trim(),
       strikePrice: parseFloat(strike),
       optionType: trade.optionType,
+      segment: "F&O",
+      instrumentType: "OPTION",
       type: trade.type,
       quantity: parseFloat(qty),
       lotSize: getLotSize(),
@@ -231,7 +253,7 @@ export default function IndianOptionsAddTradePage() {
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          
+
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Underlying</label>
@@ -301,7 +323,7 @@ export default function IndianOptionsAddTradePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Trade Date</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Trade Date <span style={{ color: "#D63B3B" }}>*</span></label>
               <input name="tradeDate" type="date" value={trade.tradeDate} onChange={handleChange} required style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
             </div>
 
@@ -416,7 +438,7 @@ export default function IndianOptionsAddTradePage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Planned Risk : Reward</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Planned Risk : Reward <span style={{ color: "#D63B3B" }}>*</span></label>
               <select
                 name="riskRewardRatio"
                 value={trade.riskRewardRatio}
@@ -506,11 +528,11 @@ export default function IndianOptionsAddTradePage() {
             <div style={{ background: "#FFFFFF", borderRadius: 12, padding: 20, border: "1px solid #E2E8F0" }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#0F1923", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
                 <span>🧠</span> TRADE PSYCHOLOGY
-                <span style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", background: "#F8FAFC", padding: "2px 6px", borderRadius: 4 }}>OPTIONAL</span>
+                <span style={{ fontSize: 9, color: "#D63B3B", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.08em", background: "#FFF0F0", padding: "2px 6px", borderRadius: 4 }}>REQUIRED</span>
               </div>
 
               <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>HOW ARE YOU FEELING?</label>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>HOW ARE YOU FEELING? <span style={{ color: "#D63B3B" }}>*</span></label>
                 <div style={{ display: "flex", gap: 8 }}>
                   {[
                     { emoji: "😰", val: 1, label: "Stressed" },
@@ -543,7 +565,7 @@ export default function IndianOptionsAddTradePage() {
               </div>
 
               <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 6, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>CONFIDENCE LEVEL</label>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 6, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>CONFIDENCE LEVEL <span style={{ color: "#D63B3B" }}>*</span></label>
                 <select
                   name="confidence"
                   value={trade.confidence}
@@ -559,7 +581,7 @@ export default function IndianOptionsAddTradePage() {
               </div>
 
               <div style={{ marginBottom: 18 }}>
-                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>EMOTIONAL TAGS</label>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: theme.muted, marginBottom: 8, fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: "0.05em" }}>EMOTIONAL TAGS <span style={{ color: "#D63B3B" }}>*</span></label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {["FOMO", "Revenge", "Fear", "Greed", "Calm", "Bored", "Focused", "Frustrated"].map(tag => {
                     const selected = (trade.emotionalTags || []).includes(tag);

@@ -54,7 +54,6 @@ exports.createTrade = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Option type must be CE or PE", "VALIDATION_ERROR");
   }
 
-    // Build pair from underlying + strike + optionType if not provided
   let symbol = pair;
   if (!symbol && underlying && strikePrice != null) {
     symbol = `${String(underlying).trim()} ${strikePrice} ${ot}`;
@@ -62,6 +61,7 @@ exports.createTrade = asyncHandler(async (req, res) => {
   if (!symbol) {
     throw new ApiError(400, "Symbol is required (provide pair or underlying + strike + optionType)", "VALIDATION_ERROR");
   }
+
   if (!tradeDate) {
     throw new ApiError(400, "Trade date is required", "VALIDATION_ERROR");
   }
@@ -72,7 +72,7 @@ exports.createTrade = asyncHandler(async (req, res) => {
     type: type.toUpperCase(),
     optionType: ot,
     tradeDate: normalizeTradeDate(tradeDate),
-    user: req.user._id
+    user: req.user._id,
   });
 
   await clearUserCache(req.user._id);
@@ -116,18 +116,21 @@ exports.updateTrade = asyncHandler(async (req, res) => {
   if (type && !validTypes.includes(type.toUpperCase())) {
     throw new ApiError(400, "Type must be BUY or SELL", "VALIDATION_ERROR");
   }
-    const trade = await IndianTrade.findOneAndUpdate(
-      { _id: req.params.id, user: req.user._id },
-      { ...req.body, ...(tradeDate && { tradeDate: normalizeTradeDate(tradeDate) }), ...(type && { type: type.toUpperCase() }) },
-      {
-        returnDocument: "after",
-        // Allow "save after OCR" to upsert the first trade (jobId is an OCR id,
-        // not an existing IndianTrade _id yet).
-        upsert: true,
-        runValidators: true,
-        setDefaultsOnInsert: true
-      }
-    );
+
+  const trade = await IndianTrade.findOneAndUpdate(
+    { _id: req.params.id, user: req.user._id },
+    {
+      ...req.body,
+      ...(tradeDate && { tradeDate: normalizeTradeDate(tradeDate) }),
+      ...(type && { type: type.toUpperCase() }),
+    },
+    {
+      returnDocument: "after",
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true
+    }
+  );
 
   if (!trade) {
     throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");

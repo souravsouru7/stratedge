@@ -3,6 +3,18 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.edgecpline"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    signingConfigs {
+        release {
+            if (project.hasProperty('MYAPP_RELEASE_STORE_FILE')) {
+                storeFile file(MYAPP_RELEASE_STORE_FILE)
+                storePassword MYAPP_RELEASE_STORE_PASSWORD
+                keyAlias MYAPP_RELEASE_KEY_ALIAS
+                keyPassword MYAPP_RELEASE_KEY_PASSWORD
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "com.edgecpline"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -18,8 +30,8 @@ android {
     }
     buildTypes {
         release {
-            // Keep release stable while integrating Capacitor/Firebase plugins.
-            // R8/resource shrinking can strip required classes/resources and cause black-screen startup crashes.
+            signingConfig signingConfigs.release
+            // R8/resource shrinking can strip required Capacitor/Firebase classes — keep disabled until thoroughly tested.
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
