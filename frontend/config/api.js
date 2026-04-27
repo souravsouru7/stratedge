@@ -20,11 +20,14 @@ function normalizeApiBaseUrl(value) {
     ? raw.replace(/\/+$/, "")
     : `http://${raw.replace(/^\/+/, "").replace(/\/+$/, "")}`;
 
-  if (isCapacitorRuntime() && isLocalhostUrl(normalized)) {
+  // Guard against env vars that include the /api suffix.
+  const withoutApiSuffix = normalized.replace(/\/api$/i, "");
+
+  if (isCapacitorRuntime() && isLocalhostUrl(withoutApiSuffix)) {
     return DEFAULT_REMOTE_API_BASE_URL;
   }
 
-  return normalized;
+  return withoutApiSuffix;
 }
 
 export const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);

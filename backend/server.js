@@ -59,37 +59,69 @@ startDataCleanupCron();
 
 const app = express();
 
-app.use(cors({
+const normalizeOrigin = (value) => {
+  if (!value) return "";
+  try {
+    return new URL(value).origin.toLowerCase();
+  } catch {
+    return String(value).trim().replace(/\/+$/, "").toLowerCase();
+  }
+};
+
+const isAllowedProductionOrigin = (origin) => {
+  if (!origin) return true;
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  const staticAllowedOrigins = new Set([
+    "https://stratedge.live",
+    "https://www.stratedge.live",
+  ]);
+
+  if (staticAllowedOrigins.has(normalizedOrigin)) {
+    return true;
+  }
+
+  // Allow known Stratedge subdomains used for production web/app clients.
+  return /^https:\/\/([a-z0-9-]+\.)?stratedge\.live$/i.test(normalizedOrigin);
+};
+
+const corsOptions = {
   origin: function (origin, callback) {
-    // In development, avoid blocking the frontend with CORS when using localhost
-    // or local network IPs (e.g. 192.168.x.x). Production uses an allow-list below.
+    // In development, allow all origins (localhost, LAN IPs, etc.)
     if (appConfig.env !== "production") {
       return callback(null, true);
     }
 
-    const allowedOrigins = appConfig.cors.allowedOrigins;
+    const allowedOrigins = appConfig.cors.allowedOrigins.map((item) => normalizeOrigin(item));
+    const normalizedOrigin = normalizeOrigin(origin);
 
-    // Hardcode production domains to ensure they are always allowed
-    const productionOrigins = [
-      'https://stratedge.live',
-      'https://www.stratedge.live'
-    ];
-
-    // Optional debug log for CORS troubleshooting (disabled by default).
     if (appConfig.cors.debug) {
-      console.log(`CORS Check | Origin: ${origin} | Allowed: ${allowedOrigins.join(", ")}`);
+      console.log(`CORS Check | Origin: ${origin} | Normalized: ${normalizedOrigin} | AllowedList: ${allowedOrigins.join(", ")}`);
     }
 
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin || allowedOrigins.includes(origin) || productionOrigins.includes(origin) || origin.startsWith('http://localhost') || origin.startsWith('https://localhost') || origin.startsWith('capacitor://localhost')) {
+    // Allow requests with no origin (mobile apps, curl, Capacitor)
+    if (
+      !origin ||
+      isAllowedProductionOrigin(origin) ||
+      allowedOrigins.includes(normalizedOrigin) ||
+      normalizedOrigin.startsWith("http://localhost") ||
+      normalizedOrigin.startsWith("https://localhost") ||
+      String(origin).startsWith("capacitor://localhost")
+    ) {
       callback(null, true);
     } else {
       console.warn(`CORS Rejected | Origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     }
   },
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+// Handle OPTIONS preflight requests explicitly before any other middleware
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 
 // HTTP security headers
 app.use(helmet());
