@@ -50,14 +50,6 @@ const isMobileBrowser = () => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
-const shouldUseRedirectForWebGoogle = () => {
-  // Use env override only; default popup keeps compatibility with Google secure-browser checks.
-  const envOverride = process.env.NEXT_PUBLIC_FIREBASE_GOOGLE_WEB_FLOW;
-  if (envOverride === "popup") return false;
-  if (envOverride === "redirect") return true;
-  return false;
-};
-
 // Native Google Sign-In via @capacitor-firebase/authentication
 const signInWithNativeGoogle = async () => {
   let FirebaseAuthentication;
@@ -110,7 +102,7 @@ const signInWithWebGoogle = async () => {
   provider.addScope("email");
   provider.addScope("profile");
 
-  if (isMobileBrowser() || shouldUseRedirectForWebGoogle()) {
+  if (isMobileBrowser()) {
     setRedirectPending();
     await signInWithRedirect(auth, provider);
     return null; // page reloads; result handled in handleGoogleRedirectResult
