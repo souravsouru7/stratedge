@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { loginUser, googleLogin, testConnection as apiTestConnection } from "@/services/api";
-import { signInWithFirebaseGoogle, handleGoogleRedirectResult } from "@/services/firebaseAuth";
+import {
+  signInWithFirebaseGoogle,
+  handleGoogleRedirectResult,
+  recoverFirebaseSessionIdToken,
+} from "@/services/firebaseAuth";
 
 /**
  * useLogin
@@ -28,8 +32,10 @@ export function useLogin() {
     const token = typeof window !== "undefined" && localStorage.getItem("token");
     if (token) { router.push("/dashboard"); return; }
 
-    // Pick up the idToken after a mobile redirect Google sign-in
+    // Pick up the idToken after a mobile redirect Google sign-in.
+    // Fallback to an existing Firebase session when redirect result is empty.
     handleGoogleRedirectResult()
+      .then(async (idToken) => idToken || recoverFirebaseSessionIdToken())
       .then(idToken => { if (idToken) return googleLogin(idToken); })
       .then(data => { if (data) handleAuthSuccess(data); })
       .catch(err => alert("Google login failed: " + (err?.message || err)));

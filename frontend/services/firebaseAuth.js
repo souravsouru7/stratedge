@@ -37,7 +37,13 @@ const getFirebaseApp = () => {
 const getFirebaseAuth = async () => {
   const auth = getAuth(getFirebaseApp());
   if (!isCapacitorApp()) {
-    await setPersistence(auth, browserLocalPersistence);
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+    } catch (err) {
+      // Some mobile browsers can block persistence APIs during redirects.
+      // Keep auth usable even if persistence cannot be explicitly set.
+      console.warn("[GoogleAuth] setPersistence failed, continuing:", err?.message || err);
+    }
   }
   return auth;
 };
@@ -130,6 +136,13 @@ export const handleGoogleRedirectResult = async () => {
     console.error("[GoogleAuth] redirect result error:", err);
     throw err;
   }
+};
+
+export const recoverFirebaseSessionIdToken = async () => {
+  const auth = await getFirebaseAuth();
+  const currentUser = auth.currentUser;
+  if (!currentUser) return null;
+  return currentUser.getIdToken();
 };
 
 export const signInWithFirebaseGoogle = async () => {
