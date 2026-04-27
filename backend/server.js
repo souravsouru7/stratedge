@@ -119,8 +119,9 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Handle OPTIONS preflight requests explicitly before any other middleware
-app.options('*', cors(corsOptions));
+// Handle OPTIONS preflight requests explicitly before any other middleware.
+// Express/path-to-regexp in this stack rejects "*" as a route path.
+app.options(/.*/, cors(corsOptions));
 app.use(cors(corsOptions));
 
 // HTTP security headers
