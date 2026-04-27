@@ -218,7 +218,7 @@ function UploadCard({ state }) {
       >
         {loading ? (
           <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            {processingStatus === "pending" ? "UPLOAD RECEIVED..." : processingStatus === "processing" ? "PROCESSING TRADE..." : "EXTRACTING TRADE DATA..."}</>
+            {processingStatus === "uploading" ? "UPLOADING SCREENSHOT..." : processingStatus === "pending" ? "QUEUED FOR EXTRACTION..." : "EXTRACTING TRADE DATA..."}</>
         ) : (
           <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>EXTRACT TRADE DATA</>
         )}
@@ -630,6 +630,13 @@ function UploadTradeContent() {
   const { isInd, mounted, loading, processingStatus, trade, trades, savedTrades, savingAll, saveAllTrades, tradeCount } = state;
   const visibleTradeCount = trades.length > 1 ? trades.length : tradeCount;
   const parseProfitValue = (value) => parseFloat(String(value || 0).replace(/,/g, "")) || 0;
+  const extractionStepMap = {
+    uploading: { label: "Uploading screenshot", hint: "Securely sending image to server", progress: 25 },
+    pending: { label: "Queued for extraction", hint: "Preparing OCR and AI pipeline", progress: 45 },
+    processing: { label: "Extracting trade details", hint: "Reading image, parsing fields, validating output", progress: 75 },
+    completed: { label: "Extraction completed", hint: "Finalizing extracted data", progress: 100 },
+  };
+  const extractionStep = extractionStepMap[processingStatus] || extractionStepMap.processing;
 
   // Auto-scroll to psychology section when extraction completes
   const psychologyRef = useRef(null);
@@ -673,11 +680,35 @@ function UploadTradeContent() {
 
           {/* Processing spinner */}
           {loading && (
-            <SectionCard accentColor="#B8860B" title="" subtitle="" delay={0.1}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 0", gap: 14 }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#B8860B" strokeWidth="2.5" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                <div style={{ fontSize: 12, color: "#94A3B8", letterSpacing: "0.12em", ...monoStyle }}>
-                  {processingStatus === "pending" ? "UPLOAD RECEIVED..." : processingStatus === "processing" ? "PROCESSING TRADE..." : "EXTRACTING TRADE DATA..."}
+            <SectionCard accentColor="#B8860B" title="Extraction In Progress" subtitle="AI is analyzing your screenshot" delay={0.1}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "8px 0 4px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(184,134,11,0.25)", borderTopColor: "#B8860B", animation: "spin 1s linear infinite" }} />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#0F1923" }}>{extractionStep.label}</div>
+                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{extractionStep.hint}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#B8860B", ...monoStyle }}>
+                    {extractionStep.progress}%
+                  </div>
+                </div>
+
+                <div style={{ height: 8, borderRadius: 999, background: "#F1F5F9", overflow: "hidden", border: "1px solid #E2E8F0" }}>
+                  <div
+                    style={{
+                      width: `${extractionStep.progress}%`,
+                      height: "100%",
+                      borderRadius: 999,
+                      background: "linear-gradient(90deg,#B8860B,#D4A917)",
+                      transition: "width 400ms ease",
+                    }}
+                  />
+                </div>
+
+                <div style={{ fontSize: 10, color: "#94A3B8", ...monoStyle, letterSpacing: "0.06em" }}>
+                  PLEASE KEEP THIS SCREEN OPEN UNTIL EXTRACTION FINISHES
                 </div>
               </div>
             </SectionCard>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createTrade } from "@/services/tradeApi";
 import Link from "next/link";
@@ -30,6 +30,7 @@ const LOT_SIZES = { "NIFTY": 25, "BANK NIFTY": 15, "FIN NIFTY": 25, "MIDCPNIFTY"
 
 export default function IndianOptionsAddTradePage() {
   const router = useRouter();
+  const submitLockRef = useRef(false);
   const [trade, setTrade] = useState({
     underlying: "NIFTY",
     underlyingOther: "",
@@ -140,6 +141,9 @@ export default function IndianOptionsAddTradePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitLockRef.current || loading) {
+      return;
+    }
     const underlyingLabel = getUnderlyingLabel();
     if (!underlyingLabel?.trim()) {
       alert("Select or enter underlying (e.g. NIFTY).");
@@ -224,6 +228,7 @@ export default function IndianOptionsAddTradePage() {
     tradeData.setupRules = activeRules.map(({ label, followed }) => ({ label: label.trim(), followed }));
     tradeData.setupScore = setupScore;
 
+    submitLockRef.current = true;
     setLoading(true);
     try {
       const result = await createTrade(tradeData, MARKETS.INDIAN_MARKET);
@@ -236,6 +241,7 @@ export default function IndianOptionsAddTradePage() {
     } catch (err) {
       alert(err.message || "Failed to save.");
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };

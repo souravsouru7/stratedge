@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTrade } from "@/services/tradeApi";
@@ -67,6 +67,7 @@ export function useAddTrade(marketType, isIndianMarket) {
   const [uploading, setUploading] = useState(false);
   const [setupRules, setSetupRules] = useState([]);
   const [mounted, setMounted] = useState(false);
+  const submitLockRef = useRef(false);
 
   // 1. Fetch Setups Strategy via useQuery
   const { data: strategies = [], isLoading: setupsLoading } = useQuery({
@@ -102,6 +103,9 @@ export function useAddTrade(marketType, isIndianMarket) {
     },
     onError: (err) => {
       addToast(err.message || "Failed to save trade. Please check your inputs.", "error");
+    },
+    onSettled: () => {
+      submitLockRef.current = false;
     },
   });
 
@@ -167,6 +171,9 @@ export function useAddTrade(marketType, isIndianMarket) {
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
+    if (submitLockRef.current || createTradeMutation.isPending) {
+      return;
+    }
     if (!trade.pair) {
       addToast(`Please enter a ${isIndianMarket ? "Symbol" : "Pair"}`, "info");
       return;
@@ -196,6 +203,7 @@ export function useAddTrade(marketType, isIndianMarket) {
     tradeData.setupRules = activeRules.map(r => ({ label: r.label.trim(), followed: r.followed }));
     tradeData.setupScore = activeRules.length ? Math.round((activeRules.filter(r => r.followed).length / activeRules.length) * 100) : null;
 
+    submitLockRef.current = true;
     createTradeMutation.mutate(tradeData);
   };
 

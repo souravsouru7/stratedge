@@ -420,8 +420,10 @@ export function useUploadTrade() {
     }
   }, [jobStatusQuery.error]);
 
-  const loading = uploadJobMutation.isPending || (!!jobId && jobStatusQuery.isLoading) || jobStatusQuery.isFetching;
-  const processingStatus = uploadJobMutation.isPending ? "uploading" : jobStatusQuery.data?.status || (!!jobId ? "processing" : "");
+  const loading = uploadJobMutation.isPending || !!jobId;
+  const processingStatus = uploadJobMutation.isPending
+    ? "uploading"
+    : (jobStatusQuery.data?.status || (jobId ? "processing" : ""));
 
   // 7. Save Mutation
   const saveTradeMutation = useMutation({
