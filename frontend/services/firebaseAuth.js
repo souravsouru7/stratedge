@@ -10,6 +10,7 @@ import {
   signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
+  signOut,
 } from "firebase/auth";
 
 const getFirebaseConfig = () => {
@@ -150,4 +151,13 @@ export const signInWithFirebaseGoogle = async () => {
     return signInWithNativeGoogle();
   }
   return signInWithWebGoogle();
+};
+
+export const signOutFirebase = async () => {
+  try {
+    const auth = await getFirebaseAuth();
+    await signOut(auth);
+  } catch (err) {
+    console.warn("[GoogleAuth] signOut failed:", err?.message || err);
+  }
 };

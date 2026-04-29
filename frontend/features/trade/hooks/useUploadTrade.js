@@ -83,6 +83,11 @@ const toNum = (value) => {
   const n = Number.parseFloat(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : null;
 };
+const parseOptionalNumber = (value) => {
+  if (value == null) return undefined;
+  const n = Number.parseFloat(String(value).replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : undefined;
+};
 
 const normalizeText = (value) => String(value ?? "").trim().toUpperCase();
 
@@ -122,6 +127,66 @@ const dedupeParsedTrades = (rawTrades) => {
   }
   return unique;
 };
+
+const inferIndianTradeSubTypeFromPayload = (payload) => {
+  const rows = [
+    payload?.parsedData?.parsedTrade || payload?.parsedTrade || null,
+    ...(payload?.parsedData?.parsedTrades || payload?.parsedTrades || []),
+  ].filter(Boolean);
+
+  if (rows.length === 0) return null;
+
+  const hasOptionSignals = rows.some((row) => {
+    const pair = String(row?.pair || "").toUpperCase();
+    const optionType = String(row?.optionType || "").toUpperCase();
+    return (
+      optionType === "CE" ||
+      optionType === "PE" ||
+      row?.strikePrice != null ||
+      /\b(CE|PE|CALL|PUT|FUT)\b/.test(pair)
+    );
+  });
+  if (hasOptionSignals) return "OPTION";
+
+  const hasEquitySignals = rows.some((row) => {
+    const instrumentType = String(row?.instrumentType || "").toUpperCase();
+    return (
+      instrumentType === "EQUITY" ||
+      !!row?.stockSymbol ||
+      row?.sharesQty != null ||
+      row?.exchange === "NSE" ||
+      row?.exchange === "BSE"
+    );
+  });
+  if (hasEquitySignals) return "EQUITY";
+
+  return null;
+};
+
+function buildEquityTradeTemplate(imageUrl, t = {}) {
+  return {
+    pair: t.stockSymbol || t.pair || "",
+    stockSymbol: t.stockSymbol || "",
+    exchange: t.exchange || "NSE",
+    sharesQty: t.sharesQty != null ? String(t.sharesQty) : "",
+    action: (t.type || t.action || "buy").toLowerCase(),
+    entryPrice: t.entryPrice != null ? String(t.entryPrice) : "",
+    exitPrice: t.exitPrice != null ? String(t.exitPrice) : "",
+    profit: t.profit != null ? String(t.profit) : "",
+    sector: t.sector || "",
+    screenshot: imageUrl,
+    instrumentType: "EQUITY",
+    segment: "EQUITY",
+    tradeType: "INTRADAY",
+    strategy: "", strategyCustom: "",
+    tradeDate: normalizeDateForInput(t.tradeDate) || getTodayInputValue(),
+    brokerage: "", sttTaxes: "",
+    entryBasis: "Plan", entryBasisCustom: "",
+    setup: "", mistakeTag: "", lesson: "", notes: "",
+    mood: null, confidence: "", emotionalTags: [], wouldRetake: "",
+    setupRules: [],
+  };
+}
 
 function buildForexTradeTemplate(imageUrl, t = {}) {
   return {
@@ -179,7 +244,22 @@ function buildTradePayload(trade, isInd, setupRules) {
     setupScore,
   };
 
-  if (isInd) {
+  if (isInd && trade.instrumentType === "EQUITY") {
+    Object.assign(base, {
+      instrumentType: "EQUITY",
+      segment: "EQUITY",
+      tradeType: "INTRADAY",
+      stockSymbol: (trade.stockSymbol || trade.pair || "").toUpperCase(),
+      exchange: trade.exchange || "NSE",
+      sharesQty: parseOptionalNumber(trade.sharesQty),
+      sector: trade.sector || undefined,
+      setup: trade.setup || undefined,
+      mistakeTag: trade.mistakeTag || undefined,
+      lesson: trade.lesson || undefined,
+      brokerage: trade.brokerage ? parseFloat(trade.brokerage) : undefined,
+      sttTaxes: trade.sttTaxes ? parseFloat(trade.sttTaxes) : undefined,
+    });
+  } else if (isInd) {
     Object.assign(base, {
       optionType: (trade.optionType || "CE").toUpperCase(),
       quantity: trade.quantity ? parseFloat(trade.quantity) : undefined,
@@ -247,6 +327,9 @@ export function useUploadTrade() {
   const [jobId, setJobId]                     = useState("");
   const [uploadedTradeId, setUploadedTradeId] = useState(null); // original ghost trade ID from upload
   const [broker, setBroker]                   = useState("AUTO");
+  const [tradeSubType, setTradeSubType]       = useState(
+    searchParams?.get("type") === "EQUITY" ? "EQUITY" : "OPTION"
+  );
   const [trade, setTrade]                     = useState(null);
   const [trades, setTrades]                   = useState([]);
   const [savedTrades, setSavedTrades]         = useState([]);
@@ -268,7 +351,7 @@ export function useUploadTrade() {
 
   // 5. Initial Image Upload Mutation
   const uploadJobMutation = useMutation({
-    mutationFn: (fileObj) => uploadTradeImage({ file: fileObj, marketType, broker: isInd ? broker : "" }),
+    mutationFn: (fileObj) => uploadTradeImage({ file: fileObj, marketType, broker: isInd ? broker : "", tradeSubType: isInd ? tradeSubType : undefined }),
     onSuccess: (res) => {
       const tradeId = String(res.jobId || "");
       setJobId(tradeId);
@@ -308,24 +391,51 @@ export function useUploadTrade() {
     setExtractedText(payload?.extractedText || "");
 
     if (isInd) {
+      const backendSubType = String(payload?.tradeSubType || "").toUpperCase();
+      const inferredSubType = inferIndianTradeSubTypeFromPayload(payload);
+      const resolvedSubType =
+        backendSubType === "EQUITY" || backendSubType === "OPTION"
+          ? backendSubType
+          : inferredSubType || tradeSubType;
+
+      if (resolvedSubType !== tradeSubType) {
+        setTradeSubType(resolvedSubType);
+      }
+
+      const isEquity = resolvedSubType === "EQUITY";
+      const templateFn = isEquity ? buildEquityTradeTemplate : buildIndianTradeTemplate;
       const multiTrades = parsedTradesPayload || [];
       if (multiTrades.length > 1) {
-        const tradeArr = multiTrades.map(t => applyDefaultSetup(buildIndianTradeTemplate(imageUrl, t), strategies));
+        const tradeArr = multiTrades.map(t => applyDefaultSetup(templateFn(imageUrl, t), strategies));
         setTrades(tradeArr);
         setSavedTrades(new Array(tradeArr.length).fill(false));
         setTrade(tradeArr[0]);
-        // Load default setup rules into checklist
         if (strategies?.[0]?.rules?.length) {
           setSetupRules(strategies[0].rules.map((r, i) => ({ id: r.id ?? i + 1, label: r.label, followed: false })));
         }
       } else {
         setTrades([]);
         setSavedTrades([]);
-        const single = multiTrades[0] || p;
-        const pairStr = (single.pair || "").trim().toUpperCase();
-        const ot = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (single.optionType || "CE");
-        const base = { ...buildIndianTradeTemplate(imageUrl, single), optionType: ot.toUpperCase() };
-        setTrade(applyDefaultSetup(base, strategies));
+        const row = multiTrades[0] || {};
+        // Merge row-level data (entryPrice from "Avg") with top-level parsedTrade
+        // (profit from "+₹1,618.50"). The row wins for per-position fields;
+        // parsedTrade fills in anything the row missed — except exitPrice which
+        // on open-position screens is the market/LTP price, not an actual exit.
+        const single = {
+          ...p,
+          ...row,
+          profit: row.pnl ?? row.profit ?? p.profit ?? null,
+          entryPrice: row.entryPrice ?? p.entryPrice ?? null,
+        };
+        if (isEquity) {
+          const base = buildEquityTradeTemplate(imageUrl, single);
+          setTrade(applyDefaultSetup(base, strategies));
+        } else {
+          const pairStr = (single.pair || "").trim().toUpperCase();
+          const ot = pairStr.endsWith(" PE") ? "PE" : pairStr.endsWith(" CE") ? "CE" : (single.optionType || "CE");
+          const base = { ...buildIndianTradeTemplate(imageUrl, single), optionType: ot.toUpperCase() };
+          setTrade(applyDefaultSetup(base, strategies));
+        }
         if (strategies?.[0]?.rules?.length) {
           setSetupRules(strategies[0].rules.map((r, i) => ({ id: r.id ?? i + 1, label: r.label, followed: false })));
         }
@@ -510,6 +620,13 @@ export function useUploadTrade() {
       addToast("Trade date is required before saving", "info");
       return false;
     }
+    if (isInd && tradeToSave?.instrumentType === "EQUITY") {
+      const sharesQty = parseOptionalNumber(tradeToSave?.sharesQty);
+      if (sharesQty == null || sharesQty <= 0) {
+        addToast("Shares quantity is required for equity trades", "info");
+        return false;
+      }
+    }
     return true;
   };
 
@@ -517,7 +634,7 @@ export function useUploadTrade() {
     file, setFile, trade, setTrade, trades, savedTrades, loading, error, setError,
     extractedText, strategies, setupsLoading, jobId, processingStatus, mounted, saved,
     showCustomRR, setShowCustomRR, broker, setBroker, setupRules, isInd, marketType,
-    tradeCount,
+    tradeCount, tradeSubType, setTradeSubType,
     savingAll: saveTradeMutation.isPending,
     handleUpload,
     handleChange,

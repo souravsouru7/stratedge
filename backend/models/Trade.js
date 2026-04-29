@@ -74,6 +74,13 @@ const tradeSchema = new mongoose.Schema(
       default: "Forex"
     },
 
+    // For Indian_Market: "OPTION" (default) or "EQUITY" (intraday stocks)
+    tradeSubType: {
+      type: String,
+      enum: ["OPTION", "EQUITY", ""],
+      default: ""
+    },
+
     broker: {
       type: String,
       default: ""

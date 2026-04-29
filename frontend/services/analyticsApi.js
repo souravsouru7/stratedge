@@ -99,51 +99,53 @@ const fetchWithRateLimitRetry = async (url, options, maxRetries = 4) => {
   return null;
 };
 
+const itParam = (instrumentType) => instrumentType ? `&instrumentType=${instrumentType}` : '';
+
 // Basic Analytics
-export const getSummary = async (marketType = 'Forex') => {
+export const getSummary = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/summary?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/summary?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getWeeklyStats = async (marketType = 'Forex') => {
+export const getWeeklyStats = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/weekly?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/weekly?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
 // Advanced Analytics
-export const getRiskRewardAnalysis = async (marketType = 'Forex') => {
+export const getRiskRewardAnalysis = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/risk-reward?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/risk-reward?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getTradeDistribution = async (marketType = 'Forex') => {
+export const getTradeDistribution = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/distribution?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/distribution?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getPerformanceMetrics = async (marketType = 'Forex') => {
+export const getPerformanceMetrics = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/performance?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/performance?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getTimeAnalysis = async (marketType = 'Forex', range = 'all') => {
+export const getTimeAnalysis = async (marketType = 'Forex', range = 'all', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/time-analysis?marketType=${marketType}&range=${encodeURIComponent(range)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/time-analysis?marketType=${marketType}&range=${encodeURIComponent(range)}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getTradeQuality = async (marketType = 'Forex') => {
+export const getTradeQuality = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/quality?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/quality?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getDrawdownAnalysis = async (marketType = 'Forex') => {
+export const getDrawdownAnalysis = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/drawdown?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/drawdown?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getAIInsights = async (marketType = 'Forex') => {
+export const getAIInsights = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/ai-insights?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/ai-insights?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
 // All-in-one advanced analytics
@@ -152,12 +154,12 @@ export const getAdvancedAnalytics = async (marketType = 'Forex') => {
   return fetchWithRateLimitRetry(`${baseUrl}/analytics/advanced?marketType=${marketType}`, getAuthHeaders());
 };
 
-export const getPnLBreakdown = async (marketType = 'Forex') => {
+export const getPnLBreakdown = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/pnl-breakdown?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/pnl-breakdown?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };
 
-export const getPsychologyAnalytics = async (marketType = 'Forex') => {
+export const getPsychologyAnalytics = async (marketType = 'Forex', instrumentType = '') => {
   const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/psychology?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(`${baseUrl}/analytics/psychology?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
 };

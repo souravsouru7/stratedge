@@ -1,3 +1,5 @@
+const { logger } = require("../utils/logger");
+
 function parseForexLot(rawLot) {
   if (rawLot == null) return null;
   const cleaned = String(rawLot)
@@ -329,54 +331,87 @@ exports.parseForexTradesFromOCR = (text) => {
     }
   }
 
-  console.log("[Forex Parser] Total OCR lines:", lines.length);
-  console.log("[Forex Parser] Detected trade headers:", detectedHeaders.length);
-  if (detectedHeaders.length > 0) {
-    detectedHeaders.forEach((header, index) => {
-      console.log(`[Forex Parser] Header ${index + 1}: ${header}`);
-    });
-  }
+  logger.debug("[Forex Parser] OCR scan complete", { totalLines: lines.length, detectedHeaders: detectedHeaders.length, headers: detectedHeaders });
 
   if (blocks.length === 0) return [];
 
   const parsed = blocks
-    .map((block, index) => {
-      console.log(`[Forex Parser] Block ${index + 1} lines (${block.length}):`, JSON.stringify(block));
-      const trade = exports.parseTrade(block.join("\n"));
-      console.log(`[Forex Parser] Parsed trade ${index + 1}:`, JSON.stringify(trade));
-      return trade;
-    })
+    .map((block) => exports.parseTrade(block.join("\n")))
     .filter((trade) => trade.pair && (trade.entryPrice != null || trade.profit != null));
 
-  console.log("[Forex Parser] Final parsed trades count:", parsed.length);
+  logger.debug("[Forex Parser] Final parsed trades", { count: parsed.length });
   return parsed;
 };
 
-// Common OCR typos: strike price correction for Indian indices
+// Common OCR typos: strike price correction for Indian indices.
+// Ranges are kept deliberately wide to absorb future market levels without code changes.
 const STRIKE_CORRECTIONS = {
-  "2100": "26000", "21000": "26000", "2600": "26000", "2610": "26100", "4700": "47000",
+  // NIFTY — OCR drops a digit (24450 → 2445) or swaps first two (24450 → 42450)
+  "2100": "26000", "21000": "26000",
+  "2200": "22000", "2300": "23000", "2400": "24000", "2450": "24500",
+  "2440": "24400", "2445": "24450", "2460": "24600", "2480": "24800",
+  "2500": "25000", "2510": "25100", "2520": "25200", "2530": "25300",
+  "2540": "25400", "2550": "25500", "2560": "25600", "2580": "25800",
+  "2600": "26000", "2610": "26100", "2620": "26200", "2640": "26400",
+  "2650": "26500", "2700": "27000",
+  // BANKNIFTY — OCR drops leading 5 (51000 → 5100) or swaps (51000 → 15000)
+  "4700": "47000", "4800": "48000", "4850": "48500", "4900": "49000",
+  "4950": "49500", "5000": "50000", "5050": "50500", "5100": "51000",
+  "5150": "51500", "5200": "52000", "5250": "52500", "5300": "53000",
+  "5350": "53500", "5400": "54000", "5450": "54500", "5500": "55000",
+  // SENSEX — OCR drops leading 8 (82000 → 8200)
+  "7900": "79000", "8000": "80000", "8100": "81000", "8200": "82000",
+  "8300": "83000", "8400": "84000", "8500": "85000", "8600": "86000",
 };
+
+// Wide ranges — update only if the index moves beyond these levels
 const UNDERLYING_STRIKE_RANGES = {
-  NIFTY: [22000, 27000], BANKNIFTY: [45000, 52000], FINNIFTY: [19000, 22000],
-  MIDCPNIFTY: [9000, 12000], SENSEX: [75000, 95000],
+  NIFTY:      [20000, 30000],
+  BANKNIFTY:  [42000, 60000],
+  FINNIFTY:   [18000, 26000],
+  MIDCPNIFTY: [7000,  16000],
+  SENSEX:     [70000, 95000],
+  BANKEX:     [50000, 65000],
 };
+
 function correctStrikeOcrTypo(underlying, rawStrike) {
   if (!rawStrike || !underlying) return rawStrike;
   const u = String(underlying).toUpperCase().replace(/\s+/g, "");
   const strike = parseFloat(String(rawStrike).replace(/[^\d]/g, ""));
   if (Number.isNaN(strike)) return rawStrike;
+
   const range = UNDERLYING_STRIKE_RANGES[u] || UNDERLYING_STRIKE_RANGES.NIFTY;
   if (strike >= range[0] && strike <= range[1]) return String(strike);
+
+  // Explicit correction table first
   const corrected = STRIKE_CORRECTIONS[String(strike)];
-  if (corrected) return corrected;
-  
-  // Nifty specific corrections for common OCR swaps
+  if (corrected) {
+    const correctedNum = parseFloat(corrected);
+    if (correctedNum >= range[0] && correctedNum <= range[1]) return corrected;
+  }
+
+  // Index-specific digit-drop recovery: OCR truncated a leading digit
   if (u === "NIFTY") {
     if (strike === 62000) return "26200";
     if (strike === 64000) return "26400";
     if (strike < 10000 && strike >= 2000) return String(strike * 10);
     if (strike < 1000) return String(strike * 100);
   }
+  if (u === "BANKNIFTY") {
+    // 5100 → 51000, 4800 → 48000
+    if (strike < 10000 && strike >= 4000) return String(strike * 10);
+  }
+  if (u === "FINNIFTY") {
+    if (strike < 10000 && strike >= 1800) return String(strike * 10);
+  }
+  if (u === "SENSEX") {
+    // 8200 → 82000
+    if (strike < 10000 && strike >= 7000) return String(strike * 10);
+  }
+  if (u === "MIDCPNIFTY") {
+    if (strike < 1000 && strike >= 700) return String(strike * 10);
+  }
+
   return String(strike);
 }
 function fixInstrumentOcrTypos(line) {
@@ -869,6 +904,58 @@ function isNoiseLine(line) {
   return NOISE_PATTERNS.some((re) => re.test(line.trim()));
 }
 
+function parsePositionRowsFromJoinedText(normalizedText, broker = "") {
+  const joined = fixInstrumentOcrTypos(String(normalizedText || "").replace(/\s+/g, " "));
+  if (!joined) return [];
+
+  const headerPattern = /\b(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX)\b\s+(?:\d{1,2}(?:ST|ND|RD|TH)?\s+[A-Z]{3}\s+)?(\d{4,6})\s+(CALL|PUT|CE|PE)\b/gi;
+  const matches = Array.from(joined.matchAll(headerPattern));
+  if (matches.length === 0) return [];
+
+  return matches.map((match, index) => {
+    const symbol = String(match[1] || "").toUpperCase().replace(/\s+/g, "");
+    const strike = parseFloat(correctStrikeOcrTypo(symbol, match[2]));
+    const optionType = String(match[3] || "").toUpperCase().replace("CALL", "CE").replace("PUT", "PE");
+    const start = match.index ?? 0;
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? joined.length) : joined.length;
+    const segment = joined.slice(start, end);
+
+    let pnl = null;
+    let entryPrice = null;
+    let quantity = null;
+
+    const pnlCandidates = [
+      ...segment.matchAll(/([+\-]\s*₹?\s*[\d,]+\.\d{2})/g),
+      ...segment.matchAll(/([+\-]\s*[\d,]+\.\d{2})/g),
+    ]
+      .map((m) => cleanPnLValue(m[1]))
+      .filter((v) => v != null);
+    if (pnlCandidates.length > 0) {
+      pnl = pnlCandidates.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
+    }
+
+    const marketMatch = segment.match(/(?:Mkt|LTP)\s*₹?\s*([\d,]+\.\d{2})/i);
+    if (marketMatch) {
+      entryPrice = parseFloat(marketMatch[1].replace(/,/g, ""));
+    }
+
+    const qtyMatch = segment.match(/(?:Qty\.?|Quantity|Lots?)\s*[:\s]*(\d[\d,]*)/i);
+    if (qtyMatch) {
+      quantity = parseInt(qtyMatch[1].replace(/,/g, ""), 10);
+    }
+
+    return {
+      symbol,
+      strike,
+      optionType,
+      quantity,
+      entryPrice,
+      pnl,
+      ...(broker && { broker }),
+    };
+  }).filter((trade) => trade.symbol && trade.strike && trade.optionType);
+}
+
 // Regex to detect an Indian contract header:  SYMBOL [optional expiry e.g. "03 Feb"] STRIKE CE/PE/Put/Call
 const CONTRACT_HEADER_RE =
   /\b(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX)\b[\s\w]*?\b(\d{4,6})\s*(CE|PE|CALL|PUT|Call|Put)\b/i;
@@ -950,7 +1037,9 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
     }
   }
 
-  if (blocks.length === 0) return [];
+  if (blocks.length === 0) {
+    return parsePositionRowsFromJoinedText(normalized, broker);
+  }
 
   // ── Step 2: Extract fields from each block ───────────────────
   const trades = blocks.map((block) => {
@@ -1114,7 +1203,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
     }
   }
 
-  return trades.map((t) => {
+  const finalizedTrades = trades.map((t) => {
     // eslint-disable-next-line no-unused-vars
     const { _pnlHasRupee, ...rest } = t;
     return {
@@ -1122,4 +1211,124 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       ...(broker && { broker }),
     };
   });
+
+  if (finalizedTrades.length <= 1) {
+    const joinedTextTrades = parsePositionRowsFromJoinedText(normalized, broker);
+    if (joinedTextTrades.length > finalizedTrades.length) {
+      return joinedTextTrades;
+    }
+  }
+
+  return finalizedTrades;
+};
+
+// ── Equity Intraday Parsing ──────────────────────────────────────────────────
+
+const EQUITY_OCR_CORRECTIONS = [
+  [/RELIANC[E3]?/gi, "RELIANCE"],
+  [/RELI4NCE/gi, "RELIANCE"],
+  [/[Il]NFY\b/gi, "INFY"],
+  [/\bW[Il]PR[O0]\b/gi, "WIPRO"],
+  [/HCLTE[CG]H/gi, "HCLTECH"],
+  [/[Il]C[Il]C[Il]BANK/gi, "ICICIBANK"],
+  [/SB[Il]N\b/gi, "SBIN"],
+  [/HDFCBAN[KX]/gi, "HDFCBANK"],
+  [/BAJF[Il]N/gi, "BAJFINANCE"],
+];
+
+function correctEquitySymbol(raw) {
+  let s = String(raw || "").trim().toUpperCase().replace(/\s+/g, "");
+  for (const [pattern, replacement] of EQUITY_OCR_CORRECTIONS) {
+    s = s.replace(pattern, replacement);
+  }
+  return s || null;
+}
+
+function parseIndianRupee(raw) {
+  if (raw == null) return null;
+  let s = String(raw).replace(/[₹$€£]|Rs\.|INR/gi, "").trim();
+  const bracketNeg = s.match(/^\(([^)]+)\)$/);
+  if (bracketNeg) s = "-" + bracketNeg[1];
+  s = s.replace(/,/g, "");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+exports.parseEquityIntradayTrade = (text, opts = {}) => {
+  const broker = canonicalizeBroker(opts?.broker) || detectBroker(text);
+  const normalizedText = normalizeBrokerLabels(text);
+  const lines = normalizedText.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  let stockSymbol = null;
+  let sharesQty = null;
+  let entryPrice = null;
+  let exitPrice = null;
+  let profit = null;
+  let type = null;
+  let exchange = "NSE";
+
+  // Detect exchange
+  if (/\bBSE\b/.test(normalizedText)) exchange = "BSE";
+
+  // Detect BUY / SELL
+  if (/\bBUY\b|\bBOUGHT\b|\bLONG\b/i.test(normalizedText)) type = "BUY";
+  else if (/\bSELL\b|\bSOLD\b|\bSHORT\b/i.test(normalizedText)) type = "SELL";
+
+  for (const line of lines) {
+    // Stock symbol: look for standalone uppercase ticker (2-15 chars) near known labels
+    if (!stockSymbol) {
+      const symMatch = line.match(/(?:Symbol|Scrip|Stock|Security|Instrument)[:\s]+([A-Z&_-]{2,15})/i);
+      if (symMatch) stockSymbol = correctEquitySymbol(symMatch[1]);
+    }
+
+    // Shares quantity
+    if (sharesQty == null) {
+      const qtyMatch = line.match(/(?:Qty|Shares|Units|Quantity)[:\s]+([\d,]+)/i);
+      if (qtyMatch) sharesQty = parseIndianRupee(qtyMatch[1]);
+    }
+
+    // Entry (avg buy) price
+    if (entryPrice == null) {
+      const entryMatch = line.match(/(?:Avg\.?\s*Price|Buy\s*Avg|Entry|Trade\s*Price|Buy\s*Price)[:\s]+([\d,₹Rs\.]+)/i);
+      if (entryMatch) entryPrice = parseIndianRupee(entryMatch[1]);
+    }
+
+    // Exit (avg sell) price
+    if (exitPrice == null) {
+      const exitMatch = line.match(/(?:Sell\s*Avg|Exit\s*Price|LTP|Close|Sell\s*Price)[:\s]+([\d,₹Rs\.]+)/i);
+      if (exitMatch) exitPrice = parseIndianRupee(exitMatch[1]);
+    }
+
+    // P&L
+    if (profit == null) {
+      const pnlMatch = line.match(/(?:P&L|Net\s*P&L|Realized|Profit)[:\s]+([-+₹Rs\.(\d,\s)]+)/i);
+      if (pnlMatch) profit = parseIndianRupee(pnlMatch[1]);
+    }
+  }
+
+  // Fallback: try to pick symbol from first prominent ALLCAPS token (2-12 chars) that is not a broker name
+  if (!stockSymbol) {
+    const tokens = normalizedText.match(/\b([A-Z]{2,12})\b/g) || [];
+    const skipTokens = new Set(["BUY", "SELL", "NSE", "BSE", "INTRADAY", "DELIVERY", "SWING", "P&L", "QTY", "AVG", "LTP", "NET"]);
+    for (const t of tokens) {
+      if (!skipTokens.has(t)) {
+        stockSymbol = correctEquitySymbol(t);
+        break;
+      }
+    }
+  }
+
+  return {
+    stockSymbol,
+    exchange,
+    sharesQty,
+    type,
+    entryPrice,
+    exitPrice,
+    profit,
+    ...(broker && { broker }),
+    instrumentType: "EQUITY",
+    segment: "EQUITY",
+    tradeType: "INTRADAY",
+  };
 };

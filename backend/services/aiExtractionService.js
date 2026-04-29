@@ -26,6 +26,17 @@ JSON: {"pair":"EURUSD","type":"BUY","quantity":0.01,"entryPrice":1.08500,"exitPr
 const INDIAN_VISION_PROMPT = `You are a trading data extraction specialist analyzing an Indian broker screenshot (Zerodha, Upstox, Angel One, Groww, Dhan, Fyers, 5paisa, ICICI Direct, Kotak Neo, Paytm Money, Motilal Oswal, Sharekhan).
 Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
 
+CRITICAL RULES:
+1. If this is a POSITIONS / F&O / OPEN POSITIONS screen, IGNORE "TOTAL P&L", index quotes/cards, tabs, and summary widgets. Extract only the individual option rows.
+2. Never invent a strike price. Use the exact strike visible in each row.
+3. Convert option names exactly:
+   - "Call" => "CE"
+   - "Put" => "PE"
+4. Example row mappings:
+   - "NIFTY 28 Apr 24450 Call" => pair="NIFTY 24450 CE", underlying="NIFTY", strikePrice=24450, optionType="CE"
+   - "NIFTY 28 Apr 24450 Put" => pair="NIFTY 24450 PE", underlying="NIFTY", strikePrice=24450, optionType="PE"
+5. If multiple option rows are visible, return ALL of them in "trades". Do not collapse them into one trade.
+
 FIELD EXTRACTION RULES:
 - pair: full instrument name including expiry and strike (e.g. "NIFTY 26000 PE 25JAN", "BANKNIFTY 48000 CE").
 - underlying: index or stock name only (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, or stock ticker like RELIANCE, TCS).
@@ -45,24 +56,58 @@ Set top-level fields to the first/main/most recent trade.
 
 JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha"}]}`;
 
+const INDIAN_EQUITY_VISION_PROMPT = `You are a trading data extraction specialist analyzing an Indian broker app screenshot showing INTRADAY EQUITY (stock) trades — NOT options/F&O.
+Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
+
+CRITICAL RULES — READ CAREFULLY:
+1. IGNORE any "TOTAL RETURNS", "Total P&L", "Total Returns", or any aggregate/summary row at the top. These are NOT stock names.
+2. Only extract individual stock/company rows (e.g. "Vedanta", "HDFC Bank", "Reliance", "TCS").
+3. This may be a Positions / Holdings / Closed Trades page. Each stock row has: stock name, P&L value (right side), and optionally Qty, Avg price, Mkt price.
+4. If Qty shows "0" and Avg shows "₹0.00", the intraday position is fully closed — entryPrice and exitPrice will be null. The P&L shown IS the realized profit/loss.
+5. The P&L is GREEN/positive (+₹) or RED/negative (-₹). Extract the exact number with correct sign.
+
+FIELD EXTRACTION RULES:
+- stockSymbol: Company name converted to NSE ticker. Examples: "Vedanta"→VEDL, "HDFC Bank"→HDFCBANK, "Voltas"→VOLTAS, "Shipping Corporation"→SCI, "Reliance"→RELIANCE, "TCS"→TCS, "Infosys"→INFY, "Wipro"→WIPRO, "ICICI Bank"→ICICIBANK, "SBI"→SBIN. If unsure, use the name in UPPERCASE with spaces removed.
+- exchange: "NSE" or "BSE". Default "NSE".
+- sharesQty: integer shares quantity. Use the displayed Qty number. If Qty=0 for closed position, still use the original qty if visible, otherwise null.
+- type: "BUY" for long/buy intraday, "SELL" for short/sell intraday. Default "BUY" if direction not clear.
+- entryPrice: avg buy price per share in ₹. null if not shown or "₹0.00".
+- exitPrice: avg sell price per share in ₹. null if not shown or "₹0.00".
+- profit: net realized P&L in ₹. Green/+ = positive number. Red/- = negative number. Strip ₹ and commas. Indian format: "1,23,456" = 123456.
+- broker: app/platform name visible (Zerodha/Upstox/Angel One/Groww/Dhan/Fyers/5paisa/ICICI Direct/Kotak/Paytm Money). null if not visible.
+
+MULTI-TRADE: If MULTIPLE stock rows are visible, extract ALL of them into "trades" array. The top-level fields should contain the first trade.
+
+EXAMPLE for Zerodha Positions page with 2 stocks:
+JSON: {"stockSymbol":"VEDL","exchange":"NSE","sharesQty":null,"type":"BUY","entryPrice":null,"exitPrice":null,"profit":211.90,"broker":"Zerodha","trades":[{"stockSymbol":"VEDL","exchange":"NSE","sharesQty":null,"type":"BUY","entryPrice":null,"exitPrice":null,"profit":211.90},{"stockSymbol":"VOLTAS","exchange":"NSE","sharesQty":null,"type":"SELL","entryPrice":null,"exitPrice":null,"profit":-2783.20}]}`;
+
 async function extractTradeWithGeminiVision(imageUrl, options = {}) {
   const geminiKey = appConfig.ai.geminiApiKey;
   if (!geminiKey || !imageUrl) return null;
 
   const marketType = options.marketType || "Forex";
   const isIndian = marketType === "Indian_Market";
+  const isEquity = isIndian && options.tradeSubType === "EQUITY";
   const timeoutMs = Math.max(TIMEOUT_CONFIG.aiTimeout || 45000, GEMINI_EXTRACTION_TIMEOUT_MS);
 
   try {
-    // Download image and convert to base64 for Gemini inline data
-    const imgResponse = await withTimeout(fetch(imageUrl), "Image download for Gemini Vision", 15000);
-    if (!imgResponse.ok) {
-      logger.warn("Gemini Vision: failed to download image", { imageUrl, status: imgResponse.status });
-      return null;
+    let base64, mimeType;
+
+    if (options.imageBuffer) {
+      // Use pre-downloaded buffer — avoids a duplicate HTTP round-trip
+      base64 = options.imageBuffer.toString("base64");
+      mimeType = options.imageMimeType || "image/jpeg";
+    } else {
+      // Fallback: download the image ourselves (30s — was 15s)
+      const imgResponse = await withTimeout(fetch(imageUrl), "Image download for Gemini Vision", 30000);
+      if (!imgResponse.ok) {
+        logger.warn("Gemini Vision: failed to download image", { imageUrl, status: imgResponse.status });
+        return null;
+      }
+      const buffer = await imgResponse.arrayBuffer();
+      base64 = Buffer.from(buffer).toString("base64");
+      mimeType = imgResponse.headers.get("content-type")?.split(";")[0] || "image/jpeg";
     }
-    const buffer = await imgResponse.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    const mimeType = imgResponse.headers.get("content-type")?.split(";")[0] || "image/jpeg";
 
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({
@@ -70,7 +115,7 @@ async function extractTradeWithGeminiVision(imageUrl, options = {}) {
       generationConfig: { temperature: 0, maxOutputTokens: 2048 },
     });
 
-    const prompt = isIndian ? INDIAN_VISION_PROMPT : FOREX_VISION_PROMPT;
+    const prompt = isEquity ? INDIAN_EQUITY_VISION_PROMPT : isIndian ? INDIAN_VISION_PROMPT : FOREX_VISION_PROMPT;
     const visionPromise = model.generateContent([
       { inlineData: { data: base64, mimeType } },
       { text: prompt },
@@ -93,6 +138,22 @@ async function extractTradeWithGeminiVision(imageUrl, options = {}) {
     }
 
     logger.info("Gemini Vision extraction succeeded", { marketType, imageUrl });
+
+    if (isEquity) {
+      const mapOne = (item) => ({
+        stockSymbol: item.stockSymbol && typeof item.stockSymbol === "string" ? item.stockSymbol.trim().toUpperCase() : null,
+        exchange: item.exchange === "BSE" ? "BSE" : "NSE",
+        sharesQty: toNumberOrNull(item.sharesQty),
+        type: item.type === "BUY" || item.type === "SELL" ? item.type : null,
+        entryPrice: toNumberOrNull(item.entryPrice),
+        exitPrice: toNumberOrNull(item.exitPrice),
+        profit: toNumberOrNull(item.profit),
+        broker: item.broker ?? null,
+      });
+      const main = mapOne(parsed);
+      const trades = Array.isArray(parsed.trades) ? parsed.trades.map(mapOne) : [];
+      return { ...main, trades, rawResponse: rawText };
+    }
 
     if (isIndian) {
       const mapOne = (item) => ({
@@ -348,7 +409,7 @@ JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying
       const response = mappedTrades.length > 0 ? { ...mapped, trades: mappedTrades } : mapped;
       return options.includeRawResponse ? { ...response, rawResponse: content } : response;
     } catch (err2) {
-      console.warn("[AI extraction] JSON parse error:", err.message);
+      logger.warn("[AI extraction] Indian JSON parse error", { error: err.message });
       return null;
     }
   }
@@ -403,9 +464,104 @@ JSON: {"pair":"EURUSD","type":"BUY","quantity":0.01,"entryPrice":1.08500,"exitPr
     };
     return options.includeRawResponse ? { ...mapped, rawResponse: content } : mapped;
   } catch (err) {
-    console.warn("[AI extraction] Generic JSON parse error:", err.message);
+    logger.warn("[AI extraction] Forex JSON parse error", { error: err.message });
     return null;
   }
 }
 
-module.exports = { extractIndianTradeWithAI, extractTradeWithAI, extractTradeWithGeminiVision };
+// Sector lookup for top liquid NSE stocks
+const STOCK_SECTOR_MAP = {
+  RELIANCE: "Oil & Gas", TCS: "IT", INFY: "IT", WIPRO: "IT", HCLTECH: "IT", TECHM: "IT",
+  ICICIBANK: "Banking", HDFCBANK: "Banking", SBIN: "Banking", KOTAKBANK: "Banking", AXISBANK: "Banking", BANKBARODA: "Banking", PNB: "Banking", CANBK: "Banking",
+  HDFC: "Finance", BAJFINANCE: "Finance", BAJAJFINSV: "Finance", MUTHOOTFIN: "Finance",
+  HINDUNILVR: "FMCG", ITC: "FMCG", BRITANNIA: "FMCG", NESTLEIND: "FMCG",
+  MARUTI: "Auto", TATAMOTORS: "Auto", M_M: "Auto", BAJAJ_AUTO: "Auto", HEROMOTOCO: "Auto", EICHERMOT: "Auto",
+  SUNPHARMA: "Pharma", DRREDDY: "Pharma", CIPLA: "Pharma", DIVISLAB: "Pharma", AUROPHARMA: "Pharma",
+  TATASTEEL: "Metals", HINDALCO: "Metals", JSWSTEEL: "Metals", SAIL: "Metals",
+  NTPC: "Power", POWERGRID: "Power", ADANIGREEN: "Power", TATAPOWER: "Power",
+  ONGC: "Oil & Gas", BPCL: "Oil & Gas", IOC: "Oil & Gas",
+  BHARTIARTL: "Telecom", INDUSINDBK: "Banking", SHREECEM: "Cement", ULTRACEMCO: "Cement", GRASIM: "Cement",
+  ADANIENT: "Conglomerate", ADANIPORTS: "Infrastructure", LT: "Infrastructure",
+  ASIANPAINT: "Paints", BERGEPAINT: "Paints",
+  ZOMATO: "Consumer Tech", PAYTM: "Consumer Tech", NYKAA: "Consumer Tech",
+};
+
+function detectSector(symbol) {
+  if (!symbol) return "";
+  const normalized = symbol.replace(/[-&]/g, "_").toUpperCase();
+  return STOCK_SECTOR_MAP[normalized] || "";
+}
+
+async function extractEquityIntradayWithAI(extractedText, options = {}) {
+  const cleanText = String(extractedText || "")
+    .replace(/(\d):(\d{2})(?!\d)/g, "$1.$2")
+    .replace(/\(?\s*[+\-]?\s*[\d,]+\.\d*\s*%\s*\)?/g, " ");
+  if (!cleanText || cleanText.trim().length < 10) return null;
+
+  const brokerHint = options.brokerHint ? `Broker: ${options.brokerHint}\n` : "";
+  const ocrSlice = cleanText.slice(0, 4000);
+  const prompt = `You are extracting Indian intraday EQUITY (stock) trade data from broker app OCR text — NOT options/F&O.
+Return ONLY valid JSON, no markdown, no explanation.
+${brokerHint}
+CRITICAL: IGNORE any "Total Returns", "TOTAL RETURNS", "Total P&L", or any aggregate/summary line. These are NOT stock names.
+Only extract individual company/stock rows.
+
+This may be a Positions/Holdings/Closed-Trades page. Format per row: stock name, P&L, optionally Qty + Avg price + Mkt price.
+If Avg shows "0.00" or "₹0.00" with Qty=0, the intraday position is closed — set entryPrice=null, exitPrice=null, use the P&L shown.
+
+EXTRACTION RULES:
+- stockSymbol: Convert company name to NSE ticker (VEDANTA→VEDL, HDFC BANK→HDFCBANK, SHIPPING CORPORATION→SCI, VOLTAS→VOLTAS, RELIANCE→RELIANCE, TCS→TCS, INFOSYS→INFY, WIPRO→WIPRO, ICICI BANK→ICICIBANK, STATE BANK→SBIN). If unsure, uppercase the name with spaces removed.
+- exchange: "NSE" or "BSE". Default "NSE".
+- sharesQty: integer shares. null if Qty=0 or not shown.
+- type: "BUY" for long/buy, "SELL" for short/sell. Default "BUY".
+- entryPrice: avg buy price ₹. null if "₹0.00" or not shown.
+- exitPrice: avg sell price ₹. null if "₹0.00" or not shown.
+- profit: realized P&L signed number in ₹. Green/+ = positive, Red/- = negative. Indian lakh: "1,23,456"=123456. Strip ₹.
+- broker: app name. null if not found.
+
+Return ALL stock rows in "trades" array (top-level = first trade). Use null for missing fields.
+
+OCR text:
+${ocrSlice}
+
+JSON: {"stockSymbol":"VEDL","exchange":"NSE","sharesQty":null,"type":"BUY","entryPrice":null,"exitPrice":null,"profit":211.90,"broker":"Zerodha","trades":[{"stockSymbol":"VEDL","exchange":"NSE","sharesQty":null,"type":"BUY","entryPrice":null,"exitPrice":null,"profit":211.90},{"stockSymbol":"VOLTAS","exchange":"NSE","sharesQty":null,"type":"SELL","entryPrice":null,"exitPrice":null,"profit":-2783.20}]}`;
+
+  const data = await callAIForTradeExtraction(prompt, TIMEOUT_CONFIG.aiTimeout, { preferGemini: true });
+  const content = data?.choices?.[0]?.message?.content?.trim();
+  if (!content) return null;
+
+  const mapOne = (item) => ({
+    stockSymbol: item.stockSymbol && typeof item.stockSymbol === "string" ? item.stockSymbol.trim().toUpperCase() : null,
+    exchange: item.exchange === "BSE" ? "BSE" : "NSE",
+    sharesQty: toNumberOrNull(item.sharesQty),
+    type: item.type === "BUY" || item.type === "SELL" ? item.type : null,
+    entryPrice: toNumberOrNull(item.entryPrice),
+    exitPrice: toNumberOrNull(item.exitPrice),
+    profit: toNumberOrNull(item.profit),
+    broker: item.broker ?? null,
+  });
+
+  try {
+    const jsonStr = stripJsonEnvelope(content);
+    const parsed = JSON.parse(jsonStr);
+    const main = mapOne(parsed);
+    if (main.stockSymbol) main.sector = detectSector(main.stockSymbol);
+    const trades = Array.isArray(parsed.trades)
+      ? parsed.trades.map((t) => { const m = mapOne(t); if (m.stockSymbol) m.sector = detectSector(m.stockSymbol); return m; })
+      : [];
+    return options.includeRawResponse ? { ...main, trades, rawResponse: content } : { ...main, trades };
+  } catch {
+    try {
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) return null;
+      const parsed = JSON.parse(stripJsonEnvelope(match[0]));
+      const main = mapOne(parsed);
+      if (main.stockSymbol) main.sector = detectSector(main.stockSymbol);
+      return { ...main, trades: [] };
+    } catch {
+      return null;
+    }
+  }
+}
+
+module.exports = { extractIndianTradeWithAI, extractEquityIntradayWithAI, extractTradeWithAI, extractTradeWithGeminiVision };

@@ -1,6 +1,9 @@
 const IndianTrade = require("../models/IndianTrade");
 
-const userQuery = (req) => ({ user: req.user._id });
+const userQuery = (req) => {
+  const instrumentType = (req.query.instrumentType || "OPTION").toUpperCase();
+  return { user: req.user._id, instrumentType };
+};
 
 // ========== BASIC ANALYTICS ==========
 
@@ -354,7 +357,40 @@ exports.getTradeDistribution = async (req, res) => {
     });
     Object.keys(byDirection).forEach(k => (byDirection[k].winRate = byDirection[k].total ? ((byDirection[k].wins / byDirection[k].total) * 100).toFixed(1) : 0));
 
-    res.json({ byPair, byType, byDirection, byStrategy, bySession, byTradeType, byEntryBasis, byMistakeTag, byUnderlying, byOptionType });
+    const isEquity = (req.query.instrumentType || "").toUpperCase() === "EQUITY";
+
+    // Equity-specific: by stock symbol and by sector
+    const byStockSymbol = {};
+    const bySector = {};
+    if (isEquity) {
+      trades.forEach(t => {
+        const symKey = (t.stockSymbol && t.stockSymbol.trim()) ? t.stockSymbol.toUpperCase() : "Unspecified";
+        if (!byStockSymbol[symKey]) byStockSymbol[symKey] = { total: 0, wins: 0, losses: 0, profit: 0 };
+        byStockSymbol[symKey].total++;
+        if (t.profit > 0) byStockSymbol[symKey].wins++;
+        else if (t.profit < 0) byStockSymbol[symKey].losses++;
+        byStockSymbol[symKey].profit += t.profit || 0;
+
+        const secKey = (t.sector && t.sector.trim()) ? t.sector : "Other";
+        if (!bySector[secKey]) bySector[secKey] = { total: 0, wins: 0, losses: 0, profit: 0 };
+        bySector[secKey].total++;
+        if (t.profit > 0) bySector[secKey].wins++;
+        else if (t.profit < 0) bySector[secKey].losses++;
+        bySector[secKey].profit += t.profit || 0;
+      });
+      Object.keys(byStockSymbol).forEach(k => (byStockSymbol[k].winRate = byStockSymbol[k].total ? ((byStockSymbol[k].wins / byStockSymbol[k].total) * 100).toFixed(1) : 0));
+      Object.keys(bySector).forEach(k => (bySector[k].winRate = bySector[k].total ? ((bySector[k].wins / bySector[k].total) * 100).toFixed(1) : 0));
+    }
+
+    res.json({
+      byPair, byType, byDirection, byStrategy, bySession, byTradeType, byEntryBasis, byMistakeTag,
+      // Options-specific (empty for equity)
+      byUnderlying: isEquity ? {} : byUnderlying,
+      byOptionType: isEquity ? {} : byOptionType,
+      // Equity-specific (empty for options)
+      byStockSymbol: isEquity ? byStockSymbol : {},
+      bySector: isEquity ? bySector : {},
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

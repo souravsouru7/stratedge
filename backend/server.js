@@ -125,7 +125,11 @@ app.options(/.*/, cors(corsOptions));
 app.use(cors(corsOptions));
 
 // HTTP security headers
-app.use(helmet());
+// crossOriginOpenerPolicy must allow-popups so Firebase Auth popup (Google Sign-In)
+// can call window.closed across origins without being blocked.
+app.use(helmet({
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+}));
 
 // Global timeout middleware (apply early)
 app.use(timeoutMiddleware);

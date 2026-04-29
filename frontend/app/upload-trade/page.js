@@ -60,7 +60,8 @@ const grid2     = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 };
 // ── upload / status card ─────────────────────────────────────────────────────
 
 function UploadCard({ state }) {
-  const { file, setFile, setError, loading, processingStatus, error, isInd, broker, setBroker, handleUpload, trade } = state;
+  const { file, setFile, setError, loading, processingStatus, error, isInd, broker, setBroker, handleUpload, trade, tradeSubType, setTradeSubType } = state;
+  const isEquityMode = isInd && tradeSubType === "EQUITY";
   const [showSample, setShowSample] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmImageUrl, setConfirmImageUrl] = useState("");
@@ -96,7 +97,7 @@ function UploadCard({ state }) {
     <SectionCard
       accentColor={isInd ? "#1B5E20" : "#B8860B"}
       title="Upload Screenshot"
-      subtitle={isInd ? "DROP YOUR OPTIONS TRADE SCREENSHOT" : "AI-POWERED SCREENSHOT EXTRACTION"}
+      subtitle={isEquityMode ? "DROP YOUR STOCK TRADE SCREENSHOT" : isInd ? "DROP YOUR OPTIONS TRADE SCREENSHOT" : "AI-POWERED SCREENSHOT EXTRACTION"}
       delay={0.05}
     >
       {/* Step indicator */}
@@ -114,6 +115,25 @@ function UploadCard({ state }) {
           </div>
         ))}
       </div>
+
+      {/* Options / Stocks toggle — Indian market only */}
+      {isInd && (
+        <div style={{ display: "flex", gap: 0, marginBottom: 14, borderRadius: 8, overflow: "hidden", border: "1.5px solid #E2E8F0" }}>
+          {[{ v: "OPTION", label: "Options" }, { v: "EQUITY", label: "Intraday Stocks" }].map(({ v, label }) => {
+            const active = tradeSubType === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => { setTradeSubType(v); setFile(null); setError(null); }}
+                style={{ flex: 1, padding: "9px 8px", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none", background: active ? "#1B5E20" : "#FFFFFF", color: active ? "#FFFFFF" : "#64748B", transition: "all 0.2s", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}
+              >
+                {label.toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <FileUploadZone selectedFile={file} onFileSelect={f => { setFile(f); setError(null); }} onClear={() => { setFile(null); setError(null); }} />
 
@@ -135,7 +155,7 @@ function UploadCard({ state }) {
             <polyline points="20 6 9 17 4 12" />
           </svg>
           <span style={{ fontSize: 11, color: "#065F46", fontWeight: 700 }}>
-            You uploaded the correct {isInd ? "Indian" : "Forex"} image.
+            You uploaded the correct {isEquityMode ? "intraday stock" : isInd ? "Indian options" : "Forex"} image.
           </span>
         </div>
       )}
@@ -329,7 +349,8 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
     ? e => state.handleMultiTradeStrategyChange(tradeIdx, e)
     : state.handleStrategyChange;
   const setupRules = isMulti ? (trade?.setupRules || []) : state.setupRules;
-  const { isInd } = state;
+  const { isInd, tradeSubType } = state;
+  const isEquityMode = isInd && tradeSubType === "EQUITY";
   const bull     = parseFloat(trade?.profit || 0) >= 0;
   const saved    = isMulti ? state.savedTrades[tradeIdx] : state.saved;
   const currency = isInd ? "₹" : "$";
@@ -385,7 +406,7 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
       {/* ── Trade Details ── */}
       <SectionCard
         accentColor={isInd ? "#1B5E20" : "#B8860B"}
-        title={isMulti ? `Trade #${tradeIdx + 1} — ${trade?.pair || ""}` : `${isInd ? "Indian Options" : "Forex"} Trade Details`}
+        title={isMulti ? `Trade #${tradeIdx + 1} — ${trade?.pair || ""}` : `${isEquityMode ? "Intraday Stock" : isInd ? "Indian Options" : "Forex"} Trade Details`}
         subtitle={isMulti ? `P&L: ${bull ? "+" : ""}${currency}${Math.abs(parseFloat(trade?.profit || 0)).toFixed(2)}` : "REVIEW & CORRECT EXTRACTED FIELDS"}
         delay={0.1}
         style={isMulti && saved ? { opacity: 0.6 } : {}}
@@ -405,7 +426,22 @@ function TradeFormCard({ state, tradeIdx = null, psychologyRef = null }) {
           <div />
         </div>
 
-        {isInd ? (
+        {isEquityMode ? (
+          <>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
+              <FormInput label="STOCK SYMBOL" name="stockSymbol" value={trade?.stockSymbol} onChange={onChange} placeholder="RELIANCE" />
+              <FormInput label="SHARES QTY" name="sharesQty" value={trade?.sharesQty} onChange={onChange} placeholder="10" type="number" />
+            </div>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
+              <FormInput label="ENTRY PRICE (₹)" name="entryPrice" value={trade?.entryPrice} onChange={onChange} placeholder="0.00" type="number" />
+              <FormInput label="EXIT PRICE (₹)"  name="exitPrice"  value={trade?.exitPrice}  onChange={onChange} placeholder="0.00" type="number" />
+            </div>
+            <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
+              <FormInput label="P&L (₹)" name="profit" value={trade?.profit} onChange={onChange} placeholder="0.00" type="number" />
+              <FormSelect label="EXCHANGE" name="exchange" value={trade?.exchange || "NSE"} onChange={onChange} options={[{ value: "NSE", label: "NSE" }, { value: "BSE", label: "BSE" }]} />
+            </div>
+          </>
+        ) : isInd ? (
           <>
             <div className="form-2col" style={{ ...grid2, marginBottom: 14 }}>
               <FormInput label="QUANTITY" name="quantity" value={trade?.quantity} onChange={onChange} placeholder="50" type="number" />

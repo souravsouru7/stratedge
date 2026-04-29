@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createTrade } from "@/services/tradeApi";
 import Link from "next/link";
 import { MARKETS } from "@/context/MarketContext";
@@ -28,9 +28,13 @@ const theme = {
 const UNDERLYINGS = ["NIFTY", "BANK NIFTY", "FIN NIFTY", "MIDCPNIFTY", "SENSEX", "BANKEX", "Other"];
 const LOT_SIZES = { "NIFTY": 25, "BANK NIFTY": 15, "FIN NIFTY": 25, "MIDCPNIFTY": 50, "SENSEX": 10, "BANKEX": 15, "Other": 1 };
 
-export default function IndianOptionsAddTradePage() {
+function IndianOptionsAddTradeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const submitLockRef = useRef(false);
+  const [tradeSubType, setTradeSubType] = useState(
+    searchParams?.get("type") === "EQUITY" ? "EQUITY" : "OPTION"
+  );
   const [trade, setTrade] = useState({
     underlying: "NIFTY",
     underlyingOther: "",
@@ -58,9 +62,14 @@ export default function IndianOptionsAddTradePage() {
     sttTaxes: "",
     mood: null,
     confidence: "",
-    emotionalTags: []
+    emotionalTags: [],
+    stockSymbol: "",
+    exchange: "NSE",
+    sharesQty: "",
+    sector: ""
   });
   const [loading, setLoading] = useState(false);
+  const isEquity = tradeSubType === "EQUITY";
   const [strategies, setStrategies] = useState([]);
   const [setupsLoading, setSetupsLoading] = useState(false);
   const [setupRules, setSetupRules] = useState([]);
@@ -144,22 +153,36 @@ export default function IndianOptionsAddTradePage() {
     if (submitLockRef.current || loading) {
       return;
     }
-    const underlyingLabel = getUnderlyingLabel();
-    if (!underlyingLabel?.trim()) {
-      alert("Select or enter underlying (e.g. NIFTY).");
-      return;
+
+    if (isEquity) {
+      if (!trade.stockSymbol?.trim()) {
+        alert("Enter stock symbol (e.g. RELIANCE).");
+        return;
+      }
+      const sq = String(trade.sharesQty).trim();
+      if (!sq || isNaN(parseFloat(sq)) || parseFloat(sq) <= 0) {
+        alert("Enter shares quantity.");
+        return;
+      }
+    } else {
+      const underlyingLabel = getUnderlyingLabel();
+      if (!underlyingLabel?.trim()) {
+        alert("Select or enter underlying (e.g. NIFTY).");
+        return;
+      }
+      const strike = trade.strikePrice?.trim();
+      if (!strike || isNaN(parseFloat(strike))) {
+        alert("Enter strike price.");
+        return;
+      }
+      const qty = trade.quantity?.trim();
+      if (!qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0) {
+        alert("Enter quantity (lots).");
+        return;
+      }
     }
-    const strike = trade.strikePrice?.trim();
-    if (!strike || isNaN(parseFloat(strike))) {
-      alert("Enter strike price.");
-      return;
-    }
-    const qty = trade.quantity?.trim();
-    if (!qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0) {
-      alert("Enter quantity (lots).");
-      return;
-    }
-    const pnl = trade.profit?.trim();
+
+    const pnl = String(trade.profit).trim();
     if (pnl === "" || pnl === undefined) {
       alert("Enter profit or loss (₹).");
       return;
@@ -189,24 +212,14 @@ export default function IndianOptionsAddTradePage() {
       return;
     }
 
-    const pair = `${underlyingLabel.trim()} ${strike} ${trade.optionType}`;
-    const tradeData = {
-      pair,
-      underlying: underlyingLabel.trim(),
-      strikePrice: parseFloat(strike),
-      optionType: trade.optionType,
-      segment: "F&O",
-      instrumentType: "OPTION",
+    const sharedFields = {
       type: trade.type,
-      quantity: parseFloat(qty),
-      lotSize: getLotSize(),
       profit: parseFloat(pnl),
       entryPrice: trade.entryPrice ? parseFloat(trade.entryPrice) : undefined,
       exitPrice: trade.exitPrice ? parseFloat(trade.exitPrice) : undefined,
       tradeType: trade.tradeType || "INTRADAY",
       strategy: trade.strategy === "Custom" ? (trade.strategyCustom?.trim() || "Custom") : (trade.strategy || undefined),
       tradeDate: trade.tradeDate,
-      expiryDate: trade.expiryDate || undefined,
       riskRewardRatio: trade.riskRewardCustom?.trim() ? "custom" : (trade.riskRewardRatio || ""),
       riskRewardCustom: trade.riskRewardCustom?.trim() || "",
       entryBasis: trade.entryBasis || "Plan",
@@ -221,6 +234,39 @@ export default function IndianOptionsAddTradePage() {
       confidence: trade.confidence || undefined,
       emotionalTags: Array.isArray(trade.emotionalTags) ? trade.emotionalTags : undefined
     };
+
+    let tradeData;
+    if (isEquity) {
+      const symbol = trade.stockSymbol.trim().toUpperCase();
+      tradeData = {
+        ...sharedFields,
+        pair: symbol,
+        stockSymbol: symbol,
+        exchange: trade.exchange || "NSE",
+        sharesQty: parseFloat(trade.sharesQty),
+        sector: trade.sector || undefined,
+        instrumentType: "EQUITY",
+        segment: "EQUITY",
+        tradeType: "INTRADAY"
+      };
+    } else {
+      const underlyingLabel = getUnderlyingLabel();
+      const strike = trade.strikePrice.trim();
+      const qty = trade.quantity.trim();
+      const pair = `${underlyingLabel.trim()} ${strike} ${trade.optionType}`;
+      tradeData = {
+        ...sharedFields,
+        pair,
+        underlying: underlyingLabel.trim(),
+        strikePrice: parseFloat(strike),
+        optionType: trade.optionType,
+        segment: "F&O",
+        instrumentType: "OPTION",
+        quantity: parseFloat(qty),
+        lotSize: getLotSize(),
+        expiryDate: trade.expiryDate || undefined
+      };
+    }
 
     const activeRules = setupRules.filter(r => r.label && r.label.trim().length > 0);
     const followedCount = activeRules.filter(r => r.followed).length;
@@ -252,56 +298,129 @@ export default function IndianOptionsAddTradePage() {
 
       <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 24px" }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, color: theme.secondary }}>
-          Log New <span style={{ color: '#1B5E20' }}>Options Trade</span>
+          Log New <span style={{ color: '#1B5E20' }}>{isEquity ? "Stock Trade" : "Options Trade"}</span>
         </h1>
         <p style={{ fontSize: 12, color: theme.muted, marginBottom: 32, fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>
-          NSE / BSE F&O MARKET ENTRY
+          {isEquity ? "NSE / BSE EQUITY INTRADAY" : "NSE / BSE F&O MARKET ENTRY"}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
+          {/* Instrument type toggle */}
+          <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: "1.5px solid #E2E8F0" }}>
+            {[{ v: "OPTION", label: "Options" }, { v: "EQUITY", label: "Intraday Stocks" }].map(({ v, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setTradeSubType(v)}
+                style={{
+                  flex: 1,
+                  padding: "11px 0",
+                  border: "none",
+                  background: tradeSubType === v ? theme.primary : "#FFFFFF",
+                  color: tradeSubType === v ? "#FFFFFF" : theme.muted,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  letterSpacing: "0.04em"
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Underlying</label>
-              <select name="underlying" value={trade.underlying} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
-                {UNDERLYINGS.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-            {trade.underlying === "Other" && (
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Symbol</label>
-                <input name="underlyingOther" placeholder="e.g. RELIANCE" value={trade.underlyingOther} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
-              </div>
+            {isEquity ? (
+              <>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Stock Symbol</label>
+                  <input name="stockSymbol" placeholder="e.g. RELIANCE, TCS, HDFC" value={trade.stockSymbol} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14, textTransform: "uppercase" }} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Exchange</label>
+                    <select name="exchange" value={trade.exchange} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
+                      <option value="NSE">NSE</option>
+                      <option value="BSE">BSE</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>BUY / SELL</label>
+                    <select name="type" value={trade.type} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
+                      <option value="BUY">BUY</option>
+                      <option value="SELL">SELL</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Shares Qty</label>
+                    <input name="sharesQty" type="number" min="1" placeholder="e.g. 100" value={trade.sharesQty} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Sector</label>
+                    <select name="sector" value={trade.sector} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
+                      <option value="">Auto-detect</option>
+                      <option value="IT">IT</option>
+                      <option value="Banking">Banking</option>
+                      <option value="Pharma">Pharma</option>
+                      <option value="Auto">Auto</option>
+                      <option value="FMCG">FMCG</option>
+                      <option value="Metal">Metal</option>
+                      <option value="Energy">Energy</option>
+                      <option value="Infra">Infra</option>
+                      <option value="Telecom">Telecom</option>
+                      <option value="Realty">Realty</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Underlying</label>
+                  <select name="underlying" value={trade.underlying} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
+                    {UNDERLYINGS.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+                {trade.underlying === "Other" && (
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Symbol</label>
+                    <input name="underlyingOther" placeholder="e.g. RELIANCE" value={trade.underlyingOther} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+                  </div>
+                )}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Strike (₹)</label>
+                  <input name="strikePrice" placeholder="e.g. 26100" value={trade.strikePrice} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>CE / PE</label>
+                    <select name="optionType" value={trade.optionType} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
+                      <option value="CE">CE</option>
+                      <option value="PE">PE</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>BUY / SELL</label>
+                    <select name="type" value={trade.type} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
+                      <option value="BUY">BUY</option>
+                      <option value="SELL">SELL</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Qty (lots)</label>
+                  <input name="quantity" type="number" min="1" placeholder="e.g. 3" value={trade.quantity} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+                </div>
+              </>
             )}
-
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Strike (₹)</label>
-              <input name="strikePrice" placeholder="e.g. 26100" value={trade.strikePrice} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>CE / PE</label>
-                <select name="optionType" value={trade.optionType} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
-                  <option value="CE">CE</option>
-                  <option value="PE">PE</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>BUY / SELL</label>
-                <select name="type" value={trade.type} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }}>
-                  <option value="BUY">BUY</option>
-                  <option value="SELL">SELL</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Qty (lots)</label>
-              <input name="quantity" type="number" min="1" placeholder="e.g. 3" value={trade.quantity} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
-            </div>
 
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Profit / Loss (₹)</label>
@@ -310,12 +429,12 @@ export default function IndianOptionsAddTradePage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Entry premium (₹)</label>
-                <input name="entryPrice" type="number" step="0.01" placeholder="e.g. 85.50" value={trade.entryPrice} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>{isEquity ? "Avg buy price (₹)" : "Entry premium (₹)"}</label>
+                <input name="entryPrice" type="number" step="0.01" placeholder={isEquity ? "e.g. 2450.50" : "e.g. 85.50"} value={trade.entryPrice} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Exit premium (₹)</label>
-                <input name="exitPrice" type="number" step="0.01" placeholder="e.g. 120" value={trade.exitPrice} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>{isEquity ? "Avg sell price (₹)" : "Exit premium (₹)"}</label>
+                <input name="exitPrice" type="number" step="0.01" placeholder={isEquity ? "e.g. 2510" : "e.g. 120"} value={trade.exitPrice} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
               </div>
             </div>
 
@@ -438,10 +557,12 @@ export default function IndianOptionsAddTradePage() {
               <input name="setup" placeholder="e.g. Breakout above 26200" value={trade.setup} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
             </div>
 
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Expiry date</label>
-              <input name="expiryDate" type="date" value={trade.expiryDate} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
-            </div>
+            {!isEquity && (
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Expiry date</label>
+                <input name="expiryDate" type="date" value={trade.expiryDate} onChange={handleChange} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 14 }} />
+              </div>
+            )}
 
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: theme.muted, marginBottom: 6 }}>Planned Risk : Reward <span style={{ color: "#D63B3B" }}>*</span></label>
@@ -502,7 +623,11 @@ export default function IndianOptionsAddTradePage() {
                 <option value="Overtraded">Overtraded</option>
                 <option value="Held too long">Held too long</option>
                 <option value="Exited early">Exited early</option>
-                <option value="Wrong strike">Wrong strike</option>
+                {isEquity ? (
+                  <option value="Wrong stock">Wrong stock</option>
+                ) : (
+                  <option value="Wrong strike">Wrong strike</option>
+                )}
                 <option value="Revenge trade">Revenge trade</option>
                 <option value="No stop">No stop</option>
                 <option value="Other">Other</option>
@@ -672,5 +797,13 @@ export default function IndianOptionsAddTradePage() {
         </form>
       </main>
     </div>
+  );
+}
+
+export default function IndianOptionsAddTradePage() {
+  return (
+    <Suspense>
+      <IndianOptionsAddTradeContent />
+    </Suspense>
   );
 }

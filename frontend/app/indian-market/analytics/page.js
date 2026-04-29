@@ -412,6 +412,7 @@ export default function IndianAnalyticsPage() {
   };
   const prevMonth = () => shiftCalendarMonth(-1);
   const nextMonth = () => shiftCalendarMonth(1);
+  const [instrumentType, setInstrumentType] = useState("OPTION");
   const [data, setData] = useState({
     summary: null,
     rr: null,
@@ -432,8 +433,14 @@ export default function IndianAnalyticsPage() {
       router.push("/login");
       return;
     }
-    fetchData();
+    fetchData(instrumentType);
   }, [router]);
+
+  const switchInstrumentType = (type) => {
+    if (type === instrumentType) return;
+    setInstrumentType(type);
+    fetchData(type);
+  };
 
   const safeCall = async (fn) => {
     try { return await fn(); } catch { return null; }
@@ -452,20 +459,21 @@ export default function IndianAnalyticsPage() {
     return results;
   };
 
-  const fetchData = async () => {
+  const fetchData = async (itType = "OPTION") => {
     setLoading(true);
     try {
+      const it = itType;
       const [summary, rr, perf, time, drawdown, ai, breakdown, distribution, quality, psychology] = await runInBatches([
-        () => getSummary(MARKETS.INDIAN_MARKET),
-        () => getRiskRewardAnalysis(MARKETS.INDIAN_MARKET),
-        () => getPerformanceMetrics(MARKETS.INDIAN_MARKET),
-        () => getTimeAnalysis(MARKETS.INDIAN_MARKET),
-        () => getDrawdownAnalysis(MARKETS.INDIAN_MARKET),
-        () => getAIInsights(MARKETS.INDIAN_MARKET),
-        () => getPnLBreakdown(MARKETS.INDIAN_MARKET),
-        () => getTradeDistribution(MARKETS.INDIAN_MARKET),
-        () => getTradeQuality(MARKETS.INDIAN_MARKET),
-        () => getPsychologyAnalytics(MARKETS.INDIAN_MARKET)
+        () => getSummary(MARKETS.INDIAN_MARKET, it),
+        () => getRiskRewardAnalysis(MARKETS.INDIAN_MARKET, it),
+        () => getPerformanceMetrics(MARKETS.INDIAN_MARKET, it),
+        () => getTimeAnalysis(MARKETS.INDIAN_MARKET, 'all', it),
+        () => getDrawdownAnalysis(MARKETS.INDIAN_MARKET, it),
+        () => getAIInsights(MARKETS.INDIAN_MARKET, it),
+        () => getPnLBreakdown(MARKETS.INDIAN_MARKET, it),
+        () => getTradeDistribution(MARKETS.INDIAN_MARKET, it),
+        () => getTradeQuality(MARKETS.INDIAN_MARKET, it),
+        () => getPsychologyAnalytics(MARKETS.INDIAN_MARKET, it)
       ]);
       setData({ summary, rr, perf, time, drawdown, ai, breakdown, distribution, quality, psychology });
     } catch (error) {
@@ -494,12 +502,36 @@ export default function IndianAnalyticsPage() {
       <IndianMarketHeader />
 
       <main style={{ padding: "28px 20px", maxWidth: 1100, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 24 }}>
-          Advanced <span style={{ color: theme.secondary }}>Options Analytics</span>
+        <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>
+          Advanced <span style={{ color: theme.secondary }}>{instrumentType === "EQUITY" ? "Intraday Stocks" : "Options"} Analytics</span>
         </h1>
 
+        {/* Instrument type tab bar */}
+        <div style={{ display: "flex", gap: 0, marginBottom: 24, borderRadius: 8, overflow: "hidden", border: "1.5px solid #E2E8F0", width: "fit-content" }}>
+          {[{ v: "OPTION", label: "Options Analytics" }, { v: "EQUITY", label: "Intraday Stocks" }].map(({ v, label }) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => switchInstrumentType(v)}
+              style={{
+                padding: "10px 20px",
+                border: "none",
+                background: instrumentType === v ? theme.primary : "#FFFFFF",
+                color: instrumentType === v ? "#FFFFFF" : theme.muted,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                fontFamily: "'Plus Jakarta Sans',sans-serif"
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
-          <LoadingSpinner message="Analyzing Indian options performance..." fullPage />
+          <LoadingSpinner message={`Analyzing ${instrumentType === "EQUITY" ? "stock" : "options"} performance...`} fullPage />
         ) : (
           <>
             {/* TOP SUMMARY ROW */}
@@ -1286,24 +1318,45 @@ export default function IndianAnalyticsPage() {
                   <DistList title="" data={data.distribution.byEntryBasis} currency={currency} maxItems={5} />
                 </div>
               )}
-              {data.distribution?.byUnderlying && Object.keys(data.distribution.byUnderlying).filter(k => data.distribution.byUnderlying[k].total > 0).length > 0 && (
-                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Underlying</div>
-                  <DistList title="" data={data.distribution.byUnderlying} currency={currency} maxItems={6} />
-                </div>
+              {instrumentType === "EQUITY" ? (
+                <>
+                  {data.distribution?.byStockSymbol && Object.keys(data.distribution.byStockSymbol).filter(k => data.distribution.byStockSymbol[k].total > 0).length > 0 && (
+                    <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>By Stock</div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>Best and worst performing stocks in your journal.</div>
+                      <DistList title="" data={data.distribution.byStockSymbol} currency={currency} maxItems={8} />
+                    </div>
+                  )}
+                  {data.distribution?.bySector && Object.keys(data.distribution.bySector).filter(k => data.distribution.bySector[k].total > 0).length > 0 && (
+                    <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>By Sector</div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>IT vs Banking vs Pharma — where your edge lies.</div>
+                      <DistList title="" data={data.distribution.bySector} currency={currency} maxItems={6} />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {data.distribution?.byUnderlying && Object.keys(data.distribution.byUnderlying).filter(k => data.distribution.byUnderlying[k].total > 0).length > 0 && (
+                    <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Underlying</div>
+                      <DistList title="" data={data.distribution.byUnderlying} currency={currency} maxItems={6} />
+                    </div>
+                  )}
+                  {/* CE vs PE */}
+                  {data.distribution?.byOptionType && Object.keys(data.distribution.byOptionType).filter(k => k !== "Unspecified" && data.distribution.byOptionType[k].total > 0).length > 0 && (
+                    <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>CE vs PE</div>
+                      <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>Which option type you profit from more.</div>
+                      <DistList title="" data={data.distribution.byOptionType} currency={currency} maxItems={4} />
+                    </div>
+                  )}
+                </>
               )}
               {data.distribution?.byMistakeTag && Object.keys(data.distribution.byMistakeTag).filter(k => k !== "None" && data.distribution.byMistakeTag[k].total > 0).length > 0 && (
                 <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: theme.primary }}>By Mistake Tag</div>
                   <DistList title="" data={data.distribution.byMistakeTag} currency={currency} maxItems={6} />
-                </div>
-              )}
-              {/* CE vs PE */}
-              {data.distribution?.byOptionType && Object.keys(data.distribution.byOptionType).filter(k => k !== "Unspecified" && data.distribution.byOptionType[k].total > 0).length > 0 && (
-                <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>CE vs PE</div>
-                  <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>Which option type you profit from more.</div>
-                  <DistList title="" data={data.distribution.byOptionType} currency={currency} maxItems={4} />
                 </div>
               )}
               {/* BUY vs SELL direction */}
@@ -1314,8 +1367,8 @@ export default function IndianAnalyticsPage() {
                   <DistList title="" data={data.distribution.byDirection} currency={currency} maxItems={4} />
                 </div>
               )}
-              {/* By Symbol */}
-              {data.distribution?.byPair && Object.keys(data.distribution.byPair).filter(k => data.distribution.byPair[k].total > 0).length > 0 && (
+              {/* By Symbol (options) */}
+              {instrumentType !== "EQUITY" && data.distribution?.byPair && Object.keys(data.distribution.byPair).filter(k => data.distribution.byPair[k].total > 0).length > 0 && (
                 <div style={{ background: theme.card, borderRadius: 14, border: `1px solid ${theme.border}`, padding: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: theme.primary }}>By Symbol</div>
                   <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>Top performing options symbols in your journal.</div>

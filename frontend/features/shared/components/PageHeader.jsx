@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Menu, X, LogOut } from "lucide-react";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import { signOutFirebase } from "@/services/firebaseAuth";
 
 const NAV_LINKS = [
   { href: "/trades",                       label: "Journal"   },
@@ -25,8 +26,9 @@ export default function PageHeader({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("token");
+    await signOutFirebase();
     router.push("/login");
   };
 

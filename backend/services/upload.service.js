@@ -68,6 +68,9 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
     }
     const marketType = rawMarketType;
 
+    const tradeSubTypeRaw = String(body.tradeSubType || query.tradeSubType || "").trim().toUpperCase();
+    const tradeSubType = (marketType === "Indian_Market" && tradeSubTypeRaw === "EQUITY") ? "EQUITY" : "OPTION";
+
     const brokerOverrideRaw = String(body.broker || query.broker || "").trim();
     const brokerOverride =
       brokerOverrideRaw && brokerOverrideRaw.toUpperCase() !== "AUTO"
@@ -87,6 +90,7 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
       screenshot: uploadedImage.imageUrl,
       imageUrl: uploadedImage.imageUrl,
       marketType,
+      tradeSubType,
       broker: brokerOverride || "",
       status: "pending",
       queuedAt: new Date(),

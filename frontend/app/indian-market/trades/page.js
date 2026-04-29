@@ -21,6 +21,20 @@ const fmtINR = (v) => v != null ? `₹${Number(v).toLocaleString("en-IN", { mini
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
 const fmtTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 const getTradeDisplayDate = (trade) => trade.tradeDate || trade.createdAt;
+const isEquityTrade = (trade) => {
+  const instrumentType = String(trade?.instrumentType || "").toUpperCase();
+  if (instrumentType === "EQUITY") return true;
+  if (instrumentType === "OPTION") return false;
+  // Fallback for trades without instrumentType field
+  const optionType = String(trade?.optionType || "").toUpperCase();
+  const pair = String(trade?.pair || "").toUpperCase().trim();
+  return !(
+    optionType === "CE" ||
+    optionType === "PE" ||
+    trade?.strikePrice != null ||
+    /\b(CE|PE|CALL|PUT|FUT)\b/.test(pair)
+  );
+};
 
 // ─── Ticker ──────────────────────────────────────────────────────────────────
 const TICKERS = [
@@ -122,6 +136,7 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
   const bull    = profit >= 0;
   const optType = trade.optionType || (trade.pair?.includes(" PE") ? "PE" : "CE");
   const isLong  = trade.type?.toUpperCase() === "BUY";
+  const equityTrade = isEquityTrade(trade);
 
   const lotSizeMap = { NIFTY: 25, "BANK NIFTY": 15, BANKNIFTY: 15, "FIN NIFTY": 25, FINNIFTY: 25, MIDCPNIFTY: 75, SENSEX: 10, BANKEX: 15 };
   const defaultLS  = lotSizeMap[String(trade.underlying || "").toUpperCase().trim()] || 1;
@@ -160,14 +175,15 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#fff", fontWeight: 800, fontSize: 11, fontFamily: C.mono,
               }}>
-                {(trade.underlying || trade.pair || "N").charAt(0)}
+                {(trade.stockSymbol || trade.underlying || trade.pair || "N").charAt(0)}
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, fontFamily: C.mono, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
-                  {trade.pair || `${trade.underlying} ${trade.strikePrice} ${optType}`}
+                  {equityTrade ? (trade.stockSymbol || trade.pair) : (trade.pair || `${trade.underlying} ${trade.strikePrice} ${optType}`)}
                 </div>
                 <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono }}>
                   {fmtDate(getTradeDisplayDate(trade))} · {fmtTime(getTradeDisplayDate(trade))}
+                  {equityTrade && trade.sector ? ` · ${trade.sector}` : ""}
                 </div>
               </div>
             </div>
@@ -178,10 +194,18 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
             <div style={{ fontSize: 18, fontWeight: 900, color: bull ? C.bull : C.bear, fontFamily: C.mono, letterSpacing: "-0.02em" }}>
               {bull ? "+" : ""}₹{Math.abs(profit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
-            {lots > 0 && (
-              <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono }}>
-                {lots}L × {lotSize}
-              </div>
+            {equityTrade ? (
+              trade.sharesQty > 0 && (
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono }}>
+                  {trade.sharesQty} shares · {trade.exchange || "NSE"}
+                </div>
+              )
+            ) : (
+              lots > 0 && (
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono }}>
+                  {lots}L × {lotSize}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -199,16 +223,26 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
             {isLong ? "▲ BUY" : "▼ SELL"}
           </span>
 
-          {/* CE/PE badge */}
-          <span style={{
-            fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", fontFamily: C.mono,
-            color: optType === "CE" ? C.bull : C.bear,
-            background: optType === "CE" ? `${C.bull}10` : `${C.bear}10`,
-            border: `1px solid ${optType === "CE" ? C.bull : C.bear}30`,
-            borderRadius: 5, padding: "3px 8px",
-          }}>
-            {optType === "CE" ? "CE CALL" : "PE PUT"}
-          </span>
+          {/* CE/PE badge (options) or EQUITY badge (stock) */}
+          {equityTrade ? (
+            <span style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", fontFamily: C.mono,
+              color: C.blue, background: `${C.blue}10`,
+              border: `1px solid ${C.blue}30`, borderRadius: 5, padding: "3px 8px",
+            }}>
+              EQUITY
+            </span>
+          ) : (
+            <span style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", fontFamily: C.mono,
+              color: optType === "CE" ? C.bull : C.bear,
+              background: optType === "CE" ? `${C.bull}10` : `${C.bear}10`,
+              border: `1px solid ${optType === "CE" ? C.bull : C.bear}30`,
+              borderRadius: 5, padding: "3px 8px",
+            }}>
+              {optType === "CE" ? "CE CALL" : "PE PUT"}
+            </span>
+          )}
 
           {/* Trade type */}
           {trade.tradeType && (
@@ -247,11 +281,15 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
 
         {/* Row 3: Prices */}
         <div className="card-price-grid" style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-          {[
+          {(equityTrade ? [
+            { label: "Buy Price", val: fmtINR(trade.entryPrice) },
+            { label: "Sell Price", val: fmtINR(trade.exitPrice) },
+            { label: "Shares", val: trade.sharesQty != null ? String(trade.sharesQty) : "—" },
+          ] : [
             { label: "Entry", val: fmtINR(trade.entryPrice) },
             { label: "Exit",  val: fmtINR(trade.exitPrice)  },
             { label: "Strike", val: trade.strikePrice != null ? `₹${Number(trade.strikePrice).toLocaleString("en-IN")}` : "—" },
-          ].map(p => (
+          ]).map(p => (
             <div key={p.label} style={{ background: C.bg, borderRadius: 7, padding: "7px 10px" }}>
               <div style={{ fontSize: 9, color: C.muted, fontFamily: C.mono, marginBottom: 2 }}>{p.label}</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontFamily: C.mono }}>{p.val}</div>
@@ -336,13 +374,15 @@ function TradeCard({ trade, onDelete, style: extraStyle }) {
 }
 
 // ─── Filter bar ───────────────────────────────────────────────────────────────
-function FilterBar({ filter, setFilter, period, setPeriod, search, setSearch }) {
+function FilterBar({ filter, setFilter, period, setPeriod, search, setSearch, instrumentType, setInstrumentType }) {
   const filters = [
     { key: "all",  label: "All" },
     { key: "win",  label: "Winners" },
     { key: "loss", label: "Losers" },
-    { key: "CE",   label: "Calls" },
-    { key: "PE",   label: "Puts" },
+    ...(instrumentType !== "EQUITY" ? [
+      { key: "CE", label: "Calls" },
+      { key: "PE", label: "Puts" },
+    ] : []),
   ];
   const periods = [
     { key: "1w", label: "1W" },
@@ -351,7 +391,27 @@ function FilterBar({ filter, setFilter, period, setPeriod, search, setSearch }) 
     { key: "all", label: "ALL" },
   ];
   return (
-    <div className="filter-bar-row" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+    <div style={{ marginBottom: 20 }}>
+      {/* Instrument type toggle */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 12, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${C.border}`, width: "fit-content" }}>
+        {[{ v: "OPTION", label: "Options" }, { v: "EQUITY", label: "Intraday Stocks" }].map(({ v, label }) => (
+          <button
+            key={v}
+            onClick={() => { setInstrumentType(v); setFilter("all"); }}
+            style={{
+              padding: "9px 18px", border: "none",
+              background: instrumentType === v ? "#0D9E6E" : C.card,
+              color: instrumentType === v ? "#fff" : C.muted,
+              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              fontFamily: C.mono, transition: "all 0.15s",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+    <div className="filter-bar-row" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       {/* Search */}
       <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
         <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -407,6 +467,7 @@ function FilterBar({ filter, setFilter, period, setPeriod, search, setSearch }) 
         ))}
       </div>
     </div>
+    </div>
   );
 }
 
@@ -445,6 +506,7 @@ export default function IndianTradesPage() {
   const [filter, setFilter]           = useState("all");
   const [period, setPeriod]           = useState("1m");
   const [search, setSearch]           = useState("");
+  const [instrumentType, setInstrumentType] = useState("OPTION");
 
   useEffect(() => {
     if (!localStorage.getItem("token")) { router.push("/login"); return; }
@@ -470,7 +532,11 @@ export default function IndianTradesPage() {
   };
 
   const filtered = useMemo(() => {
-    let list = trades;
+    let list = trades.filter(t =>
+      instrumentType === "EQUITY"
+        ? isEquityTrade(t)
+        : !isEquityTrade(t)
+    );
     if (filter === "win")  list = list.filter(t => (t.profit || 0) > 0);
     if (filter === "loss") list = list.filter(t => (t.profit || 0) < 0);
     if (filter === "CE")   list = list.filter(t => (t.optionType || "CE") === "CE");
@@ -479,13 +545,15 @@ export default function IndianTradesPage() {
       const q = search.toLowerCase();
       list = list.filter(t =>
         (t.pair || "").toLowerCase().includes(q) ||
+        (t.stockSymbol || "").toLowerCase().includes(q) ||
         (t.strategy || "").toLowerCase().includes(q) ||
         (t.underlying || "").toLowerCase().includes(q) ||
+        (t.sector || "").toLowerCase().includes(q) ||
         new Date(getTradeDisplayDate(t)).toLocaleDateString("en-IN").toLowerCase().includes(q)
       );
     }
     return list;
-  }, [trades, filter, search]);
+  }, [trades, filter, search, instrumentType]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: C.sans, color: C.ink }}>
@@ -501,9 +569,11 @@ export default function IndianTradesPage() {
         <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 900, color: C.ink, margin: 0, letterSpacing: "-0.02em" }}>
-              Options Journal
+              {instrumentType === "EQUITY" ? "Stocks Journal" : "Options Journal"}
             </h1>
-            <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0", fontFamily: C.mono }}>NSE / BSE · Options</p>
+            <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0", fontFamily: C.mono }}>
+              NSE / BSE · {instrumentType === "EQUITY" ? "Intraday Equities" : "Options"}
+            </p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <Link href="/indian-market/upload-trade" style={{
@@ -534,7 +604,7 @@ export default function IndianTradesPage() {
 
         {/* Filters */}
         {!loading && trades.length > 0 && (
-          <FilterBar filter={filter} setFilter={setFilter} period={period} setPeriod={setPeriod} search={search} setSearch={setSearch} />
+          <FilterBar filter={filter} setFilter={setFilter} period={period} setPeriod={setPeriod} search={search} setSearch={setSearch} instrumentType={instrumentType} setInstrumentType={setInstrumentType} />
         )}
 
         {/* Content */}

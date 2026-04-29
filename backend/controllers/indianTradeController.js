@@ -37,8 +37,21 @@ function getPeriodStart(period) {
   }
 }
 
+function parseFiniteNumber(value) {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const cleaned = value.replace(/,/g, "").trim();
+    if (!cleaned) return null;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 exports.createTrade = asyncHandler(async (req, res) => {
-  const { pair, type, underlying, strikePrice, optionType, tradeDate } = req.body;
+  const { pair, type, underlying, strikePrice, optionType, tradeDate, instrumentType, stockSymbol, sharesQty } = req.body;
 
   if (!type) {
     throw new ApiError(400, "Type (BUY/SELL) is required", "VALIDATION_ERROR");
@@ -48,32 +61,61 @@ exports.createTrade = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Type must be BUY or SELL", "VALIDATION_ERROR");
   }
 
-  const validOptionTypes = ["CE", "PE"];
-  const ot = (optionType || "CE").toUpperCase();
-  if (!validOptionTypes.includes(ot)) {
-    throw new ApiError(400, "Option type must be CE or PE", "VALIDATION_ERROR");
+  const isEquity = (instrumentType || "").toUpperCase() === "EQUITY";
+
+  let ot = (optionType || "CE").toUpperCase();
+  if (!isEquity) {
+    const validOptionTypes = ["CE", "PE"];
+    if (!validOptionTypes.includes(ot)) {
+      throw new ApiError(400, "Option type must be CE or PE", "VALIDATION_ERROR");
+    }
+  }
+
+  if (isEquity) {
+    if (!stockSymbol && !pair) {
+      throw new ApiError(400, "Stock symbol is required for equity trades", "VALIDATION_ERROR");
+    }
+    const normalizedSharesQty = parseFiniteNumber(sharesQty);
+    if (normalizedSharesQty == null || normalizedSharesQty <= 0) {
+      throw new ApiError(400, "Shares quantity is required for equity trades", "VALIDATION_ERROR");
+    }
+    req.body.sharesQty = normalizedSharesQty;
   }
 
   let symbol = pair;
-  if (!symbol && underlying && strikePrice != null) {
-    symbol = `${String(underlying).trim()} ${strikePrice} ${ot}`;
-  }
-  if (!symbol) {
-    throw new ApiError(400, "Symbol is required (provide pair or underlying + strike + optionType)", "VALIDATION_ERROR");
+  if (!isEquity) {
+    if (!symbol && underlying && strikePrice != null) {
+      symbol = `${String(underlying).trim()} ${strikePrice} ${ot}`;
+    }
+    if (!symbol) {
+      throw new ApiError(400, "Symbol is required (provide pair or underlying + strike + optionType)", "VALIDATION_ERROR");
+    }
+  } else {
+    symbol = pair || String(stockSymbol).trim().toUpperCase();
   }
 
   if (!tradeDate) {
     throw new ApiError(400, "Trade date is required", "VALIDATION_ERROR");
   }
 
-  const trade = await IndianTrade.create({
+  const tradeData = {
     ...req.body,
     pair: symbol,
     type: type.toUpperCase(),
-    optionType: ot,
     tradeDate: normalizeTradeDate(tradeDate),
     user: req.user._id,
-  });
+  };
+  if (!isEquity) {
+    tradeData.optionType = ot;
+    tradeData.instrumentType = "OPTION";
+    tradeData.segment = "F&O";
+  } else {
+    tradeData.instrumentType = "EQUITY";
+    tradeData.segment = "EQUITY";
+    tradeData.tradeType = "INTRADAY";
+  }
+
+  const trade = await IndianTrade.create(tradeData);
 
   await clearUserCache(req.user._id);
 
@@ -86,7 +128,7 @@ exports.getTrades = asyncHandler(async (req, res) => {
   const periodStart = getPeriodStart(period);
   const trades = await IndianTrade.find(query)
     .select(
-      "pair underlying type optionType quantity lotSize entryPrice exitPrice profit strategy session entryBasis entryBasisCustom createdAt tradeDate"
+      "pair underlying type optionType quantity lotSize entryPrice exitPrice profit strategy session entryBasis entryBasisCustom createdAt tradeDate instrumentType segment tradeType stockSymbol sharesQty exchange sector strikePrice"
     )
     .lean();
   res.json(

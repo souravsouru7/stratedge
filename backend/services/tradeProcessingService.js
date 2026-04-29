@@ -4,12 +4,13 @@ const { clearUserCache } = require("../utils/cacheUtils");
 const { buildCacheKey, setCache } = require("../utils/cache");
 const { extractText } = require("./ocrService");
 const { extractTextWithVision, isVisionAvailable } = require("./visionOcrService");
-const { extractIndianTradeWithAI, extractTradeWithAI, extractTradeWithGeminiVision } = require("./aiExtractionService");
+const { extractIndianTradeWithAI, extractEquityIntradayWithAI, extractTradeWithAI, extractTradeWithGeminiVision } = require("./aiExtractionService");
 const {
   parseTrade,
   parseIndianTrade,
   parseTradesFromOCR,
   parseForexTradesFromOCR,
+  parseEquityIntradayTrade,
 } = require("./parsingService");
 const cloudinary = require("../config/cloudinary");
 const {
@@ -52,6 +53,19 @@ function logExtractedTrades({ tradeId, stage, parsedTrade, parsedTrades }) {
       stage,
     });
   }
+}
+
+function logIndianOptionExtractionDebug({ tradeId, stage, cleanedText = "", aiRawResponse = "", parsedTrade = {}, parsedTrades = [] }) {
+  const multiTrades = Array.isArray(parsedTrades) ? parsedTrades.filter(Boolean) : [];
+  logger.warn(`Indian options debug | tradeId=${tradeId} | ${stage}`, {
+    tradeId,
+    stage,
+    ocrPreview: cleanedText ? cleanedText.slice(0, 1200) : "",
+    aiPreview: aiRawResponse ? aiRawResponse.slice(0, 1200) : "",
+    parsedTrade,
+    parsedTrades: multiTrades,
+    parsedTradesCount: multiTrades.length,
+  });
 }
 
 function normalizeTradeType(type) {
@@ -168,27 +182,73 @@ function safeParseForexTradesFromOCR(text) {
   }
 }
 
-async function downloadImageBuffer(imageUrl) {
-  const res = await withTimeout(fetch(imageUrl), "Image download", 15000);
-  if (!res.ok) throw new Error(`Image download failed: ${res.status}`);
-  const arrayBuffer = await res.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+function safeParseEquityTrade(text, options) {
+  try {
+    return parseEquityIntradayTrade(text || "", options || {});
+  } catch (error) {
+    logger.error("Safe parseEquityIntradayTrade failed", { error: error.message });
+    return {};
+  }
 }
 
+function mergeEquityAiData(parsedTrade, aiData) {
+  if (!aiData) return parsedTrade;
+  const merged = { ...parsedTrade };
+  // AI (Gemini Vision / text AI) takes precedence over OCR regex — it reads the image
+  // directly and understands context; OCR regex is a dumb pattern match.
+  if (aiData.stockSymbol) merged.stockSymbol = aiData.stockSymbol;
+  if (aiData.exchange) merged.exchange = aiData.exchange;
+  if (aiData.sharesQty != null && aiData.sharesQty > 0) merged.sharesQty = aiData.sharesQty;
+  if (aiData.type) merged.type = aiData.type;
+  if (aiData.entryPrice != null && aiData.entryPrice > 0) merged.entryPrice = aiData.entryPrice;
+  if (aiData.exitPrice != null && aiData.exitPrice > 0) merged.exitPrice = aiData.exitPrice;
+  if (aiData.profit != null) merged.profit = aiData.profit;
+  if (aiData.broker) merged.broker = aiData.broker;
+  if (aiData.sector) merged.sector = aiData.sector;
+  merged.instrumentType = "EQUITY";
+  merged.segment = "EQUITY";
+  merged.tradeType = "INTRADAY";
+  if (merged.stockSymbol && !merged.pair) {
+    merged.pair = merged.stockSymbol;
+  }
+  return merged;
+}
+
+async function downloadImageBuffer(imageUrl) {
+  const res = await withTimeout(fetch(imageUrl), "Image download", 30000);
+  if (!res.ok) throw new Error(`Image download failed: ${res.status}`);
+  const mimeType = res.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+  const arrayBuffer = await res.arrayBuffer();
+  return { buffer: Buffer.from(arrayBuffer), mimeType };
+}
+
+// Returns { text, buffer, mimeType, ocrFailed } — always returns the image buffer so
+// Gemini Vision can reuse it without a second download, even when OCR itself fails.
 async function runOcrWithRetry(imagePath) {
+  // Download the image once upfront — separate from OCR so the buffer is always
+  // available to the caller even if Tesseract/Vision times out.
+  let imageBuffer, imageMimeType;
+  try {
+    const result = await downloadImageBuffer(imagePath);
+    imageBuffer = result.buffer;
+    imageMimeType = result.mimeType;
+  } catch (error) {
+    // Image itself is unreachable — nothing downstream can help.
+    throw error;
+  }
+
   // 1. Google Cloud Vision — most accurate, handles complex broker UIs
   if (isVisionAvailable()) {
     try {
       logger.info("OCR: trying Google Cloud Vision (primary)");
-      const buffer = await downloadImageBuffer(imagePath);
       const result = await withTimeout(
-        extractTextWithVision(buffer),
+        extractTextWithVision(imageBuffer),
         "Google Vision OCR timeout",
         PROCESSING_TIMEOUT_MS
       );
       if (result?.text && result.text.trim().length > 20) {
         logger.info("OCR: Google Cloud Vision succeeded", { textLength: result.text.length });
-        return result.text;
+        return { text: result.text, buffer: imageBuffer, mimeType: imageMimeType };
       }
       logger.warn("OCR: Google Cloud Vision returned empty text, falling back to Tesseract");
     } catch (error) {
@@ -199,26 +259,23 @@ async function runOcrWithRetry(imagePath) {
   }
 
   // 2. Tesseract — last resort
-  let lastError = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
       logger.info(`OCR: Tesseract attempt ${attempt}`);
-      return await withTimeout(extractText(imagePath), "Processing timeout");
+      const text = await withTimeout(extractText(imageBuffer), "Processing timeout");
+      return { text, buffer: imageBuffer, mimeType: imageMimeType };
     } catch (error) {
-      lastError = error;
-      logger.error(`OCR: Tesseract attempt ${attempt} failed`, {
-        attempt,
-        error: error.message,
-      });
+      logger.error(`OCR: Tesseract attempt ${attempt} failed`, { attempt, error: error.message });
     }
   }
 
-  const failure = new Error("OCR failed after retry");
-  failure.cause = lastError;
-  throw failure;
+  // OCR exhausted — return empty text but keep the buffer for Gemini Vision
+  logger.warn("OCR failed after all attempts — returning buffer for Gemini Vision fallback");
+  return { text: "", buffer: imageBuffer, mimeType: imageMimeType, ocrFailed: true };
 }
 
-async function runAiWithRetry({ marketType, text, includeRawResponse = true, brokerHint = "", expectedMultiple = false }) {
+async function runAiWithRetry({ marketType, tradeSubType = "OPTION", text, includeRawResponse = true, brokerHint = "", expectedMultiple = false }) {
+  const isEquity = marketType === "Indian_Market" && tradeSubType === "EQUITY";
   let lastError = null;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -228,7 +285,9 @@ async function runAiWithRetry({ marketType, text, includeRawResponse = true, bro
         marketType,
       });
       const result = await withTimeout(
-        marketType === "Indian_Market"
+        isEquity
+          ? extractEquityIntradayWithAI(text, { includeRawResponse, brokerHint })
+          : marketType === "Indian_Market"
           ? extractIndianTradeWithAI(text, {
               includeRawResponse,
               improvedPrompt: attempt === 2,
@@ -277,11 +336,16 @@ function mergeIndianAiData(parsedTrade, aiData) {
   if (!aiData) return parsedTrade;
 
   const merged = { ...parsedTrade };
-  if (!merged.pair && aiData.pair) merged.pair = aiData.pair;
-  if (merged.profit == null && aiData.profit != null) merged.profit = aiData.profit;
-  if (merged.quantity == null && aiData.quantity != null) merged.quantity = aiData.quantity;
-  if (merged.strikePrice == null && aiData.strikePrice != null) merged.strikePrice = aiData.strikePrice;
-  if (!merged.optionType && aiData.optionType) merged.optionType = aiData.optionType;
+  // AI overrides OCR — wrong strike/optionType from OCR regex must not survive
+  if (aiData.pair) merged.pair = aiData.pair;
+  if (aiData.profit != null) merged.profit = aiData.profit;
+  if (aiData.quantity != null && aiData.quantity > 0) merged.quantity = aiData.quantity;
+  if (aiData.strikePrice != null && aiData.strikePrice > 0) merged.strikePrice = aiData.strikePrice;
+  if (aiData.optionType) merged.optionType = aiData.optionType;
+  if (aiData.underlying) merged.underlying = aiData.underlying;
+  if (aiData.entryPrice != null && aiData.entryPrice > 0) merged.entryPrice = aiData.entryPrice;
+  if (aiData.exitPrice != null && aiData.exitPrice > 0) merged.exitPrice = aiData.exitPrice;
+  if (aiData.broker) merged.broker = aiData.broker;
   return merged;
 }
 
@@ -314,17 +378,65 @@ function mergeIndianAiTrades(parsedTrades = [], aiTrades = [], broker = "") {
       };
     }
 
+    // AI overrides OCR per-row — AI reads context, OCR regex misses expiry/strike typos
     return {
       ...trade,
-      symbol: trade.symbol || aiTrade.underlying || aiTrade.pair?.split(" ")[0] || trade.symbol,
-      strike: trade.strike ?? aiTrade.strikePrice ?? null,
-      optionType: trade.optionType || aiTrade.optionType || null,
-      quantity: trade.quantity ?? aiTrade.quantity ?? null,
-      entryPrice: trade.entryPrice ?? aiTrade.entryPrice ?? null,
-      pnl: trade.pnl ?? aiTrade.profit ?? null,
-      broker: trade.broker || aiTrade.broker || broker || "",
+      symbol: aiTrade.underlying || aiTrade.pair?.split(" ")[0] || trade.symbol,
+      strike: (aiTrade.strikePrice != null && aiTrade.strikePrice > 0) ? aiTrade.strikePrice : trade.strike ?? null,
+      optionType: aiTrade.optionType || trade.optionType || null,
+      quantity: (aiTrade.quantity != null && aiTrade.quantity > 0) ? aiTrade.quantity : trade.quantity ?? null,
+      entryPrice: (aiTrade.entryPrice != null && aiTrade.entryPrice > 0) ? aiTrade.entryPrice : trade.entryPrice ?? null,
+      pnl: aiTrade.profit ?? trade.pnl ?? null,
+      broker: aiTrade.broker || trade.broker || broker || "",
     };
   });
+}
+
+function buildIndianTradeFromParsedRow(row = {}, fallbackBroker = "") {
+  const symbol = String(row.symbol || "").trim().toUpperCase();
+  const optionType = String(row.optionType || "").trim().toUpperCase();
+  const strike = row.strike ?? null;
+  return {
+    pair: symbol && strike != null && optionType ? `${symbol} ${strike} ${optionType}` : null,
+    underlying: symbol || null,
+    optionType: optionType === "CE" || optionType === "PE" ? optionType : null,
+    strikePrice: strike,
+    quantity: row.quantity ?? null,
+    entryPrice: row.entryPrice ?? null,
+    profit: row.pnl ?? null,
+    broker: row.broker || fallbackBroker || "",
+  };
+}
+
+function inferIndianTradeSubType(data) {
+  const rows = [data, ...(Array.isArray(data?.trades) ? data.trades : [])].filter(Boolean);
+  if (rows.length === 0) return null;
+
+  const hasOptionSignals = rows.some((row) => {
+    const pair = String(row?.pair || "").toUpperCase();
+    const optionType = String(row?.optionType || "").toUpperCase();
+    return (
+      optionType === "CE" ||
+      optionType === "PE" ||
+      row?.strikePrice != null ||
+      /\b(CE|PE|CALL|PUT|FUT)\b/.test(pair)
+    );
+  });
+  if (hasOptionSignals) return "OPTION";
+
+  const hasEquitySignals = rows.some((row) => {
+    const instrumentType = String(row?.instrumentType || "").toUpperCase();
+    return (
+      instrumentType === "EQUITY" ||
+      !!row?.stockSymbol ||
+      row?.sharesQty != null ||
+      row?.exchange === "NSE" ||
+      row?.exchange === "BSE"
+    );
+  });
+  if (hasEquitySignals) return "EQUITY";
+
+  return null;
 }
 
 function isIndianExtractionWeak({ parsedTrade, parsedTrades }) {
@@ -341,21 +453,22 @@ function isIndianExtractionWeak({ parsedTrade, parsedTrades }) {
 function mergeGenericAiData(parsedTrade, aiData) {
   if (!aiData) return parsedTrade;
 
+  // AI overrides OCR — pair names and prices from Gemini are more reliable than regex
   return {
     ...parsedTrade,
-    pair: parsedTrade?.pair || aiData.pair || null,
-    type: parsedTrade?.type || parsedTrade?.action || aiData.type || null,
-    quantity: parsedTrade?.quantity ?? aiData.quantity ?? parsedTrade?.lotSize ?? null,
+    pair: aiData.pair || parsedTrade?.pair || null,
+    type: aiData.type || parsedTrade?.type || parsedTrade?.action || null,
+    quantity: aiData.quantity ?? parsedTrade?.quantity ?? parsedTrade?.lotSize ?? null,
     lotSize: parsedTrade?.lotSize ?? aiData.quantity ?? null,
-    entryPrice: parsedTrade?.entryPrice ?? aiData.entryPrice ?? null,
-    exitPrice: parsedTrade?.exitPrice ?? aiData.exitPrice ?? null,
-    profit: parsedTrade?.profit ?? aiData.profit ?? null,
-    stopLoss: parsedTrade?.stopLoss ?? aiData.stopLoss ?? null,
-    takeProfit: parsedTrade?.takeProfit ?? aiData.takeProfit ?? null,
-    broker: parsedTrade?.broker || aiData.broker || null,
-    strikePrice: parsedTrade?.strikePrice ?? aiData.strikePrice ?? null,
-    optionType: parsedTrade?.optionType || aiData.optionType || null,
-    underlying: parsedTrade?.underlying || aiData.underlying || null,
+    entryPrice: (aiData.entryPrice != null && aiData.entryPrice > 0) ? aiData.entryPrice : parsedTrade?.entryPrice ?? null,
+    exitPrice: (aiData.exitPrice != null && aiData.exitPrice > 0) ? aiData.exitPrice : parsedTrade?.exitPrice ?? null,
+    profit: aiData.profit ?? parsedTrade?.profit ?? null,
+    stopLoss: (aiData.stopLoss != null && aiData.stopLoss > 0) ? aiData.stopLoss : parsedTrade?.stopLoss ?? null,
+    takeProfit: (aiData.takeProfit != null && aiData.takeProfit > 0) ? aiData.takeProfit : parsedTrade?.takeProfit ?? null,
+    broker: aiData.broker || parsedTrade?.broker || null,
+    strikePrice: (aiData.strikePrice != null && aiData.strikePrice > 0) ? aiData.strikePrice : parsedTrade?.strikePrice ?? null,
+    optionType: aiData.optionType || parsedTrade?.optionType || null,
+    underlying: aiData.underlying || parsedTrade?.underlying || null,
   };
 }
 
@@ -389,6 +502,12 @@ function buildTradeUpdate({
     instrumentType: parsedTrade?.instrumentType || trade.instrumentType || "",
     strikePrice: parsedTrade?.strikePrice ?? trade.strikePrice ?? undefined,
     expiryDate: parsedTrade?.expiryDate || trade.expiryDate || "",
+    // Equity intraday fields
+    stockSymbol: parsedTrade?.stockSymbol || trade.stockSymbol || undefined,
+    exchange: parsedTrade?.exchange || trade.exchange || undefined,
+    sharesQty: parsedTrade?.sharesQty ?? trade.sharesQty ?? undefined,
+    sector: parsedTrade?.sector || trade.sector || undefined,
+    tradeSubType: trade.tradeSubType || undefined,
     extractedText,
     rawOCRText: extractedText,
     aiRawResponse: aiRawResponse || "",
@@ -457,15 +576,26 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
 
   return withTimeout((async () => {
     const marketType = trade.marketType || "Forex";
+    let tradeSubType = trade.tradeSubType || "OPTION";
+    let isEquityIntraday = marketType === "Indian_Market" && tradeSubType === "EQUITY";
     let extractedText = "";
     let ocrSkipped = false;
+    let ocrImageBuffer = null;
+    let ocrImageMimeType = "image/jpeg";
 
     try {
-      extractedText = await runOcrWithRetry(sourceImage);
+      const ocrResult = await runOcrWithRetry(sourceImage);
+      extractedText = ocrResult.text;
+      ocrImageBuffer = ocrResult.buffer;
+      ocrImageMimeType = ocrResult.mimeType;
+      if (ocrResult.ocrFailed) {
+        ocrSkipped = true;
+        logger.warn(`OCR text extraction failed | tradeId=${tradeId} | image buffer retained for Gemini Vision`, { tradeId });
+      }
     } catch (error) {
-      // OCR timed out or failed — don't crash the job, fall back to AI-only mode
+      // Image download itself failed — no buffer available
       ocrSkipped = true;
-      logger.warn(`OCR failed | tradeId=${tradeId} | falling back to AI-only extraction`, {
+      logger.warn(`OCR failed (image unreachable) | tradeId=${tradeId} | falling back to AI-only extraction`, {
         tradeId,
         reason: error.message,
       });
@@ -482,6 +612,9 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       broker,
       weakOcr: weakOcr,
     });
+    if (marketType === "Indian_Market" && !isEquityIntraday) {
+      logIndianOptionExtractionDebug({ tradeId, stage: "ocr-output", cleanedText });
+    }
 
     if (cleanedText.length < 1000) {
       logger.debug(`OCR text preview | tradeId=${tradeId}`, { text: cleanedText });
@@ -507,22 +640,51 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
     // ── Primary extraction: Gemini Vision reads the image directly ──────────
     // Runs on every upload regardless of OCR quality. Direct image → JSON is
     // more accurate than OCR text → AI because it avoids all OCR corruption.
+    // Retried once on failure — a single network blip should not drop us to Tesseract.
     try {
-      const visionData = await withTimeout(
-        extractTradeWithGeminiVision(sourceImage, { marketType }),
-        "Gemini Vision timeout"
-      ).catch((err) => {
-        logger.warn(`Gemini Vision failed | tradeId=${tradeId}`, { error: err.message });
-        return null;
-      });
+      let visionData = null;
+      for (let vAttempt = 1; vAttempt <= 2; vAttempt++) {
+        try {
+          visionData = await withTimeout(
+            extractTradeWithGeminiVision(sourceImage, {
+              marketType,
+              tradeSubType,
+              imageBuffer: ocrImageBuffer,
+              imageMimeType: ocrImageMimeType,
+            }),
+            "Gemini Vision timeout"
+          );
+          if (visionData) break;
+          logger.warn(`Gemini Vision returned null | tradeId=${tradeId} | attempt=${vAttempt}`, { tradeId, vAttempt });
+        } catch (vErr) {
+          logger.warn(`Gemini Vision attempt ${vAttempt} failed | tradeId=${tradeId}`, { tradeId, vAttempt, error: vErr.message });
+          if (vAttempt === 2) visionData = null;
+        }
+      }
 
       if (visionData) {
+        if (marketType === "Indian_Market") {
+          const inferredSubType = inferIndianTradeSubType(visionData);
+          if (inferredSubType && inferredSubType !== tradeSubType) {
+            logger.warn(`Indian subtype mismatch corrected by AI | tradeId=${tradeId}`, {
+              tradeId,
+              requestedSubType: tradeSubType,
+              inferredSubType,
+            });
+            tradeSubType = inferredSubType;
+            isEquityIntraday = tradeSubType === "EQUITY";
+          }
+        }
+
         aiData = visionData;
         aiRawResponse = visionData.rawResponse || "";
         geminiVisionUsed = true;
         logger.info(`Gemini Vision primary extraction succeeded | tradeId=${tradeId}`, { tradeId, marketType });
 
-        if (marketType === "Indian_Market") {
+        if (isEquityIntraday) {
+          parsedTrade = mergeEquityAiData({}, aiData);
+          parsedTrades = Array.isArray(aiData?.trades) ? aiData.trades.map((t) => mergeEquityAiData({}, t)) : [];
+        } else if (marketType === "Indian_Market") {
           parsedTrade = mergeIndianAiData({}, aiData);
           parsedTrades = mergeIndianAiTrades([], aiData?.trades || [], broker || aiData.broker || "");
         } else {
@@ -530,6 +692,16 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         }
 
         logExtractedTrades({ tradeId, stage: "Gemini Vision extraction", parsedTrade, parsedTrades });
+        if (marketType === "Indian_Market" && !isEquityIntraday) {
+          logIndianOptionExtractionDebug({
+            tradeId,
+            stage: "gemini-vision",
+            cleanedText,
+            aiRawResponse,
+            parsedTrade,
+            parsedTrades,
+          });
+        }
       }
     } catch (err) {
       logger.warn(`Gemini Vision step error | tradeId=${tradeId}`, { error: err.message });
@@ -537,7 +709,10 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
 
     // ── OCR-based parsing (runs when Gemini Vision unavailable or failed) ───
     if (!geminiVisionUsed) {
-      if (marketType === "Indian_Market" && !weakOcr) {
+      if (isEquityIntraday && !weakOcr) {
+        parsedTrade = safeParseEquityTrade(cleanedText, { broker });
+        parsedTrades = [];
+      } else if (marketType === "Indian_Market" && !weakOcr) {
         parsedTrade = safeParseIndianTrade(cleanedText, { broker });
         parsedTrades = safeParseTradesFromOCR(cleanedText, { broker });
       } else if (!weakOcr) {
@@ -551,6 +726,54 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       }
 
       logExtractedTrades({ tradeId, stage: "OCR-based extraction", parsedTrade, parsedTrades });
+      if (marketType === "Indian_Market" && !isEquityIntraday) {
+        logIndianOptionExtractionDebug({
+          tradeId,
+          stage: "ocr-parsed",
+          cleanedText,
+          parsedTrade,
+          parsedTrades,
+        });
+      }
+    }
+
+    if (marketType === "Indian_Market" && !isEquityIntraday && !weakOcr) {
+      const ocrParsedTrade = safeParseIndianTrade(cleanedText, { broker });
+      const ocrParsedTrades = safeParseTradesFromOCR(cleanedText, { broker });
+      const hasOcrMultiOptions = Array.isArray(ocrParsedTrades) && ocrParsedTrades.length > 1;
+      const hasVisionMultiOptions = Array.isArray(parsedTrades) && parsedTrades.length > 1;
+
+      // Only let OCR override Vision when OCR found more trades AND every one of those
+      // trades has a valid symbol + strike + optionType. A partial OCR result (missing
+      // strike or CE/PE) is worse than a single-trade Vision result — don't clobber it.
+      const ocrTradesAreValid = Array.isArray(ocrParsedTrades) &&
+        ocrParsedTrades.every((t) => t.symbol && t.strike > 0 && (t.optionType === "CE" || t.optionType === "PE"));
+
+      if (hasOcrMultiOptions && !hasVisionMultiOptions && ocrTradesAreValid) {
+        logger.warn(`Indian options OCR override applied (validated) | tradeId=${tradeId}`, {
+          tradeId,
+          ocrCount: ocrParsedTrades.length,
+          visionCount: Array.isArray(parsedTrades) ? parsedTrades.length : 0,
+        });
+
+        parsedTrades = mergeIndianAiTrades(ocrParsedTrades, aiData?.trades || [], broker || aiData?.broker || "");
+        parsedTrade = mergeIndianAiData(
+          ocrParsedTrade,
+          buildIndianTradeFromParsedRow(parsedTrades[0], broker || aiData?.broker || "")
+        );
+        geminiVisionUsed = false;
+      } else if (hasOcrMultiOptions && !hasVisionMultiOptions && !ocrTradesAreValid) {
+        logger.warn(`Indian options OCR override skipped — OCR trades failed validation | tradeId=${tradeId}`, {
+          tradeId,
+          ocrCount: ocrParsedTrades.length,
+          invalidTrades: ocrParsedTrades.filter((t) => !t.symbol || !t.strike || !t.optionType).length,
+        });
+      } else if ((!parsedTrade?.pair || !parsedTrade?.optionType || parsedTrade?.strikePrice == null) && ocrParsedTrade?.pair) {
+        parsedTrade = mergeIndianAiData(ocrParsedTrade, aiData);
+        if ((!parsedTrades || parsedTrades.length === 0) && ocrParsedTrades.length > 0) {
+          parsedTrades = mergeIndianAiTrades(ocrParsedTrades, aiData?.trades || [], broker || aiData?.broker || "");
+        }
+      }
     }
 
     let quality = marketType === "Indian_Market"
@@ -577,10 +800,11 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       try {
         aiData = await runAiWithRetry({
           marketType,
+          tradeSubType,
           text: cleanedText || sourceImage,
           includeRawResponse: true,
           brokerHint: broker,
-          expectedMultiple: marketType === "Indian_Market" && ((parsedTrades && parsedTrades.length > 1) || /POSITIONS|HOLDINGS|CLOSED/i.test(cleanedText)),
+          expectedMultiple: marketType === "Indian_Market" && (isEquityIntraday ? /INTRADAY|POSITIONS|HOLDINGS|CLOSED/i.test(cleanedText) : ((parsedTrades && parsedTrades.length > 1) || /POSITIONS|HOLDINGS|CLOSED/i.test(cleanedText))),
         });
         aiRawResponse = aiData?.rawResponse || "";
 
@@ -590,7 +814,12 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
           logger.info(`Text AI output | tradeId=${tradeId}`, { response: aiRawResponse.slice(0, 1000) });
         }
 
-        if (marketType === "Indian_Market") {
+        if (isEquityIntraday) {
+          parsedTrade = mergeEquityAiData(safeParseEquityTrade(cleanedText, { broker }), aiData);
+          parsedTrades = Array.isArray(aiData?.trades) && aiData.trades.length > 1
+            ? aiData.trades.map((t) => mergeEquityAiData({}, t))
+            : [];
+        } else if (marketType === "Indian_Market") {
           parsedTrade = mergeIndianAiData(safeParseIndianTrade(cleanedText, { broker }), aiData);
           parsedTrades = mergeIndianAiTrades(
             safeParseTradesFromOCR(cleanedText, { broker }),
@@ -603,6 +832,16 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         }
 
         logExtractedTrades({ tradeId, stage: "Text AI extraction", parsedTrade, parsedTrades });
+        if (marketType === "Indian_Market" && !isEquityIntraday) {
+          logIndianOptionExtractionDebug({
+            tradeId,
+            stage: "text-ai",
+            cleanedText,
+            aiRawResponse,
+            parsedTrade,
+            parsedTrades,
+          });
+        }
       } catch (error) {
         logger.error(`AI failure | tradeId=${tradeId}`, {
           tradeId,
@@ -663,6 +902,16 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       parsedTrade,
       parsedTrades,
     });
+    if (marketType === "Indian_Market" && !isEquityIntraday) {
+      logIndianOptionExtractionDebug({
+        tradeId,
+        stage: "final",
+        cleanedText,
+        aiRawResponse,
+        parsedTrade,
+        parsedTrades,
+      });
+    }
 
     // When multiple trades are parsed, the ghost/placeholder trade that was created
     // on upload must be DELETED — it was never a real trade, just a job tracker.
@@ -687,6 +936,7 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
             screenshot: trade.screenshot || trade.imageUrl || "",
             extractedText: cleanedText,
             marketType: trade.marketType || "Forex",
+            tradeSubType: marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "",
           },
         },
         15 * 60
@@ -709,6 +959,7 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         needsReview,
         validationFailures: finalValidation.failures,
       });
+      update.tradeSubType = marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "";
       await Trade.findByIdAndUpdate(tradeId, update, { returnDocument: "after", runValidators: true });
     }
 

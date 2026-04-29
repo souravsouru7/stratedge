@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Menu, X, LogOut } from "lucide-react";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import { signOutFirebase } from "@/services/firebaseAuth";
 
 const NAV_ITEMS = [
   { href: "/indian-market/dashboard", label: "Dashboard" },
@@ -26,8 +27,9 @@ export default function IndianMarketHeader() {
     return pathname === base || (base !== "/indian-market/dashboard" && pathname.startsWith(base));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("token");
+    await signOutFirebase();
     router.push("/login");
   };
 

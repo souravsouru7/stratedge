@@ -55,8 +55,14 @@ const indianTradeSchema = new mongoose.Schema(
     riskRewardCustom: { type: String, default: "" },
     screenshot: { type: String, default: "" },
 
-    segment: { type: String, enum: ["F&O", ""], default: "F&O" },
-    instrumentType: { type: String, enum: ["OPTION", ""], default: "OPTION" },
+    segment: { type: String, enum: ["F&O", "EQUITY", ""], default: "F&O" },
+    instrumentType: { type: String, enum: ["OPTION", "EQUITY", ""], default: "OPTION" },
+
+    // Equity intraday fields (populated when instrumentType === "EQUITY")
+    stockSymbol: { type: String, default: "" },   // NSE/BSE ticker e.g. RELIANCE, TCS
+    exchange: { type: String, enum: ["NSE", "BSE", ""], default: "NSE" },
+    sharesQty: { type: Number, default: null },    // actual shares (not lots)
+    sector: { type: String, default: "" },         // IT, Banking, Pharma, Auto, etc.
 
     strikePrice: Number,
     expiryDate: Date,
