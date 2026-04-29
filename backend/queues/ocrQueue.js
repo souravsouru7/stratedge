@@ -30,6 +30,7 @@ async function enqueueOcrJob({ tradeId, imageUrl, userId, marketType, broker }) 
     },
     {
       jobId: tradeId,
+      delay: appConfig.ocrQueue.initialDelayMs,
     }
   );
 }

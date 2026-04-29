@@ -77,6 +77,7 @@ const appConfig = {
   ocrQueue: {
     attempts: readNumber("OCR_JOB_ATTEMPTS", 3),
     backoffMs: readNumber("OCR_JOB_BACKOFF_MS", 5000),
+    initialDelayMs: readNumber("OCR_JOB_INITIAL_DELAY_MS", 2000),
   },
   ocrWorker: {
     concurrency: readNumber("OCR_WORKER_CONCURRENCY", 5),

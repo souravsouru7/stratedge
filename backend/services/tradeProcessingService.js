@@ -555,8 +555,18 @@ async function logExtraction({ trade, extractedText, parsedTrade, parsedTrades, 
   }
 }
 
+async function findTradeWithRetry(tradeId) {
+  const delays = [500, 1000, 2000];
+  for (const delay of delays) {
+    const trade = await Trade.findById(tradeId);
+    if (trade) return trade;
+    await new Promise((r) => setTimeout(r, delay));
+  }
+  return Trade.findById(tradeId);
+}
+
 async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt = 1 }) {
-  const trade = await Trade.findById(tradeId);
+  const trade = await findTradeWithRetry(tradeId);
   if (!trade) {
     throw new Error("Trade not found");
   }
