@@ -181,30 +181,45 @@ exports.googleLogin = asyncHandler(async (req, res) => {
     (decodedToken.given_name ? `${decodedToken.given_name} ${decodedToken.family_name || ""}`.trim() : "Trader");
   const avatar = decodedToken.picture || null;
 
-  let user = await User.findOne({ email });
-  if (!user) {
-    user = await User.create({
-      name,
-      email,
-      googleId,
-      avatar,
-      authProvider: "google",
-      lastLogin: new Date(),
-    });
-  } else {
-    const updates = {};
-    if (!user.googleId) updates.googleId = googleId;
-    if (!user.avatar && avatar) updates.avatar = avatar;
-    if (user.authProvider !== "google" && user.authProvider !== "local") updates.authProvider = "local";
-
-    if (Object.keys(updates).length > 0) {
-      updates.lastLogin = new Date();
-      await User.updateOne({ _id: user._id }, { $set: updates });
-      user = await User.findById(user._id);
+  // Concurrency-safe upsert: $setOnInsert runs only on document creation, so two
+  // simultaneous Google logins for the same new account converge on a single document.
+  // Duplicate-key errors (e.g. email unique index) are caught and retried as a find.
+  let user;
+  try {
+    user = await User.findOneAndUpdate(
+      { email },
+      {
+        // Always update on every login
+        $set: { lastLogin: new Date() },
+        // Only set these fields when the document is first created
+        $setOnInsert: {
+          name,
+          email,
+          googleId,
+          avatar,
+          authProvider: "google",
+        },
+      },
+      { upsert: true, new: true, runValidators: false }
+    );
+  } catch (err) {
+    if (err.code === 11000) {
+      // Extremely rare: two concurrent inserts with the same email both tried upsert.
+      // The winner created the document; we just need to read it.
+      user = await User.findOne({ email });
+      if (!user) throw new ApiError(500, "Failed to create or find user account", "AUTH_FAILED");
     } else {
-      user.lastLogin = new Date();
-      await user.save();
+      throw err;
     }
+  }
+
+  // Backfill googleId / avatar for accounts that pre-date Google sign-in support.
+  const backfillUpdates = {};
+  if (!user.googleId && googleId) backfillUpdates.googleId = googleId;
+  if (!user.avatar && avatar) backfillUpdates.avatar = avatar;
+  if (Object.keys(backfillUpdates).length > 0) {
+    await User.updateOne({ _id: user._id }, { $set: backfillUpdates });
+    Object.assign(user, backfillUpdates); // keep local copy in sync
   }
 
   const needsTerms = user.termsAcceptance?.termsVersion !== CURRENT_TERMS_VERSION;
@@ -337,10 +352,26 @@ exports.verifyOTP = asyncHandler(async (req, res) => {
     throw new ApiError(429, `Too many failed attempts. Try again in ${retryAfterMin} minute(s).`, "OTP_LOCKED");
   }
 
-  const isValid =
-    user.resetPasswordOTP === otp &&
+  // Use timing-safe comparison to prevent OTP oracle attacks.
+  // Direct string equality leaks the number of matching leading bytes via response time.
+  const otpNotExpired =
     user.resetPasswordOTPExpires &&
     user.resetPasswordOTPExpires > new Date();
+
+  let otpBytesMatch = false;
+  if (user.resetPasswordOTP && otp) {
+    try {
+      otpBytesMatch = crypto.timingSafeEqual(
+        Buffer.from(String(user.resetPasswordOTP)),
+        Buffer.from(String(otp))
+      );
+    } catch {
+      // Buffers of different lengths — definitely wrong OTP
+      otpBytesMatch = false;
+    }
+  }
+
+  const isValid = otpBytesMatch && otpNotExpired;
 
   if (!isValid) {
     user.otpAttempts = (user.otpAttempts || 0) + 1;

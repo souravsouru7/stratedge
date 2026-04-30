@@ -15,10 +15,6 @@ const client = new IORedis(redisUrl, {
   },
 });
 
-client.on("connect", () => {
-  console.log("Redis Connected...");
-});
-
 client.on("error", (err) => {
   console.error("Redis Client Error", err.message);
 });

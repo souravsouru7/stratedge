@@ -1,7 +1,18 @@
 const IndianTrade = require("../models/IndianTrade");
 
+const safeNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const normalizeInstrumentType = (value) => {
+  const raw = typeof value === "string" ? value : "";
+  const normalized = raw.trim().toUpperCase();
+  return normalized === "EQUITY" ? "EQUITY" : "OPTION";
+};
+
 const userQuery = (req) => {
-  const instrumentType = (req.query.instrumentType || "OPTION").toUpperCase();
+  const instrumentType = normalizeInstrumentType(req.query.instrumentType);
   return { user: req.user._id, instrumentType };
 };
 
@@ -9,29 +20,33 @@ const userQuery = (req) => {
 
 exports.getSummary = async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: -1 });
+    const trades = await IndianTrade.find(userQuery(req))
+      .sort({ createdAt: -1 })
+      .select("profit brokerage sttTaxes setupScore")
+      .lean()
+      .limit(10000);
 
     const totalTrades = trades.length;
-    const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
-    const wins = trades.filter(t => t.profit > 0).length;
+    const totalProfit = trades.reduce((acc, t) => acc + safeNum(t.profit), 0);
+    const wins = trades.filter(t => safeNum(t.profit) > 0).length;
     const winRate = totalTrades ? (wins / totalTrades) * 100 : 0;
 
-    const winningTrades = trades.filter(t => t.profit > 0);
-    const losingTrades = trades.filter(t => t.profit < 0);
+    const winningTrades = trades.filter(t => safeNum(t.profit) > 0);
+    const losingTrades = trades.filter(t => safeNum(t.profit) < 0);
     const avgWin = winningTrades.length
-      ? winningTrades.reduce((acc, t) => acc + t.profit, 0) / winningTrades.length
+      ? winningTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / winningTrades.length
       : 0;
     const avgLoss = losingTrades.length
-      ? Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0) / losingTrades.length)
+      ? Math.abs(losingTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / losingTrades.length)
       : 0;
 
-    const totalCosts = trades.reduce((acc, t) => acc + (t.brokerage || 0) + (t.sttTaxes || 0), 0);
+    const totalCosts = trades.reduce((acc, t) => acc + safeNum(t.brokerage) + safeNum(t.sttTaxes), 0);
     const netProfit = totalProfit - totalCosts;
 
     // Setup Quality Stats
     const tradesWithScore = trades.filter(t => t.setupScore !== null && t.setupScore !== undefined);
     const avgSetupScore = tradesWithScore.length
-      ? tradesWithScore.reduce((acc, t) => acc + t.setupScore, 0) / tradesWithScore.length
+      ? tradesWithScore.reduce((acc, t) => acc + safeNum(t.setupScore), 0) / tradesWithScore.length
       : 0;
 
     res.json({

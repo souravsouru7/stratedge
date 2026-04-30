@@ -76,6 +76,7 @@ export default function LoginForm({
                 type={field.type} name={field.name}
                 placeholder={field.placeholder}
                 value={form[field.name]}
+                autoComplete={field.name === "password" ? "current-password" : "email"}
                 onChange={handleChange}
                 onFocus={() => setFocused(field.name)}
                 onBlur={() => setFocused(null)}
