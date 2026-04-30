@@ -45,17 +45,10 @@ const paymentSchema = new mongoose.Schema(
       type: String
     },
     razorpayPaymentId: {
-      type: String,
-      sparse: true,
+      type: String
     },
     razorpaySignature: {
       type: String
-    },
-    // Tracks whether this payment has fully extended the user's subscription.
-    // Used as an idempotency guard: if true, skip subscription extension on retry.
-    subscriptionExtended: {
-      type: Boolean,
-      default: false,
     }
   },
   { timestamps: true }
@@ -63,7 +56,5 @@ const paymentSchema = new mongoose.Schema(
 
 paymentSchema.index({ user: 1, createdAt: -1 });
 paymentSchema.index({ status: 1, createdAt: -1 });
-// Unique per Razorpay payment — blocks double-verification at DB level.
-paymentSchema.index({ razorpayPaymentId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Payment", paymentSchema);

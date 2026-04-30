@@ -115,34 +115,11 @@ const signInWithWebGoogle = async () => {
     return null; // page reloads; result handled in handleGoogleRedirectResult
   }
 
-  try {
-    const result = await signInWithPopup(auth, provider);
-    if (!isCapacitorApp()) {
-      try { await setPersistence(auth, browserLocalPersistence); } catch { /* non-fatal */ }
-    }
-    return result.user.getIdToken();
-  } catch (err) {
-    const code = String(err?.code || "");
-    const message = String(err?.message || "").toLowerCase();
-    const shouldFallbackToRedirect =
-      code === "auth/popup-blocked" ||
-      code === "auth/popup-closed-by-user" ||
-      code === "auth/cancelled-popup-request" ||
-      code === "auth/network-request-failed" ||
-      message.includes("cross-origin-opener-policy") ||
-      message.includes("window.closed") ||
-      message.includes("window.close");
-
-    if (!shouldFallbackToRedirect) {
-      throw err;
-    }
-
-    // Some production hosts enforce strict COOP/COEP and break popup opener messaging.
-    // Redirect auth is resilient to that scenario.
-    setRedirectPending();
-    await signInWithRedirect(auth, provider);
-    return null;
+  const result = await signInWithPopup(auth, provider);
+  if (!isCapacitorApp()) {
+    try { await setPersistence(auth, browserLocalPersistence); } catch { /* non-fatal */ }
   }
+  return result.user.getIdToken();
 };
 
 export const handleGoogleRedirectResult = async () => {

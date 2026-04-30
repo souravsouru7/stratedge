@@ -7,39 +7,23 @@ const userRepository = require("../repositories/user.repository");
 const { logger } = require("../utils/logger");
 
 async function cleanupFailedUpload({ tradeId, uploadedImage, userId, error }) {
-  // Delete from Cloudinary FIRST to prevent orphan images consuming storage.
-  // Only after successful deletion (or if no image) do we mark the trade as failed.
-  // This ensures we never leave orphan images even if DB update fails.
-  if (uploadedImage?.publicId) {
-    try {
-      await cloudinary.uploader.destroy(uploadedImage.publicId, {
-        resource_type: "image",
-      });
-      logger.info("Cleaned up Cloudinary image from failed upload", {
-        publicId: uploadedImage.publicId,
-        tradeId,
-      });
-    } catch (cleanupError) {
-      logger.error("Failed to delete orphan Cloudinary upload", {
+  if (!tradeId && uploadedImage?.publicId) {
+    await cloudinary.uploader.destroy(uploadedImage.publicId, {
+      resource_type: "image",
+    }).catch((cleanupError) => {
+      logger.warn("Failed to delete orphan Cloudinary upload", {
         publicId: uploadedImage.publicId,
         error: cleanupError.message,
-        tradeId,
       });
-    }
+    });
   }
 
-  // Mark trade as failed after attempting Cloudinary cleanup
   if (tradeId) {
     await tradeRepository.updateTradeById(tradeId, {
       status: "failed",
       error: error.message,
       processedAt: new Date(),
-    }).catch((dbError) => {
-      logger.error("Failed to update trade status during cleanup", {
-        tradeId,
-        error: dbError.message,
-      });
-    });
+    }).catch(() => {});
   }
 
   logger.error("Upload enqueue error", {

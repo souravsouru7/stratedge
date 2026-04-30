@@ -186,40 +186,6 @@ function isTradeRelatedContent(text, marketType = "Forex") {
   return hasTradeKeyword && hasPriceNumber;
 }
 
-// ── Confidence zone classification ────────────────────────────────────────────
-// A single hard cutoff (e.g. score < 10 → reject) is fragile: a score of 9 vs
-// 10 causes completely different outcomes. Instead, we use three zones:
-//
-//   REJECT (0–4)  — nothing meaningful was extracted AND no field data present.
-//                   Safe to delete the ghost trade and clean up Cloudinary.
-//   REVIEW (5–59) — partial data extracted but uncertain. Keep for manual review.
-//   ACCEPT (60+)  — high confidence. Auto-complete without review flag.
-//
-// Critically, if ANY extracted field is present (pair, profit, entryPrice …) we
-// never return REJECT even if the score is 0–4. A near-zero score with actual
-// field data means the trade image is unusual, not that it's blank — the user
-// should review it rather than have it silently vanish.
-
-const CONFIDENCE_ACCEPT_THRESHOLD = 60;
-const CONFIDENCE_REJECT_MAX = 4;
-
-function classifyConfidence(score, parsedTrade = {}, parsedTrades = []) {
-  const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
-
-  const hasExtractedData =
-    parsedTrade?.pair ||
-    parsedTrade?.profit != null ||
-    parsedTrade?.entryPrice != null ||
-    parsedTrade?.exitPrice != null ||
-    (Array.isArray(parsedTrades) && parsedTrades.length > 0);
-
-  // Only reject when both the score is near-zero AND nothing was extracted.
-  // Anything with real field data goes to REVIEW at minimum.
-  if (s <= CONFIDENCE_REJECT_MAX && !hasExtractedData) return "REJECT";
-  if (s < CONFIDENCE_ACCEPT_THRESHOLD) return "REVIEW";
-  return "ACCEPT";
-}
-
 module.exports = {
   cleanOcrText,
   detectBrokerPattern,
@@ -231,7 +197,4 @@ module.exports = {
   calculateConfidenceScore,
   calculateIndianConfidenceScore,
   isTradeRelatedContent,
-  classifyConfidence,
-  CONFIDENCE_ACCEPT_THRESHOLD,
-  CONFIDENCE_REJECT_MAX,
 };

@@ -6,42 +6,6 @@ const forexQuery = (req) => ({
   marketType: { $ne: "Indian_Market" }
 });
 
-// ── Numeric safety ────────────────────────────────────────────────────────────
-// MongoDB lean() returns stored values as-is. If a "Number" field was written as
-// a string (e.g. profit: "50"), JavaScript `acc + ("50" || 0)` becomes the string
-// "050" rather than the number 50. safeNum() coerces to a finite number or 0.
-function safeNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-// Safe profitFactor — never returns the string "∞" which breaks JSON number parsers.
-// Returns null when totalLosses === 0 so frontend can display "∞" itself.
-function safeProfitFactor(totalWins, totalLosses) {
-  if (totalLosses > 0) return parseFloat((totalWins / totalLosses).toFixed(2));
-  if (totalWins > 0) return null; // infinite — frontend shows ∞
-  return 0;
-}
-
-// ── ISO week key ───────────────────────────────────────────────────────────────
-// Math.ceil(date.getDate() / 7) gives the week-of-month (1–5), not the ISO
-// week-of-year (1–53). Use proper ISO 8601 calculation instead.
-function getISOWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayOfWeek = d.getUTCDay() || 7; // Mon=1 … Sun=7
-  d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek); // shift to Thursday of the same week
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return {
-    isoYear: d.getUTCFullYear(),
-    isoWeek: Math.ceil(((d - yearStart) / 86400000 + 1) / 7),
-  };
-}
-
-function isoWeekKey(date) {
-  const { isoYear, isoWeek } = getISOWeekNumber(date);
-  return `${isoYear}-W${String(isoWeek).padStart(2, "0")}`;
-}
-
 // Small helper to shift trade timestamps into a configurable
 // "trader timezone" before bucketing by day/hour.
 // Set TIMEZONE_OFFSET_HOURS in your backend .env (e.g. 5.5 for IST),
@@ -68,29 +32,29 @@ exports.getSummary = async (req, res) => {
       .limit(10000);
 
     const totalTrades = trades.length;
-    const totalProfit = trades.reduce((acc, t) => acc + safeNum(t.profit), 0);
-    const wins = trades.filter(t => safeNum(t.profit) > 0).length;
+    const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
+    const wins = trades.filter(t => t.profit > 0).length;
     const winRate = totalTrades ? (wins / totalTrades) * 100 : 0;
 
-    const winningTrades = trades.filter(t => safeNum(t.profit) > 0);
-    const losingTrades = trades.filter(t => safeNum(t.profit) < 0);
+    const winningTrades = trades.filter(t => t.profit > 0);
+    const losingTrades = trades.filter(t => t.profit < 0);
 
     const avgWin = winningTrades.length
-      ? winningTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / winningTrades.length
+      ? winningTrades.reduce((acc, t) => acc + t.profit, 0) / winningTrades.length
       : 0;
     const avgLoss = losingTrades.length
-      ? Math.abs(losingTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / losingTrades.length)
+      ? Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0) / losingTrades.length)
       : 0;
 
-    const totalCommission = trades.reduce((acc, t) => acc + safeNum(t.commission), 0);
-    const totalSwap = trades.reduce((acc, t) => acc + safeNum(t.swap), 0);
+    const totalCommission = trades.reduce((acc, t) => acc + (t.commission || 0), 0);
+    const totalSwap = trades.reduce((acc, t) => acc + (t.swap || 0), 0);
     const totalCosts = totalCommission + totalSwap;
     const netProfit = totalProfit - totalCosts;
 
     // Setup Quality Stats
     const tradesWithScore = trades.filter(t => t.setupScore !== null && t.setupScore !== undefined);
     const avgSetupScore = tradesWithScore.length
-      ? tradesWithScore.reduce((acc, t) => acc + safeNum(t.setupScore), 0) / tradesWithScore.length
+      ? tradesWithScore.reduce((acc, t) => acc + t.setupScore, 0) / tradesWithScore.length
       : 0;
 
     res.json({
@@ -121,9 +85,10 @@ exports.getWeeklyStats = async (req, res) => {
     const weekly = {};
 
     trades.forEach(trade => {
-      const week = isoWeekKey(new Date(trade.createdAt));
+      const date = new Date(trade.createdAt);
+      const week = `${date.getFullYear()}-W${Math.ceil(date.getDate() / 7)}`;
       if (!weekly[week]) weekly[week] = 0;
-      weekly[week] += safeNum(trade.profit);
+      weekly[week] += trade.profit || 0;
     });
 
     res.json(weekly);
@@ -148,10 +113,10 @@ exports.getRiskRewardAnalysis = async (req, res) => {
     const tradesWithRR = trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice);
 
     // Calculate realized R:R from actual profits (works for all trades with profit/loss)
-    const winningTrades = trades.filter(t => safeNum(t.profit) > 0);
-    const losingTrades = trades.filter(t => safeNum(t.profit) < 0);
-    const avgWin = winningTrades.length ? winningTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / winningTrades.length : 0;
-    const avgLoss = losingTrades.length ? Math.abs(losingTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / losingTrades.length) : 0;
+    const winningTrades = trades.filter(t => t.profit > 0);
+    const losingTrades = trades.filter(t => t.profit < 0);
+    const avgWin = winningTrades.length ? winningTrades.reduce((acc, t) => acc + t.profit, 0) / winningTrades.length : 0;
+    const avgLoss = losingTrades.length ? Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0) / losingTrades.length) : 0;
     const actualRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
     // Calculate planned R:R from SL/TP (only for trades with stopLoss and takeProfit)
@@ -272,10 +237,9 @@ exports.getTradeDistribution = async (req, res) => {
     trades.forEach(t => {
       if (!byPair[t.pair]) byPair[t.pair] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byPair[t.pair].total++;
-      const p = safeNum(t.profit);
-      if (p > 0) byPair[t.pair].wins++;
-      else if (p < 0) byPair[t.pair].losses++;
-      byPair[t.pair].profit += p;
+      if (t.profit > 0) byPair[t.pair].wins++;
+      else if (t.profit < 0) byPair[t.pair].losses++;
+      byPair[t.pair].profit += t.profit || 0;
     });
     Object.keys(byPair).forEach(pair => byPair[pair].winRate = ((byPair[pair].wins / byPair[pair].total) * 100).toFixed(1));
 
@@ -284,10 +248,9 @@ exports.getTradeDistribution = async (req, res) => {
     trades.forEach(t => {
       if (byType[t.type]) {
         byType[t.type].total++;
-        const p = safeNum(t.profit);
-        if (p > 0) byType[t.type].wins++;
-        else if (p < 0) byType[t.type].losses++;
-        byType[t.type].profit += p;
+        if (t.profit > 0) byType[t.type].wins++;
+        else if (t.profit < 0) byType[t.type].losses++;
+        byType[t.type].profit += t.profit || 0;
       }
     });
     Object.keys(byType).forEach(type => byType[type].winRate = byType[type].total ? ((byType[type].wins / byType[type].total) * 100).toFixed(1) : 0);
@@ -298,46 +261,43 @@ exports.getTradeDistribution = async (req, res) => {
       const strat = t.strategy || "Unspecified";
       if (!byStrategy[strat]) byStrategy[strat] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byStrategy[strat].total++;
-      const p = safeNum(t.profit);
-      if (p > 0) byStrategy[strat].wins++;
-      else if (p < 0) byStrategy[strat].losses++;
-      byStrategy[strat].profit += p;
+      if (t.profit > 0) byStrategy[strat].wins++;
+      else if (t.profit < 0) byStrategy[strat].losses++;
+      byStrategy[strat].profit += t.profit || 0;
     });
     Object.keys(byStrategy).forEach(strat => byStrategy[strat].winRate = ((byStrategy[strat].wins / byStrategy[strat].total) * 100).toFixed(1));
 
-    // By Session — computed from UTC hour when no stored session value is present.
-    // Check overlap window FIRST: 13–16 UTC is both London and NY open simultaneously.
-    // The old code had London (8–16) catch 13–16 before NY (13–21) could, so overlap
-    // trades were silently misclassified as pure London.
+    // By Session (determine from time)
     const bySession = {
-      "Asia Session":       { total: 0, wins: 0, losses: 0, profit: 0 },
-      "London Session":     { total: 0, wins: 0, losses: 0, profit: 0 },
-      "London/NY Overlap":  { total: 0, wins: 0, losses: 0, profit: 0 },
-      "NY Session":         { total: 0, wins: 0, losses: 0, profit: 0 },
-      "Other":              { total: 0, wins: 0, losses: 0, profit: 0 },
+      "Asia Session": { total: 0, wins: 0, losses: 0, profit: 0 },
+      "London Session": { total: 0, wins: 0, losses: 0, profit: 0 },
+      "NY Session": { total: 0, wins: 0, losses: 0, profit: 0 },
+      "Other": { total: 0, wins: 0, losses: 0, profit: 0 }
     };
 
     trades.forEach(t => {
-      const p = safeNum(t.profit);
-      let session;
+      const hour = new Date(t.createdAt).getUTCHours();
+      let session = "Other";
 
-      // Prefer the broker-stored session tag set when the trade was created.
+      // UTC hours for sessions
+      // Asia: 0-8 (midnight to 8am UTC)
+      // London: 8-16 (8am to 4pm UTC) 
+      // NY: 13-21 (1pm to 9pm UTC) - overlaps with London
+
+      if (hour >= 0 && hour < 8) session = "Asia Session";
+      else if (hour >= 8 && hour < 16) session = "London Session";
+      else if (hour >= 13 && hour < 21) session = "NY Session";
+
+      // Use stored session if available
       if (t.session) {
         session = t.session;
         if (!bySession[session]) bySession[session] = { total: 0, wins: 0, losses: 0, profit: 0 };
-      } else {
-        const hour = new Date(t.createdAt).getUTCHours();
-        if (hour >= 13 && hour < 16)      session = "London/NY Overlap"; // check overlap first
-        else if (hour >= 0  && hour < 8)  session = "Asia Session";
-        else if (hour >= 8  && hour < 16) session = "London Session";
-        else if (hour >= 16 && hour < 21) session = "NY Session";
-        else                              session = "Other";
       }
 
       bySession[session].total++;
-      if (p > 0) bySession[session].wins++;
-      else if (p < 0) bySession[session].losses++;
-      bySession[session].profit += p;
+      if (t.profit > 0) bySession[session].wins++;
+      else if (t.profit < 0) bySession[session].losses++;
+      bySession[session].profit += t.profit || 0;
     });
 
     Object.keys(bySession).forEach(session => {
@@ -372,26 +332,24 @@ exports.getPerformanceMetrics = async (req, res) => {
       .lean()
       .limit(10000);
 
-    const winningTrades = trades.filter(t => safeNum(t.profit) > 0);
-    const losingTrades = trades.filter(t => safeNum(t.profit) < 0);
+    const winningTrades = trades.filter(t => t.profit > 0);
+    const losingTrades = trades.filter(t => t.profit < 0);
 
-    const largestWin = winningTrades.length > 0 ? Math.max(...winningTrades.map(t => safeNum(t.profit))) : 0;
-    const largestLoss = losingTrades.length > 0 ? Math.min(...losingTrades.map(t => safeNum(t.profit))) : 0;
+    const largestWin = winningTrades.length > 0 ? Math.max(...winningTrades.map(t => t.profit)) : 0;
+    const largestLoss = losingTrades.length > 0 ? Math.min(...losingTrades.map(t => t.profit)) : 0;
 
-    const avgWin = winningTrades.length ? winningTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / winningTrades.length : 0;
-    const avgLoss = losingTrades.length ? losingTrades.reduce((acc, t) => acc + safeNum(t.profit), 0) / losingTrades.length : 0;
+    const avgWin = winningTrades.length ? winningTrades.reduce((acc, t) => acc + t.profit, 0) / winningTrades.length : 0;
+    const avgLoss = losingTrades.length ? losingTrades.reduce((acc, t) => acc + t.profit, 0) / losingTrades.length : 0;
 
     let maxWinStreak = 0, maxLossStreak = 0, tempWinStreak = 0, tempLossStreak = 0;
     trades.forEach(t => {
-      const p = safeNum(t.profit);
-      if (p > 0) { tempWinStreak++; tempLossStreak = 0; maxWinStreak = Math.max(maxWinStreak, tempWinStreak); }
-      else if (p < 0) { tempLossStreak++; tempWinStreak = 0; maxLossStreak = Math.max(maxLossStreak, tempLossStreak); }
+      if (t.profit > 0) { tempWinStreak++; tempLossStreak = 0; maxWinStreak = Math.max(maxWinStreak, tempWinStreak); }
+      else if (t.profit < 0) { tempLossStreak++; tempWinStreak = 0; maxLossStreak = Math.max(maxLossStreak, tempLossStreak); }
     });
 
-    const totalWins = winningTrades.reduce((acc, t) => acc + safeNum(t.profit), 0);
-    const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + safeNum(t.profit), 0));
-    // null means "infinite" (all wins, no losses) — frontend renders ∞, avoids JSON string bugs
-    const profitFactor = safeProfitFactor(totalWins, totalLosses);
+    const totalWins = winningTrades.reduce((acc, t) => acc + t.profit, 0);
+    const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0));
+    const profitFactor = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
 
     const winRate = trades.length ? (winningTrades.length / trades.length) * 100 : 0;
     const expectancy = ((avgWin * (winRate / 100)) + (avgLoss * ((100 - winRate) / 100))).toFixed(2);
@@ -403,7 +361,7 @@ exports.getPerformanceMetrics = async (req, res) => {
       avgLoss: avgLoss.toFixed(2),
       maxWinStreak,
       maxLossStreak,
-      profitFactor,           // number | null (null = infinite, i.e. no losing trades)
+      profitFactor,
       expectancy,
       totalWins: totalWins.toFixed(2),
       totalLosses: totalLosses.toFixed(2),
@@ -453,7 +411,6 @@ exports.getTimeAnalysis = async (req, res) => {
     const byDate = {};
 
     trades.forEach(t => {
-      const p = safeNum(t.profit);
       const date = getAnalyticsLocalDate(t.createdAt);
       const key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
       const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -461,12 +418,12 @@ exports.getTimeAnalysis = async (req, res) => {
       if (!byDate[dateKey]) byDate[dateKey] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byMonth[key].total++;
       byDate[dateKey].total++;
-      if (p > 0) byMonth[key].wins++;
-      else if (p < 0) byMonth[key].losses++;
-      if (p > 0) byDate[dateKey].wins++;
-      else if (p < 0) byDate[dateKey].losses++;
-      byMonth[key].profit += p;
-      byDate[dateKey].profit += p;
+      if (t.profit > 0) byMonth[key].wins++;
+      else if (t.profit < 0) byMonth[key].losses++;
+      if (t.profit > 0) byDate[dateKey].wins++;
+      else if (t.profit < 0) byDate[dateKey].losses++;
+      byMonth[key].profit += t.profit || 0;
+      byDate[dateKey].profit += t.profit || 0;
     });
 
     // Calculate win rates for months
@@ -493,13 +450,12 @@ exports.getTimeAnalysis = async (req, res) => {
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
     trades.forEach(t => {
-      const p = safeNum(t.profit);
       const day = dayNames[getAnalyticsLocalDate(t.createdAt).getDay()];
       if (byDay[day]) {
         byDay[day].total++;
-        if (p > 0) byDay[day].wins++;
-        else if (p < 0) byDay[day].losses++;
-        byDay[day].profit += p;
+        if (t.profit > 0) byDay[day].wins++;
+        else if (t.profit < 0) byDay[day].losses++;
+        byDay[day].profit += t.profit || 0;
       }
     });
 
@@ -513,12 +469,11 @@ exports.getTimeAnalysis = async (req, res) => {
     for (let i = 0; i < 24; i++) { byHour[i] = { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 }; }
 
     trades.forEach(t => {
-      const p = safeNum(t.profit);
       const hour = getAnalyticsLocalDate(t.createdAt).getHours();
       byHour[hour].total++;
-      if (p > 0) byHour[hour].wins++;
-      else if (p < 0) byHour[hour].losses++;
-      byHour[hour].profit += p;
+      if (t.profit > 0) byHour[hour].wins++;
+      else if (t.profit < 0) byHour[hour].losses++;
+      byHour[hour].profit += t.profit || 0;
     });
 
     Object.keys(byHour).forEach(hour => {
@@ -576,16 +531,22 @@ exports.getTimeAnalysis = async (req, res) => {
     const bySession = {};
 
     trades.forEach(t => {
-      const p = safeNum(t.profit);
       const session = t.session || "Unspecified";
       if (!bySession[session]) {
-        bySession[session] = { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 };
+        bySession[session] = {
+          total: 0,
+          wins: 0,
+          losses: 0,
+          profit: 0,
+          winRate: 0,
+          avgProfit: 0
+        };
       }
 
       bySession[session].total++;
-      if (p > 0) bySession[session].wins++;
-      else if (p < 0) bySession[session].losses++;
-      bySession[session].profit += p;
+      if (t.profit > 0) bySession[session].wins++;
+      else if (t.profit < 0) bySession[session].losses++;
+      bySession[session].profit += t.profit || 0;
     });
 
     Object.keys(bySession).forEach(session => {
@@ -690,23 +651,19 @@ exports.getTradeQuality = async (req, res) => {
         wins,
         losses: total - wins,
         winRate: total ? ((wins / total) * 100).toFixed(1) : 0,
-        avgProfit: total ? (range.trades.reduce((a, t) => a + safeNum(t.profit), 0) / total).toFixed(2) : 0
+        avgProfit: total ? (range.trades.reduce((a, t) => a + t.profit, 0) / total).toFixed(2) : 0
       };
     }).filter(r => r.total > 0);
 
-    const breakevenTrades = trades.filter(t => Math.abs(safeNum(t.profit)) < 5);
+    const breakevenTrades = trades.filter(t => Math.abs(t.profit) < 5);
     const breakevenRate = trades.length ? ((breakevenTrades.length / trades.length) * 100).toFixed(1) : 0;
 
-    const totalCommission = trades.reduce((acc, t) => acc + safeNum(t.commission), 0);
-    const totalSwap = trades.reduce((acc, t) => acc + safeNum(t.swap), 0);
+    const totalCommission = trades.reduce((acc, t) => acc + (t.commission || 0), 0);
+    const totalSwap = trades.reduce((acc, t) => acc + (t.swap || 0), 0);
     const totalCosts = totalCommission + totalSwap;
 
     let costImpactedTrades = 0;
-    trades.forEach(t => {
-      const p = safeNum(t.profit);
-      const cost = safeNum(t.commission) + safeNum(t.swap);
-      if (p > 0 && cost > p) costImpactedTrades++;
-    });
+    trades.forEach(t => { if (t.profit > 0 && (t.commission || 0) + (t.swap || 0) > t.profit) costImpactedTrades++; });
 
     const winningTrades = trades.filter(t => t.profit > 0).length;
     const avgRR = rrAnalysis.length > 0 ? rrAnalysis.reduce((a, r) => a + parseFloat(r.label), 0) / rrAnalysis.length : 0;
@@ -750,7 +707,7 @@ exports.getDrawdownAnalysis = async (req, res) => {
     const equityCurve = [];
 
     trades.forEach(t => {
-      cumulativeProfit += safeNum(t.profit);
+      cumulativeProfit += t.profit || 0;
       equityCurve.push({ date: t.createdAt, balance: cumulativeProfit });
       
       // Update peak if we're at a new high
@@ -830,7 +787,7 @@ exports.getAIInsights = async (req, res) => {
 
     // Single pass through all trades
     trades.forEach(t => {
-      const profit = safeNum(t.profit);
+      const profit = t.profit || 0;
       totalProfit += profit;
 
       if (profit > 0) {
@@ -863,8 +820,11 @@ exports.getAIInsights = async (req, res) => {
       stats.behaviorBuckets[behaviorKey].count++;
       stats.behaviorBuckets[behaviorKey].pnl += profit;
 
-      // Weekly plan — use ISO 8601 week number (Mon–Sun weeks, Jan 4 always in week 1)
-      const weekKey = isoWeekKey(new Date(t.createdAt));
+      // Weekly plan
+      const d = new Date(t.createdAt);
+      const year = d.getFullYear();
+      const week = Math.ceil(((d - new Date(year, 0, 1)) / 86400000 + d.getDay() + 1) / 7);
+      const weekKey = `${year}-W${week}`;
       if (!stats.weeklyPlan[weekKey]) stats.weeklyPlan[weekKey] = { total: 0, plan: 0, pnl: 0 };
       stats.weeklyPlan[weekKey].total++;
       stats.weeklyPlan[weekKey].pnl += profit;
@@ -995,7 +955,7 @@ exports.getAIInsights = async (req, res) => {
         revengeTrades.push({ id: curr._id, pair: curr.pair, createdAt: curr.createdAt, prevProfit: prev.profit, currRisk, prevRisk });
       }
     }
-    const revengeCostTotal = revengeTrades.reduce((acc, t) => acc + safeNum(t.prevProfit), 0);
+    const revengeCostTotal = revengeTrades.reduce((acc, t) => acc + (t.prevProfit || 0), 0);
 
     // Mistake feed — top costly recurring mistakes
     const mistakeFeed = Object.entries(stats.mistakeTagStats)
@@ -1109,7 +1069,7 @@ exports.getAIInsights = async (req, res) => {
         winRate: winRate.toFixed(1),
         avgWin: avgWin.toFixed(2),
         avgLoss: avgLoss.toFixed(2),
-        profitFactor: safeProfitFactor(totalWinAmount, totalLossAmount)
+        profitFactor: avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : avgWin > 0 ? "∞" : "0.00"
       }
     });
   } catch (error) {
@@ -1139,10 +1099,10 @@ exports.getAdvancedAnalytics = async (req, res) => {
     let totalRR = 0, rrCount = 0;
 
     trades.forEach(t => {
-      const profit = safeNum(t.profit);
+      const profit = t.profit || 0;
       totalProfit += profit;
-      totalCommission += safeNum(t.commission);
-      totalSwap += safeNum(t.swap);
+      totalCommission += t.commission || 0;
+      totalSwap += t.swap || 0;
 
       if (profit > 0) winningTrades.push(t);
       else if (profit < 0) losingTrades.push(t);
@@ -1167,8 +1127,8 @@ exports.getAdvancedAnalytics = async (req, res) => {
       if (trr > 0) { totalRR += trr; rrCount++; }
     });
 
-    const totalWins = winningTrades.reduce((acc, t) => acc + safeNum(t.profit), 0);
-    const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + safeNum(t.profit), 0));
+    const totalWins = winningTrades.reduce((acc, t) => acc + (t.profit || 0), 0);
+    const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + (t.profit || 0), 0));
     const avgWin = winningTrades.length ? totalWins / winningTrades.length : 0;
     const avgLoss = losingTrades.length ? totalLosses / losingTrades.length : 0;
     const winRate = (winningTrades.length / trades.length) * 100;
@@ -1193,7 +1153,7 @@ exports.getAdvancedAnalytics = async (req, res) => {
       avgLoss: avgLoss.toFixed(2),
       avgRR: avgRR.toFixed(2),
       actualRR: avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : "0.00",
-      profitFactor: safeProfitFactor(totalWins, totalLosses),
+      profitFactor: totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00",
       maxWinStreak,
       maxLossStreak,
       maxDrawdown: maxDrawdown.toFixed(2),
@@ -1227,12 +1187,11 @@ exports.getPsychologyAnalytics = async (req, res) => {
     const moodBuckets = {};
     trades.forEach(t => {
       if (t.mood != null && t.mood >= 1 && t.mood <= 5) {
-        const p = safeNum(t.profit);
         if (!moodBuckets[t.mood]) moodBuckets[t.mood] = { trades: 0, wins: 0, losses: 0, pnl: 0 };
         moodBuckets[t.mood].trades++;
-        moodBuckets[t.mood].pnl += p;
-        if (p > 0) moodBuckets[t.mood].wins++;
-        else if (p < 0) moodBuckets[t.mood].losses++;
+        moodBuckets[t.mood].pnl += t.profit || 0;
+        if ((t.profit || 0) > 0) moodBuckets[t.mood].wins++;
+        else if ((t.profit || 0) < 0) moodBuckets[t.mood].losses++;
       }
     });
 
@@ -1250,12 +1209,11 @@ exports.getPsychologyAnalytics = async (req, res) => {
     const confBuckets = {};
     trades.forEach(t => {
       if (t.confidence && t.confidence !== "") {
-        const p = safeNum(t.profit);
         if (!confBuckets[t.confidence]) confBuckets[t.confidence] = { trades: 0, wins: 0, losses: 0, pnl: 0 };
         confBuckets[t.confidence].trades++;
-        confBuckets[t.confidence].pnl += p;
-        if (p > 0) confBuckets[t.confidence].wins++;
-        else if (p < 0) confBuckets[t.confidence].losses++;
+        confBuckets[t.confidence].pnl += t.profit || 0;
+        if ((t.profit || 0) > 0) confBuckets[t.confidence].wins++;
+        else if ((t.profit || 0) < 0) confBuckets[t.confidence].losses++;
       }
     });
 

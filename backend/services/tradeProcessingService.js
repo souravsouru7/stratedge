@@ -22,7 +22,6 @@ const {
   calculateConfidenceScore,
   calculateIndianConfidenceScore,
   isTradeRelatedContent,
-  classifyConfidence,
 } = require("./extractionQualityService");
 const { logger } = require("../utils/logger");
 const { appConfig } = require("../config");
@@ -718,12 +717,6 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       logger.warn(`Gemini Vision step error | tradeId=${tradeId}`, { error: err.message });
     }
 
-    // Release the image buffer — it was only needed for Gemini Vision.
-    // Holding it through the rest of the pipeline causes worker OOM under concurrency.
-    ocrImageBuffer = null;
-    ocrImageMimeType = null;
-
-
     // ── OCR-based parsing (runs when Gemini Vision unavailable or failed) ───
     if (!geminiVisionUsed) {
       if (isEquityIntraday && !weakOcr) {
@@ -899,19 +892,11 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
       });
     }
 
-    // Post-pipeline rejection — use zone classification instead of a hard threshold.
-    // A score just below a fixed cutoff (e.g. 9 vs 10) could be a real trade with
-    // unusual formatting; classifyConfidence() only returns REJECT when the score is
-    // near-zero AND no field data was extracted at all (truly blank / non-trade).
-    const confidenceZone = classifyConfidence(quality.score, parsedTrade, parsedTrades);
-    logger.info(`Confidence zone | tradeId=${tradeId} | score=${quality.score} | zone=${confidenceZone}`, {
-      tradeId,
-      score: quality.score,
-      zone: confidenceZone,
-    });
-
-    if (confidenceZone === "REJECT") {
-      logger.warn(`Confidence REJECT — no extractable data after full pipeline | tradeId=${tradeId} | score=${quality.score}`, { tradeId, score: quality.score });
+    // Post-pipeline rejection: if confidence is still near-zero after both OCR + AI,
+    // the image is very likely unrelated to trading (e.g. AI also couldn't find anything).
+    // Distinct from needsReview (score 10–60) which is a blurry/partial trade screenshot.
+    if (quality.score < 10) {
+      logger.warn(`Near-zero confidence after full pipeline | tradeId=${tradeId} | score=${quality.score}`, { tradeId, score: quality.score });
       await rejectNonTradeImage(tradeId, trade, "Could not extract any trade data from this image. Please upload a clear screenshot from your broker platform.");
       return { tradeId, status: "failed", reason: "NOT_A_TRADE_IMAGE" };
     }
@@ -945,42 +930,27 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
     const isMultiTrade = Array.isArray(parsedTrades) && parsedTrades.length > 1;
 
     if (isMultiTrade) {
-      // Safe atomic sequence for multi-trade ghost deletion:
-      // 1. Stamp the trade as "completed" in DB first — status polls never see a broken state.
-      // 2. Write the bridge cache so the frontend can read the multi-trade payload even after
-      //    the ghost document is gone.
-      // 3. Delete the ghost trade.
-      //
-      // Order matters: if we crash between step 2 and 3 the trade remains in DB with status
-      // "completed" (harmless stale record). If we crash between step 1 and 2 the DB status
-      // is correct and can be polled directly. Never a 404 with no bridge.
-      await Trade.findByIdAndUpdate(tradeId, {
-        status: "completed",
-        processedAt: new Date(),
-        error: null,
-        parsedData: { parsedTrade, parsedTrades },
-      });
-
-      const bridgePayload = {
-        jobId: trade.ocrJobId || tradeId,
-        status: "completed",
-        attemptsMade: attempt || trade.ocrAttempts || 0,
-        error: null,
-        data: {
-          parsedData: { parsedTrade, parsedTrades },
-          parsedTrade,
-          parsedTrades,
-          imageUrl: trade.imageUrl || trade.screenshot || "",
-          screenshot: trade.screenshot || trade.imageUrl || "",
-          extractedText: cleanedText,
-          marketType: trade.marketType || "Forex",
-          tradeSubType: marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "",
-        },
-      };
-
       const statusBridgeKey = buildCacheKey("trade_status_bridge", trade.user?.toString(), tradeId);
-      // 30-minute TTL gives the frontend plenty of time to poll; DB is the fallback if it expires.
-      await setCache(statusBridgeKey, bridgePayload, 30 * 60);
+      await setCache(
+        statusBridgeKey,
+        {
+          jobId: trade.ocrJobId || tradeId,
+          status: "completed",
+          attemptsMade: attempt || trade.ocrAttempts || 0,
+          error: null,
+          data: {
+            parsedData: { parsedTrade, parsedTrades },
+            parsedTrade,
+            parsedTrades,
+            imageUrl: trade.imageUrl || trade.screenshot || "",
+            screenshot: trade.screenshot || trade.imageUrl || "",
+            extractedText: cleanedText,
+            marketType: trade.marketType || "Forex",
+            tradeSubType: marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "",
+          },
+        },
+        15 * 60
+      );
 
       await Trade.findByIdAndDelete(tradeId);
       logger.info(`Ghost trade deleted (multi-trade result) | tradeId=${tradeId} | count=${parsedTrades.length}`, {

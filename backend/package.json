@@ -3,12 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "jest --verbose",
-    "test:edge-cases": "jest test/edge-cases --verbose",
-    "test:payment": "jest test/edge-cases/payment-idempotency.test.js --verbose",
-    "test:analytics": "jest test/edge-cases/analytics-edge-cases.test.js --verbose",
-    "test:coverage": "jest --coverage",
-    "test:manual": "node scripts/test-edge-cases.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node server.js",
     "dev:watch": "nodemon server.js",
     "dev:all": "concurrently -n api,worker -c blue,green \"npm run dev\" \"npm run worker\"",
@@ -55,9 +50,6 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
-    "nodemon": "^3.1.14",
-    "jest": "^29.7.0",
-    "supertest": "^6.3.4",
-    "mongodb-memory-server": "^9.1.6"
+    "nodemon": "^3.1.14"
   }
 }
