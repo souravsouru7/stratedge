@@ -1,6 +1,6 @@
-  const DEFAULT_REMOTE_API_BASE_URL = "https://api.stratedge.live";
+   const DEFAULT_REMOTE_API_BASE_URL = "https://api.stratedge.live";
 
-//  const DEFAULT_REMOTE_API_BASE_URL ="http://localhost:5000";
+// const DEFAULT_REMOTE_API_BASE_URL ="http://localhost:5000";
 const isCapacitorRuntime = () => {
   return typeof window !== "undefined" && !!window.Capacitor;
 };

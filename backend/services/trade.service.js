@@ -4,7 +4,7 @@ const { clearUserCache } = require("../utils/cacheUtils");
 const tradeRepository = require("../repositories/trade.repository");
 
 const TRADE_LIST_TTL_SECONDS = 45;
-const TRADE_STATUS_TTL_SECONDS = 3;
+const TRADE_STATUS_TTL_SECONDS = 10;
 const TRADE_DETAILS_TTL_SECONDS = 45;
 
 function normalizeTradeType(type) {
@@ -137,6 +137,25 @@ async function getTradeStatus(userId, tradeId) {
       return bridgedStatus;
     }
     throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");
+  }
+
+  if (trade?.parsedData?.multiTradeGhost === true) {
+    return {
+      jobId: trade.ocrJobId || trade._id.toString(),
+      status: "completed",
+      attemptsMade: trade.ocrAttempts || 0,
+      data: {
+        parsedData: trade.parsedData,
+        parsedTrade: trade.parsedData?.parsedTrade || null,
+        parsedTrades: trade.parsedData?.parsedTrades || [],
+        imageUrl: trade.imageUrl || trade.screenshot || "",
+        screenshot: trade.screenshot || trade.imageUrl || "",
+        extractedText: trade.extractedText || "",
+        marketType: trade.marketType || "Forex",
+        tradeSubType: trade.tradeSubType || "",
+      },
+      error: null,
+    };
   }
 
   return {

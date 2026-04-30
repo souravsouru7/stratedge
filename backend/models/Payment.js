@@ -45,7 +45,8 @@ const paymentSchema = new mongoose.Schema(
       type: String
     },
     razorpayPaymentId: {
-      type: String
+      type: String,
+      index: false
     },
     razorpaySignature: {
       type: String
@@ -56,5 +57,16 @@ const paymentSchema = new mongoose.Schema(
 
 paymentSchema.index({ user: 1, createdAt: -1 });
 paymentSchema.index({ status: 1, createdAt: -1 });
+paymentSchema.index(
+  { razorpayPaymentId: 1 },
+  {
+    unique: true,
+    sparse: true,
+    partialFilterExpression: {
+      paymentMethod: "razorpay",
+      razorpayPaymentId: { $type: "string" },
+    },
+  }
+);
 
 module.exports = mongoose.model("Payment", paymentSchema);

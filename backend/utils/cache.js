@@ -1,5 +1,6 @@
 const { client, isRedisReady } = require("../config/redis");
 const { logger } = require("./logger");
+const inFlightResolvers = new Map();
 
 function serializeKeyPart(value) {
   return String(value)
@@ -92,9 +93,26 @@ async function rememberCache(key, ttlSeconds, resolver) {
     return { data: cached, cacheHit: true };
   }
 
-  const data = await resolver();
-  await setCache(key, data, ttlSeconds);
-  return { data, cacheHit: false };
+  const existingResolver = inFlightResolvers.get(key);
+  if (existingResolver) {
+    logger.warn("Cache miss storm deduplicated", { key });
+    const data = await existingResolver;
+    return { data, cacheHit: false, deduped: true };
+  }
+
+  const resolverPromise = (async () => {
+    const data = await resolver();
+    await setCache(key, data, ttlSeconds);
+    return data;
+  })();
+
+  inFlightResolvers.set(key, resolverPromise);
+  try {
+    const data = await resolverPromise;
+    return { data, cacheHit: false };
+  } finally {
+    inFlightResolvers.delete(key);
+  }
 }
 
 module.exports = {

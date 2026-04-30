@@ -19,6 +19,17 @@ const ocrQueue = new Queue(OCR_QUEUE_NAME, {
 });
 
 async function enqueueOcrJob({ tradeId, imageUrl, userId, marketType, broker }) {
+  const existing = await ocrQueue.getJob(tradeId);
+  if (existing) {
+    const state = await existing.getState();
+    logger.warn("Duplicate OCR enqueue prevented", {
+      tradeId,
+      jobId: existing.id,
+      state,
+    });
+    return existing;
+  }
+
   return ocrQueue.add(
     OCR_JOB_NAME,
     {
@@ -58,6 +69,10 @@ ocrQueue.on("error", (error) => {
     error: error.message,
     stack: error.stack,
   });
+});
+
+ocrQueue.on("waiting", (jobId) => {
+  logger.info("OCR job waiting", { jobId });
 });
 
 module.exports = {

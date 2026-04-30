@@ -18,6 +18,31 @@ const getAnalyticsLocalDate = (dateLike) => {
   return new Date(shiftedMs);
 };
 
+const toNum = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const safeDivide = (a, b) => {
+  const numerator = toNum(a);
+  const denominator = toNum(b);
+  if (denominator === 0) return 0;
+  const result = numerator / denominator;
+  return Number.isFinite(result) ? result : 0;
+};
+
+const fixed = (value, digits = 2) => toNum(value).toFixed(digits);
+
+function getIsoWeekKey(dateInput) {
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${weekNo}`;
+}
+
 // ============================================
 // BASIC ANALYTICS
 // ============================================
@@ -32,7 +57,7 @@ exports.getSummary = async (req, res) => {
       .limit(10000);
 
     const totalTrades = trades.length;
-    const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
+    const totalProfit = trades.reduce((acc, t) => acc + toNum(t.profit), 0);
     const wins = trades.filter(t => t.profit > 0).length;
     const winRate = totalTrades ? (wins / totalTrades) * 100 : 0;
 
@@ -40,35 +65,35 @@ exports.getSummary = async (req, res) => {
     const losingTrades = trades.filter(t => t.profit < 0);
 
     const avgWin = winningTrades.length
-      ? winningTrades.reduce((acc, t) => acc + t.profit, 0) / winningTrades.length
+      ? winningTrades.reduce((acc, t) => acc + toNum(t.profit), 0) / winningTrades.length
       : 0;
     const avgLoss = losingTrades.length
-      ? Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0) / losingTrades.length)
+      ? Math.abs(losingTrades.reduce((acc, t) => acc + toNum(t.profit), 0) / losingTrades.length)
       : 0;
 
-    const totalCommission = trades.reduce((acc, t) => acc + (t.commission || 0), 0);
-    const totalSwap = trades.reduce((acc, t) => acc + (t.swap || 0), 0);
+    const totalCommission = trades.reduce((acc, t) => acc + toNum(t.commission), 0);
+    const totalSwap = trades.reduce((acc, t) => acc + toNum(t.swap), 0);
     const totalCosts = totalCommission + totalSwap;
     const netProfit = totalProfit - totalCosts;
 
     // Setup Quality Stats
     const tradesWithScore = trades.filter(t => t.setupScore !== null && t.setupScore !== undefined);
     const avgSetupScore = tradesWithScore.length
-      ? tradesWithScore.reduce((acc, t) => acc + t.setupScore, 0) / tradesWithScore.length
+      ? tradesWithScore.reduce((acc, t) => acc + toNum(t.setupScore), 0) / tradesWithScore.length
       : 0;
 
     res.json({
       totalTrades,
-      totalProfit: totalProfit.toFixed(2),
-      netProfit: netProfit.toFixed(2),
-      winRate: winRate.toFixed(1),
-      avgTrade: (totalTrades ? totalProfit / totalTrades : 0).toFixed(2),
-      avgWin: avgWin.toFixed(2),
-      avgLoss: avgLoss.toFixed(2),
-      totalCosts: totalCosts.toFixed(2),
+      totalProfit: fixed(totalProfit),
+      netProfit: fixed(netProfit),
+      winRate: fixed(winRate, 1),
+      avgTrade: fixed(totalTrades ? totalProfit / totalTrades : 0),
+      avgWin: fixed(avgWin),
+      avgLoss: fixed(avgLoss),
+      totalCosts: fixed(totalCosts),
       winningTrades: winningTrades.length,
       losingTrades: losingTrades.length,
-      avgSetupScore: avgSetupScore.toFixed(1)
+      avgSetupScore: fixed(avgSetupScore, 1)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -85,10 +110,10 @@ exports.getWeeklyStats = async (req, res) => {
     const weekly = {};
 
     trades.forEach(trade => {
-      const date = new Date(trade.createdAt);
-      const week = `${date.getFullYear()}-W${Math.ceil(date.getDate() / 7)}`;
+      const week = getIsoWeekKey(trade.createdAt);
+      if (!week) return;
       if (!weekly[week]) weekly[week] = 0;
-      weekly[week] += trade.profit || 0;
+      weekly[week] += toNum(trade.profit);
     });
 
     res.json(weekly);
@@ -285,8 +310,9 @@ exports.getTradeDistribution = async (req, res) => {
       // NY: 13-21 (1pm to 9pm UTC) - overlaps with London
 
       if (hour >= 0 && hour < 8) session = "Asia Session";
+      else if (hour >= 13 && hour < 16) session = "Overlap Session";
       else if (hour >= 8 && hour < 16) session = "London Session";
-      else if (hour >= 13 && hour < 21) session = "NY Session";
+      else if (hour >= 16 && hour < 21) session = "NY Session";
 
       // Use stored session if available
       if (t.session) {
@@ -347,28 +373,28 @@ exports.getPerformanceMetrics = async (req, res) => {
       else if (t.profit < 0) { tempLossStreak++; tempWinStreak = 0; maxLossStreak = Math.max(maxLossStreak, tempLossStreak); }
     });
 
-    const totalWins = winningTrades.reduce((acc, t) => acc + t.profit, 0);
-    const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0));
-    const profitFactor = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
+    const totalWins = winningTrades.reduce((acc, t) => acc + toNum(t.profit), 0);
+    const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + toNum(t.profit), 0));
+    const profitFactor = safeDivide(totalWins, totalLosses);
 
     const winRate = trades.length ? (winningTrades.length / trades.length) * 100 : 0;
-    const expectancy = ((avgWin * (winRate / 100)) + (avgLoss * ((100 - winRate) / 100))).toFixed(2);
+    const expectancy = (avgWin * (winRate / 100)) + (avgLoss * ((100 - winRate) / 100));
 
     res.json({
-      largestWin: largestWin.toFixed(2),
-      largestLoss: largestLoss.toFixed(2),
-      avgWin: avgWin.toFixed(2),
-      avgLoss: avgLoss.toFixed(2),
+      largestWin: fixed(largestWin),
+      largestLoss: fixed(largestLoss),
+      avgWin: fixed(avgWin),
+      avgLoss: fixed(avgLoss),
       maxWinStreak,
       maxLossStreak,
-      profitFactor,
-      expectancy,
-      totalWins: totalWins.toFixed(2),
-      totalLosses: totalLosses.toFixed(2),
-      winRate: winRate.toFixed(1),
+      profitFactor: fixed(profitFactor),
+      expectancy: fixed(expectancy),
+      totalWins: fixed(totalWins),
+      totalLosses: fixed(totalLosses),
+      winRate: fixed(winRate, 1),
       losingTradesCount: losingTrades.length,
       winningTradesCount: winningTrades.length,
-      recoveryFactor: "0"
+      recoveryFactor: "0.00"
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

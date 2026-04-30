@@ -138,6 +138,20 @@ async function startOcrWorker({ initializeConnections = true, mode = "standalone
     );
   });
 
+  workerInstance.on("stalled", (jobId) => {
+    logger.error("OCR job stalled", {
+      jobId,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  workerInstance.on("error", (error) => {
+    logger.error("OCR worker runtime error", {
+      error: error.message,
+      stack: error.stack,
+    });
+  });
+
   bindShutdownHandlers();
 
   logger.info("OCR worker started successfully", {

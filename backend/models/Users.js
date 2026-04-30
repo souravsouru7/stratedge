@@ -89,5 +89,15 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ role: 1, subscriptionExpiry: -1 });
 userSchema.index({ role: 1, subscriptionStatus: 1, subscriptionExpiry: -1 });
+userSchema.index(
+  { googleId: 1 },
+  {
+    unique: true,
+    sparse: true,
+    partialFilterExpression: {
+      googleId: { $type: "string" },
+    },
+  }
+);
 
 module.exports = mongoose.model("User", userSchema);

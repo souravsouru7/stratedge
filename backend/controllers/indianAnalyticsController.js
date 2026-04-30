@@ -1,4 +1,14 @@
 const IndianTrade = require("../models/IndianTrade");
+const toNum = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+const safeDivide = (a, b) => {
+  const d = toNum(b);
+  if (d === 0) return 0;
+  return toNum(a) / d;
+};
+const fixed = (value, digits = 2) => toNum(value).toFixed(digits);
 
 const userQuery = (req) => {
   const instrumentType = (req.query.instrumentType || "OPTION").toUpperCase();
@@ -12,17 +22,17 @@ exports.getSummary = async (req, res) => {
     const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: -1 });
 
     const totalTrades = trades.length;
-    const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
+    const totalProfit = trades.reduce((acc, t) => acc + toNum(t.profit), 0);
     const wins = trades.filter(t => t.profit > 0).length;
     const winRate = totalTrades ? (wins / totalTrades) * 100 : 0;
 
     const winningTrades = trades.filter(t => t.profit > 0);
     const losingTrades = trades.filter(t => t.profit < 0);
     const avgWin = winningTrades.length
-      ? winningTrades.reduce((acc, t) => acc + t.profit, 0) / winningTrades.length
+      ? winningTrades.reduce((acc, t) => acc + toNum(t.profit), 0) / winningTrades.length
       : 0;
     const avgLoss = losingTrades.length
-      ? Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0) / losingTrades.length)
+      ? Math.abs(losingTrades.reduce((acc, t) => acc + toNum(t.profit), 0) / losingTrades.length)
       : 0;
 
     const totalCosts = trades.reduce((acc, t) => acc + (t.brokerage || 0) + (t.sttTaxes || 0), 0);
@@ -36,13 +46,13 @@ exports.getSummary = async (req, res) => {
 
     res.json({
       totalTrades,
-      totalProfit: totalProfit.toFixed(2),
-      netProfit: netProfit.toFixed(2),
-      winRate: winRate.toFixed(1),
-      avgTrade: (totalTrades ? totalProfit / totalTrades : 0).toFixed(2),
-      avgWin: avgWin.toFixed(2),
-      avgLoss: avgLoss.toFixed(2),
-      totalCosts: totalCosts.toFixed(2),
+      totalProfit: fixed(totalProfit),
+      netProfit: fixed(netProfit),
+      winRate: fixed(winRate, 1),
+      avgTrade: fixed(totalTrades ? totalProfit / totalTrades : 0),
+      avgWin: fixed(avgWin),
+      avgLoss: fixed(avgLoss),
+      totalCosts: fixed(totalCosts),
       winningTrades: winningTrades.length,
       losingTrades: losingTrades.length,
       avgSetupScore: avgSetupScore.toFixed(1)
@@ -418,7 +428,7 @@ exports.getPerformanceMetrics = async (req, res) => {
 
     const totalWins = winningTrades.reduce((acc, t) => acc + t.profit, 0);
     const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0));
-    const profitFactor = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
+    const profitFactor = fixed(safeDivide(totalWins, totalLosses));
 
     const winRate = trades.length ? (winningTrades.length / trades.length) * 100 : 0;
     const expectancy = ((avgWin * (winRate / 100)) + (avgLoss * ((100 - winRate) / 100))).toFixed(2);
@@ -435,10 +445,10 @@ exports.getPerformanceMetrics = async (req, res) => {
     const recoveryFactor = maxDD > 0 ? (netProfit / maxDD).toFixed(2) : netProfit > 0 ? "∞" : "0.00";
 
     res.json({
-      largestWin: largestWin.toFixed(2),
-      largestLoss: largestLoss.toFixed(2),
-      avgWin: avgWin.toFixed(2),
-      avgLoss: avgLoss.toFixed(2),
+      largestWin: fixed(largestWin),
+      largestLoss: fixed(largestLoss),
+      avgWin: fixed(avgWin),
+      avgLoss: fixed(avgLoss),
       maxWinStreak,
       maxLossStreak,
       profitFactor,

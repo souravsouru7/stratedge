@@ -196,6 +196,7 @@ exports.parseTrade = (text) => {
     const match = timeStr.match(/(\d{2}):(\d{2})/);
     if (!match) return "Unknown";
     const hour = parseInt(match[1]);
+    if (hour >= 13 && hour < 16) return "Overlap Session";
     if (hour >= 8 && hour < 13) return "London";
     if (hour >= 13 && hour < 21) return "New York";
     if (hour >= 21 || hour < 8) return "Asian";

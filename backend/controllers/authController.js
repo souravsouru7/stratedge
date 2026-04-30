@@ -181,30 +181,42 @@ exports.googleLogin = asyncHandler(async (req, res) => {
     (decodedToken.given_name ? `${decodedToken.given_name} ${decodedToken.family_name || ""}`.trim() : "Trader");
   const avatar = decodedToken.picture || null;
 
-  let user = await User.findOne({ email });
-  if (!user) {
-    user = await User.create({
-      name,
-      email,
-      googleId,
-      avatar,
-      authProvider: "google",
-      lastLogin: new Date(),
-    });
-  } else {
-    const updates = {};
-    if (!user.googleId) updates.googleId = googleId;
-    if (!user.avatar && avatar) updates.avatar = avatar;
-    if (user.authProvider !== "google" && user.authProvider !== "local") updates.authProvider = "local";
+  const now = new Date();
+  const setPayload = {
+    name,
+    authProvider: "google",
+    lastLogin: now,
+    ...(googleId ? { googleId } : {}),
+    ...(avatar ? { avatar } : {}),
+  };
 
-    if (Object.keys(updates).length > 0) {
-      updates.lastLogin = new Date();
-      await User.updateOne({ _id: user._id }, { $set: updates });
-      user = await User.findById(user._id);
-    } else {
-      user.lastLogin = new Date();
-      await user.save();
+  let user;
+  try {
+    user = await User.findOneAndUpdate(
+      { email },
+      {
+        $set: setPayload,
+        $setOnInsert: {
+          email,
+          termsAcceptance: {
+            acceptedTerms: false,
+            acceptedPrivacy: false,
+            acceptedAt: null,
+            termsVersion: null,
+          },
+        },
+      },
+      { upsert: true, new: true, runValidators: true }
+    );
+  } catch (error) {
+    if (error?.code !== 11000) {
+      throw error;
     }
+    user = await User.findOneAndUpdate(
+      { email },
+      { $set: setPayload },
+      { new: true, runValidators: true }
+    );
   }
 
   const needsTerms = user.termsAcceptance?.termsVersion !== CURRENT_TERMS_VERSION;
@@ -319,6 +331,20 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const OTP_DIGITS = 6;
+
+function timingSafeOtpEquals(expectedOtp, providedOtp) {
+  const expected = String(expectedOtp || "");
+  const provided = String(providedOtp || "");
+  if (expected.length !== OTP_DIGITS || provided.length !== OTP_DIGITS) {
+    return false;
+  }
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+  } catch {
+    return false;
+  }
+}
 
 exports.verifyOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
@@ -338,7 +364,7 @@ exports.verifyOTP = asyncHandler(async (req, res) => {
   }
 
   const isValid =
-    user.resetPasswordOTP === otp &&
+    timingSafeOtpEquals(user.resetPasswordOTP, otp) &&
     user.resetPasswordOTPExpires &&
     user.resetPasswordOTPExpires > new Date();
 

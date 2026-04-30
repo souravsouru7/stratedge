@@ -27,6 +27,10 @@ const { logger } = require("../utils/logger");
 const { appConfig } = require("../config");
 
 const PROCESSING_TIMEOUT_MS = appConfig.timeouts.processingTimeoutMs;
+const CONFIDENCE_ZONES = {
+  rejectMax: 9,
+  reviewMax: 59,
+};
 
 function logExtractedTrades({ tradeId, stage, parsedTrade, parsedTrades }) {
   const multiTrades = Array.isArray(parsedTrades) ? parsedTrades.filter(Boolean) : [];
@@ -895,7 +899,7 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
     // Post-pipeline rejection: if confidence is still near-zero after both OCR + AI,
     // the image is very likely unrelated to trading (e.g. AI also couldn't find anything).
     // Distinct from needsReview (score 10–60) which is a blurry/partial trade screenshot.
-    if (quality.score < 10) {
+    if (quality.score <= CONFIDENCE_ZONES.rejectMax) {
       logger.warn(`Near-zero confidence after full pipeline | tradeId=${tradeId} | score=${quality.score}`, { tradeId, score: quality.score });
       await rejectNonTradeImage(tradeId, trade, "Could not extract any trade data from this image. Please upload a clear screenshot from your broker platform.");
       return { tradeId, status: "failed", reason: "NOT_A_TRADE_IMAGE" };
@@ -903,7 +907,7 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
 
     const needsReview =
       !finalValidation.isValid ||
-      quality.isLowConfidence ||
+      quality.score <= CONFIDENCE_ZONES.reviewMax ||
       (marketType === "Indian_Market" && multiIndianValidation && !multiIndianValidation.isValid);
 
     logExtractedTrades({
@@ -930,30 +934,48 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
     const isMultiTrade = Array.isArray(parsedTrades) && parsedTrades.length > 1;
 
     if (isMultiTrade) {
+      const bridgePayload = {
+        jobId: trade.ocrJobId || tradeId,
+        status: "completed",
+        attemptsMade: attempt || trade.ocrAttempts || 0,
+        error: null,
+        data: {
+          parsedData: { parsedTrade, parsedTrades },
+          parsedTrade,
+          parsedTrades,
+          imageUrl: trade.imageUrl || trade.screenshot || "",
+          screenshot: trade.screenshot || trade.imageUrl || "",
+          extractedText: cleanedText,
+          marketType: trade.marketType || "Forex",
+          tradeSubType: marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "",
+        },
+      };
       const statusBridgeKey = buildCacheKey("trade_status_bridge", trade.user?.toString(), tradeId);
       await setCache(
         statusBridgeKey,
-        {
-          jobId: trade.ocrJobId || tradeId,
-          status: "completed",
-          attemptsMade: attempt || trade.ocrAttempts || 0,
-          error: null,
-          data: {
-            parsedData: { parsedTrade, parsedTrades },
-            parsedTrade,
-            parsedTrades,
-            imageUrl: trade.imageUrl || trade.screenshot || "",
-            screenshot: trade.screenshot || trade.imageUrl || "",
-            extractedText: cleanedText,
-            marketType: trade.marketType || "Forex",
-            tradeSubType: marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "",
-          },
-        },
-        15 * 60
+        bridgePayload,
+        24 * 60 * 60
       );
-
-      await Trade.findByIdAndDelete(tradeId);
-      logger.info(`Ghost trade deleted (multi-trade result) | tradeId=${tradeId} | count=${parsedTrades.length}`, {
+      await Trade.findByIdAndUpdate(
+        tradeId,
+        {
+          status: "completed",
+          extractedText: cleanedText,
+          rawOCRText: cleanedText,
+          aiRawResponse: aiRawResponse || "",
+          extractionConfidence: quality.score ?? 0,
+          isValid: true,
+          needsReview: false,
+          parsedData: {
+            ...bridgePayload.data.parsedData,
+            multiTradeGhost: true,
+          },
+          error: null,
+          processedAt: new Date(),
+        },
+        { returnDocument: "after", runValidators: true }
+      );
+      logger.info(`Ghost trade preserved as bridge (multi-trade result) | tradeId=${tradeId} | count=${parsedTrades.length}`, {
         tradeId,
         parsedTradeCount: parsedTrades.length,
       });
