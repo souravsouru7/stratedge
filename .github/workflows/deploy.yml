@@ -54,31 +54,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Preflight - check SSH port reachability
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_PORT: ${{ secrets.EC2_PORT }}
-        run: |
-          set -e
-          HOST="${EC2_HOST}"
-          PORT="${EC2_PORT:-22}"
-          if [ -z "$HOST" ]; then
-            echo "❌ Missing EC2_HOST secret"
-            exit 1
-          fi
-          echo "🔎 Checking TCP connectivity to ${HOST}:${PORT}"
-          nc -zv -w 8 "$HOST" "$PORT"
-          echo "✅ SSH port is reachable"
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          port: ${{ secrets.EC2_PORT }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 30s
-          command_timeout: 20m
           script: |
             set -e
 
@@ -86,7 +67,7 @@ jobs:
             cd ~/stratedge
             
             # Git operations
-            git config --add safe.directory ~/stratedge || true
+            git config --global --add safe.directory ~/stratedge || true
             git fetch origin main
             git reset --hard origin/main
             
