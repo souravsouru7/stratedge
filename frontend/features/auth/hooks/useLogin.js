@@ -24,6 +24,24 @@ const isInAppBrowser = () => {
   return isStandalone || isEmbeddedUa;
 };
 
+const getAuthDebugInfo = () => {
+  if (typeof window === "undefined") return null;
+  const ua = navigator.userAgent || "";
+  const isStandalone =
+    (typeof navigator !== "undefined" && navigator.standalone === true) ||
+    (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches);
+  const isEmbeddedUa = /(FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|TikTok|Pinterest|GSA\/|; wv\)|WebView)/i.test(ua);
+  const isAndroidWv = /; wv\)/i.test(ua) || /\bVersion\/\d+\.\d+.*Chrome\/\d+.*Mobile\b/i.test(ua) && /\bSafari\/\d+/i.test(ua) === false;
+  return {
+    isStandalone,
+    isEmbeddedUa,
+    isAndroidWv,
+    platform: navigator.platform || "",
+    vendor: navigator.vendor || "",
+    ua,
+  };
+};
+
 /**
  * useLogin
  * Manages login form state, terms acceptance gate, and authentication mutations.
@@ -39,12 +57,14 @@ export function useLogin() {
   const [mounted, setMounted]         = useState(false);
   const [shake, setShake]             = useState(false);
   const [inAppBrowser, setInAppBrowser] = useState(false);
+  const [authDebugInfo, setAuthDebugInfo] = useState(null);
 
   // Terms were accepted at registration — login never re-checks them
 
   useEffect(() => {
     setMounted(true);
     setInAppBrowser(isInAppBrowser());
+    setAuthDebugInfo(getAuthDebugInfo());
     const token = typeof window !== "undefined" && localStorage.getItem("token");
     if (token) { router.push("/dashboard"); return; }
 
@@ -140,6 +160,7 @@ export function useLogin() {
     showPass, setShowPass,
     mounted, shake,
     inAppBrowser,
+    authDebugInfo,
     handleSubmit,
     handleGoogleSignIn,
     testConnection,
