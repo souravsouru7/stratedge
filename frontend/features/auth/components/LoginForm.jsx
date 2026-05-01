@@ -13,6 +13,7 @@ export default function LoginForm({
   loading, googleLoading,
   showPass, setShowPass,
   mounted, shake,
+  inAppBrowser,
   handleSubmit,
   handleGoogleSignIn,
   testConnection,
@@ -109,9 +110,14 @@ export default function LoginForm({
 
         {/* Google */}
         <div style={{ marginBottom: 16 }}>
+          {inAppBrowser && (
+            <div style={{ marginBottom: 10, fontSize: 11, color: "#92400E", fontFamily: "'JetBrains Mono',monospace", textAlign: "left", padding: "10px 12px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8 }}>
+              Google login is blocked in embedded/standalone web views. Open this page in a normal <b>Chrome</b>/<b>Safari</b> tab (not “Add to Home Screen” / PWA mode) and try again.
+            </div>
+          )}
           {process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? (
             <button type="button" onClick={handleGoogleSignIn}
-              disabled={isAnyLoading}
+              disabled={isAnyLoading || inAppBrowser}
               style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "11px 16px", border: "1.5px solid #E2E8F0", borderRadius: 8, background: "#fff", cursor: isAnyLoading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, color: "#0F1923", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: isAnyLoading ? 0.7 : 1, boxShadow: "0 1px 6px rgba(15,25,35,0.08)", transition: "all 0.2s" }}
             >
               <svg width="18" height="18" viewBox="0 0 48 48">
@@ -120,7 +126,7 @@ export default function LoginForm({
                 <path fill="#FBBC05" d="M10.5 28.5c-.5-1.5-.8-3-.8-4.5s.3-3 .8-4.5l-7.8-6C1 16.5 0 20.1 0 24s1 7.5 2.7 10.7l7.8-6.2z"/>
                 <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.4-5.7c-2.1 1.4-4.7 2.2-7.8 2.2-6.2 0-11.5-3.7-13.5-9l-7.8 6C6.7 42.5 14.7 48 24 48z"/>
               </svg>
-              {googleLoading ? "Signing in..." : "Continue with Google"}
+              {inAppBrowser ? "Open in browser to continue" : (googleLoading ? "Signing in..." : "Continue with Google")}
             </button>
           ) : (
             <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace", textAlign: "center", padding: "10px 12px", background: "#F8FAFC", border: "1px dashed #E2E8F0", borderRadius: 8 }}>

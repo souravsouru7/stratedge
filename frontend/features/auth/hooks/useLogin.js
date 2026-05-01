@@ -10,6 +10,20 @@ import {
   recoverFirebaseSessionIdToken,
 } from "@/services/firebaseAuth";
 
+const isInAppBrowser = () => {
+  if (typeof window === "undefined") return false;
+  // iOS "Add to Home Screen" / PWA standalone runs in a browser-less WebView shell.
+  // Google OAuth often blocks embedded agents there (disallowed_useragent).
+  const isStandalone =
+    (typeof navigator !== "undefined" && navigator.standalone === true) ||
+    (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches);
+
+  const ua = navigator.userAgent || "";
+  // Common embedded/in-app browsers that Google blocks for OAuth (disallowed_useragent).
+  const isEmbeddedUa = /(FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|TikTok|Pinterest|GSA\/|; wv\)|WebView)/i.test(ua);
+  return isStandalone || isEmbeddedUa;
+};
+
 /**
  * useLogin
  * Manages login form state, terms acceptance gate, and authentication mutations.
@@ -24,11 +38,13 @@ export function useLogin() {
   const [showPass, setShowPass]       = useState(false);
   const [mounted, setMounted]         = useState(false);
   const [shake, setShake]             = useState(false);
+  const [inAppBrowser, setInAppBrowser] = useState(false);
 
   // Terms were accepted at registration — login never re-checks them
 
   useEffect(() => {
     setMounted(true);
+    setInAppBrowser(isInAppBrowser());
     const token = typeof window !== "undefined" && localStorage.getItem("token");
     if (token) { router.push("/dashboard"); return; }
 
@@ -77,6 +93,11 @@ export function useLogin() {
   // 4. Google Sign-In Mutation
   const googleMutation = useMutation({
     mutationFn: async () => {
+      if (isInAppBrowser()) {
+        const e = new Error("Google login is blocked inside in-app browsers. Please open this page in Chrome/Safari and try again.");
+        e.code = "DISALLOWED_USER_AGENT";
+        throw e;
+      }
       const idToken = await signInWithFirebaseGoogle();
       if (!idToken) return null;
       return googleLogin(idToken);
@@ -118,6 +139,7 @@ export function useLogin() {
     googleLoading: googleMutation.isPending,
     showPass, setShowPass,
     mounted, shake,
+    inAppBrowser,
     handleSubmit,
     handleGoogleSignIn,
     testConnection,
