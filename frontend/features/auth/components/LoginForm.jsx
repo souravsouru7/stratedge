@@ -116,16 +116,7 @@ export default function LoginForm({
               Google login is blocked in embedded/standalone web views. Open this page in a normal <b>Chrome</b>/<b>Safari</b> tab (not “Add to Home Screen” / PWA mode) and try again.
             </div>
           )}
-          {authDebugInfo && (
-            <details style={{ marginBottom: 10 }}>
-              <summary style={{ cursor: "pointer", fontSize: 10, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>
-                Login debug (tap to expand)
-              </summary>
-              <div style={{ marginTop: 8, fontSize: 10, color: "#64748B", fontFamily: "'JetBrains Mono',monospace", padding: "10px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {`standalone=${String(authDebugInfo.isStandalone)}\nembeddedUA=${String(authDebugInfo.isEmbeddedUa)}\nandroidWV=${String(authDebugInfo.isAndroidWv)}\nplatform=${authDebugInfo.platform}\nvendor=${authDebugInfo.vendor}\nua=${authDebugInfo.ua}`}
-              </div>
-            </details>
-          )}
+
           {process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? (
             <button type="button" onClick={handleGoogleSignIn}
               disabled={isAnyLoading || inAppBrowser}

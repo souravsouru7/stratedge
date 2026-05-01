@@ -38,9 +38,12 @@ const getFirebaseApp = () => {
   return initializeApp(getFirebaseConfig());
 };
 
+let isPersistenceSet = false;
+
 const getFirebaseAuth = async () => {
   const auth = getAuth(getFirebaseApp());
-  if (!isCapacitorApp()) {
+  if (!isCapacitorApp() && !isPersistenceSet && !hasRedirectPending()) {
+    isPersistenceSet = true;
     // Some mobile browsers / in-app browsers can block persistence APIs (IndexedDB/localStorage)
     // during OAuth redirects. Try progressively weaker persistence modes.
     const persistences = [
@@ -177,9 +180,13 @@ export const handleGoogleRedirectResult = async () => {
 
 export const recoverFirebaseSessionIdToken = async () => {
   const auth = await getFirebaseAuth();
-  const currentUser = auth.currentUser;
-  if (!currentUser) return null;
-  return currentUser.getIdToken();
+  return new Promise((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe();
+      if (!user) resolve(null);
+      else resolve(await user.getIdToken());
+    });
+  });
 };
 
 export const signInWithFirebaseGoogle = async () => {
