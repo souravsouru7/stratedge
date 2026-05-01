@@ -8,6 +8,8 @@ import {
   signInWithFirebaseGoogle,
   handleGoogleRedirectResult,
   recoverFirebaseSessionIdToken,
+  hasRedirectPending,
+  clearRedirectPending,
 } from "@/services/firebaseAuth";
 
 const isInAppBrowser = () => {
@@ -70,11 +72,23 @@ export function useLogin() {
 
     // Pick up the idToken after a mobile redirect Google sign-in.
     // Fallback to an existing Firebase session when redirect result is empty.
+    const wasPending = hasRedirectPending();
     handleGoogleRedirectResult()
-      .then(async (idToken) => idToken || recoverFirebaseSessionIdToken())
+      .then(async (idToken) => {
+        if (idToken) return idToken;
+        const recovered = await recoverFirebaseSessionIdToken();
+        if (!recovered && wasPending) {
+          clearRedirectPending();
+          alert("Google Sign-In was interrupted or failed. Please try again or use a different browser.");
+        }
+        return recovered;
+      })
       .then(idToken => { if (idToken) return googleLogin(idToken); })
       .then(data => { if (data) handleAuthSuccess(data); })
-      .catch(err => alert("Google login failed: " + (err?.message || err)));
+      .catch(err => {
+        clearRedirectPending();
+        alert("Google login failed: " + (err?.message || err));
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 

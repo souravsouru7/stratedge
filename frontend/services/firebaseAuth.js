@@ -106,11 +106,11 @@ const signInWithNativeGoogle = async () => {
 };
 
 const REDIRECT_PENDING_KEY = "firebase_google_redirect_pending";
-const setRedirectPending = () => {
+export const setRedirectPending = () => {
   try { sessionStorage.setItem(REDIRECT_PENDING_KEY, "1"); } catch { /* ignore */ }
   try { localStorage.setItem(REDIRECT_PENDING_KEY, "1"); } catch { /* ignore */ }
 };
-const hasRedirectPending = () => {
+export const hasRedirectPending = () => {
   try {
     if (sessionStorage.getItem(REDIRECT_PENDING_KEY)) return true;
   } catch { /* ignore */ }
@@ -119,7 +119,7 @@ const hasRedirectPending = () => {
   } catch { /* ignore */ }
   return false;
 };
-const clearRedirectPending = () => {
+export const clearRedirectPending = () => {
   try { sessionStorage.removeItem(REDIRECT_PENDING_KEY); } catch { /* ignore */ }
   try { localStorage.removeItem(REDIRECT_PENDING_KEY); } catch { /* ignore */ }
 };
@@ -130,34 +130,24 @@ const signInWithWebGoogle = async () => {
   provider.addScope("email");
   provider.addScope("profile");
 
-  // iOS web redirect flows are more fragile and can trigger "disallowed_useragent" more often.
-  // Prefer a popup first on iOS; fall back to redirect only if popup is blocked.
-  if (isIOSBrowser()) {
-    try {
-      const result = await signInWithPopup(auth, provider);
-      return result.user.getIdToken();
-    } catch (err) {
-      const code = err?.code || err?.customData?.code || "";
-      if (String(code).includes("popup")) {
-        setRedirectPending();
-        await signInWithRedirect(auth, provider);
-        return null;
-      }
-      throw err;
+  // Always attempt popup first, even on mobile browsers, as redirect flows 
+  // are often blocked by third-party cookie restrictions or cause reloads.
+  try {
+    const result = await signInWithPopup(auth, provider);
+    if (!isCapacitorApp()) {
+      try { await setPersistence(auth, browserLocalPersistence); } catch { /* non-fatal */ }
     }
+    return result.user.getIdToken();
+  } catch (err) {
+    const code = err?.code || err?.customData?.code || "";
+    // If popup is blocked or unsupported, fallback to redirect
+    if (String(code).includes("popup") || String(code).includes("unsupported")) {
+      setRedirectPending();
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    throw err;
   }
-
-  if (isMobileBrowser()) {
-    setRedirectPending();
-    await signInWithRedirect(auth, provider);
-    return null; // page reloads; result handled in handleGoogleRedirectResult
-  }
-
-  const result = await signInWithPopup(auth, provider);
-  if (!isCapacitorApp()) {
-    try { await setPersistence(auth, browserLocalPersistence); } catch { /* non-fatal */ }
-  }
-  return result.user.getIdToken();
 };
 
 export const handleGoogleRedirectResult = async () => {
