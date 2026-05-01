@@ -70,6 +70,11 @@ const isMobileBrowser = () => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
+const isIOSBrowser = () => {
+  if (typeof window === "undefined" || isCapacitorApp()) return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
 // Native Google Sign-In via @capacitor-firebase/authentication
 const signInWithNativeGoogle = async () => {
   let FirebaseAuthentication;
@@ -121,6 +126,23 @@ const signInWithWebGoogle = async () => {
   const provider = new GoogleAuthProvider();
   provider.addScope("email");
   provider.addScope("profile");
+
+  // iOS web redirect flows are more fragile and can trigger "disallowed_useragent" more often.
+  // Prefer a popup first on iOS; fall back to redirect only if popup is blocked.
+  if (isIOSBrowser()) {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      return result.user.getIdToken();
+    } catch (err) {
+      const code = err?.code || err?.customData?.code || "";
+      if (String(code).includes("popup")) {
+        setRedirectPending();
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+      throw err;
+    }
+  }
 
   if (isMobileBrowser()) {
     setRedirectPending();

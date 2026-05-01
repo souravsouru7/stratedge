@@ -128,7 +128,15 @@ export function useLogin() {
     },
     onError: (err) => {
       triggerShake();
-      alert("Google login failed: " + (err.message || "Could not connect to Google."));
+      const msg = String(err?.message || "");
+      if (/disallowed_useragent/i.test(msg) || err?.code === "DISALLOWED_USER_AGENT") {
+        alert(
+          "Google blocked this browser (Error 403: disallowed_useragent).\n\n" +
+          "Fix: open the site in Safari (iPhone) or update Chrome + System WebView + Play Services (Android), then try again."
+        );
+        return;
+      }
+      alert("Google login failed: " + (msg || "Could not connect to Google."));
     },
   });
 
