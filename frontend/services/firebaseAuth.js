@@ -4,8 +4,11 @@ import { initializeApp, getApp, getApps } from "firebase/app";
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
+  browserSessionPersistence,
   getAuth,
   getRedirectResult,
+  indexedDBLocalPersistence,
+  inMemoryPersistence,
   setPersistence,
   signInWithCredential,
   signInWithPopup,
@@ -38,12 +41,22 @@ const getFirebaseApp = () => {
 const getFirebaseAuth = async () => {
   const auth = getAuth(getFirebaseApp());
   if (!isCapacitorApp()) {
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-    } catch (err) {
-      // Some mobile browsers can block persistence APIs during redirects.
-      // Keep auth usable even if persistence cannot be explicitly set.
-      console.warn("[GoogleAuth] setPersistence failed, continuing:", err?.message || err);
+    // Some mobile browsers / in-app browsers can block persistence APIs (IndexedDB/localStorage)
+    // during OAuth redirects. Try progressively weaker persistence modes.
+    const persistences = [
+      browserLocalPersistence,
+      indexedDBLocalPersistence,
+      browserSessionPersistence,
+      inMemoryPersistence,
+    ];
+    for (const p of persistences) {
+      try {
+        await setPersistence(auth, p);
+        break;
+      } catch (err) {
+        // Non-fatal: keep trying the next persistence strategy.
+        console.warn("[GoogleAuth] setPersistence failed, trying fallback:", err?.message || err);
+      }
     }
   }
   return auth;
@@ -124,7 +137,8 @@ const signInWithWebGoogle = async () => {
 
 export const handleGoogleRedirectResult = async () => {
   if (typeof window === "undefined") return null;
-  if (!hasRedirectPending() && !isMobileBrowser()) return null;
+  // Always attempt to recover redirect results on client.
+  // Mobile/in-app browsers can lose storage flags; gating on a flag causes missed results.
 
   try {
     const auth = await getFirebaseAuth();
