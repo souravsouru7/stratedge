@@ -272,7 +272,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
       .limit(10000);
 
     // By Currency Pair
-    const byPair = {});
+    const byPair = {};
     trades.forEach(t => {
       if (!byPair[t.pair]) byPair[t.pair] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byPair[t.pair].total++;
