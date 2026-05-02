@@ -1,0 +1,38 @@
+module.exports = {
+  apps: [
+    {
+      name: "stratedge-staging",
+      script: "./server.js",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+        PORT: 4000,
+        ENABLE_EMBEDDED_OCR_WORKER: "false",
+      },
+      error_file: "./logs/pm2-staging-api-error.log",
+      out_file: "./logs/pm2-staging-api-out.log",
+      log_file: "./logs/pm2-staging-api-combined.log",
+      time: true,
+      merge_logs: true,
+    },
+    {
+      name: "stratedge-staging-worker",
+      script: "./workers/ocrWorker.js",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+      },
+      error_file: "./logs/pm2-staging-worker-error.log",
+      out_file: "./logs/pm2-staging-worker-out.log",
+      log_file: "./logs/pm2-staging-worker-combined.log",
+      time: true,
+      merge_logs: true,
+    },
+  ],
+};

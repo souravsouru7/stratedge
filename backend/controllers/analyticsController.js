@@ -3,6 +3,8 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { appConfig } = require("../config");
 
+const ALLOWED_FOREX_MARKET_TYPES = new Set(["Forex", "Crypto", "Commodities", "Indices", "Stocks"]);
+
 const forexQuery = (req) => {
   const { range, marketType } = req.query;
   
@@ -10,8 +12,8 @@ const forexQuery = (req) => {
     throw new ApiError(400, "Invalid range parameter");
   }
   
-  if (marketType && !["Forex", "Crypto", "Commodities", "Indices", "Stocks"].includes(marketType)) {
-    throw new ApiError(400, "Invalid marketType parameter");
+  if (marketType && !ALLOWED_FOREX_MARKET_TYPES.has(String(marketType))) {
+    throw new ApiError(400, "Invalid marketType parameter", "VALIDATION_ERROR");
   }
 
   return {
@@ -46,6 +48,13 @@ const safeDivide = (a, b) => {
 };
 
 const fixed = (value, digits = 2) => toNum(value).toFixed(digits);
+
+const handleAnalyticsError = (error) => {
+  if (error instanceof ApiError) {
+    throw error;
+  }
+  throw new ApiError(500, error.message);
+};
 
 function getIsoWeekKey(dateInput) {
   const d = new Date(dateInput);
@@ -110,7 +119,7 @@ exports.getSummary = asyncHandler(async (req, res) => {
       avgSetupScore: fixed(avgSetupScore, 1)
     });
   } catch (error) {
-    throw new ApiError(500, error.message);
+    handleAnalyticsError(error);
   }
 });
 
@@ -132,7 +141,7 @@ exports.getWeeklyStats = asyncHandler(async (req, res) => {
 
     res.json(weekly);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleAnalyticsError(error);
   }
 });
 
@@ -258,7 +267,7 @@ exports.getRiskRewardAnalysis = asyncHandler(async (req, res) => {
       winRate: winRate.toFixed(1)
     });
   } catch (error) {
-    throw new ApiError(500, error.message);
+    handleAnalyticsError(error);
   }
 });
 
@@ -358,7 +367,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
       shortProfit:  parseFloat(shortData.profit || 0).toFixed(2),
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleAnalyticsError(error);
   }
 });
 
@@ -411,7 +420,7 @@ exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
       recoveryFactor: "0.00"
     });
   } catch (error) {
-    throw new ApiError(500, error.message);
+    handleAnalyticsError(error);
   }
 });
 
@@ -649,7 +658,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
       bestSessionWR: bestSessionWR[1].total > 0 ? { name: bestSessionWR[0], winRate: bestSessionWR[1].winRate, trades: bestSessionWR[1].total } : null
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleAnalyticsError(error);
   }
 });
 
@@ -721,7 +730,7 @@ exports.getTradeQuality = asyncHandler(async (req, res) => {
       tradesWithRR: trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice).length
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleAnalyticsError(error);
   }
 });
 
@@ -786,7 +795,7 @@ exports.getDrawdownAnalysis = asyncHandler(async (req, res) => {
       drawdownPeriods: []
     });
   } catch (error) {
-    throw new ApiError(500, error.message);
+    handleAnalyticsError(error);
   }
 });
 
@@ -1113,7 +1122,7 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleAnalyticsError(error);
   }
 });
 
@@ -1202,7 +1211,7 @@ exports.getAdvancedAnalytics = asyncHandler(async (req, res) => {
       recentTrades: trades.slice(-10).reverse().map(t => ({ pair: t.pair, type: t.type, profit: t.profit, createdAt: t.createdAt }))
     });
   } catch (error) {
-    throw new ApiError(500, error.message);
+    handleAnalyticsError(error);
   }
 });
 
@@ -1365,7 +1374,7 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
       psychologyScore, scoreBreakdown, wouldRetakeAnalysis, totalTrackedTrades
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleAnalyticsError(error);
   }
 });
 
