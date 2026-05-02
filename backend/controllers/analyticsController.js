@@ -1,6 +1,6 @@
 const Trade = require("../models/Trade");
 const ApiError = require("../utils/ApiError");
-const { asyncHandler } = require("../middleware/errorHandler");
+const asyncHandler = require("../utils/asyncHandler");
 const { appConfig } = require("../config");
 
 const forexQuery = (req) => {
