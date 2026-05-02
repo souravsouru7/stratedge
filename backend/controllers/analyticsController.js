@@ -1,10 +1,24 @@
 const Trade = require("../models/Trade");
+const ApiError = require("../utils/ApiError");
+const { asyncHandler } = require("../middleware/errorHandler");
 const { appConfig } = require("../config");
 
-const forexQuery = (req) => ({
-  user: req.user._id,
-  marketType: { $ne: "Indian_Market" }
-});
+const forexQuery = (req) => {
+  const { range, marketType } = req.query;
+  
+  if (range && !["all", "thisWeek", "lastWeek", "thisMonth", "lastMonth", "thisYear", "ytd"].includes(range)) {
+    throw new ApiError(400, "Invalid range parameter");
+  }
+  
+  if (marketType && !["Forex", "Crypto", "Commodities", "Indices", "Stocks"].includes(marketType)) {
+    throw new ApiError(400, "Invalid marketType parameter");
+  }
+
+  return {
+    user: req.user._id,
+    marketType: { $ne: "Indian_Market" }
+  };
+};
 
 // Small helper to shift trade timestamps into a configurable
 // "trader timezone" before bucketing by day/hour.
@@ -47,10 +61,10 @@ function getIsoWeekKey(dateInput) {
 // BASIC ANALYTICS
 // ============================================
 
-exports.getSummary = async (req, res) => {
+exports.getSummary = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .sort({ createdAt: -1 })
       .select("profit commission swap setupScore")
       .lean()
@@ -96,14 +110,14 @@ exports.getSummary = async (req, res) => {
       avgSetupScore: fixed(avgSetupScore, 1)
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
-exports.getWeeklyStats = async (req, res) => {
+exports.getWeeklyStats = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .select("profit createdAt")
       .lean()
       .limit(10000);
@@ -127,10 +141,10 @@ exports.getWeeklyStats = async (req, res) => {
 // ============================================
 
 // 1. Risk/Reward Analysis
-exports.getRiskRewardAnalysis = async (req, res) => {
+exports.getRiskRewardAnalysis = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .select("profit stopLoss takeProfit entryPrice riskRewardRatio riskRewardCustom")
       .lean()
       .limit(10000);
@@ -244,21 +258,21 @@ exports.getRiskRewardAnalysis = async (req, res) => {
       winRate: winRate.toFixed(1)
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
 // 2. Trade Distribution
-exports.getTradeDistribution = async (req, res) => {
+exports.getTradeDistribution = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .select("profit pair type strategy session createdAt")
       .lean()
       .limit(10000);
 
     // By Currency Pair
-    const byPair = {};
+    const byPair = {});
     trades.forEach(t => {
       if (!byPair[t.pair]) byPair[t.pair] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byPair[t.pair].total++;
@@ -349,10 +363,10 @@ exports.getTradeDistribution = async (req, res) => {
 };
 
 // 3. Performance Metrics
-exports.getPerformanceMetrics = async (req, res) => {
+exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .sort({ createdAt: 1 })
       .select("profit createdAt lotSize")
       .lean()
@@ -397,15 +411,15 @@ exports.getPerformanceMetrics = async (req, res) => {
       recoveryFactor: "0.00"
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
 // 4. Time Analysis (Fixed)
-exports.getTimeAnalysis = async (req, res) => {
+exports.getTimeAnalysis = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    let trades = await Trade.find(query)
+    let trades = await Trade.find(query).lean()
       .select("profit createdAt session")
       .lean()
       .limit(10000);
@@ -433,7 +447,7 @@ exports.getTimeAnalysis = async (req, res) => {
 
     // By Month
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const byMonth = {};
+    const byMonth = {});
     const byDate = {};
 
     trades.forEach(t => {
@@ -640,10 +654,10 @@ exports.getTimeAnalysis = async (req, res) => {
 };
 
 // 5. Trade Quality
-exports.getTradeQuality = async (req, res) => {
+exports.getTradeQuality = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .select("profit commission swap stopLoss takeProfit entryPrice riskRewardRatio riskRewardCustom setupScore")
       .lean()
       .limit(10000);
@@ -678,7 +692,7 @@ exports.getTradeQuality = async (req, res) => {
         losses: total - wins,
         winRate: total ? ((wins / total) * 100).toFixed(1) : 0,
         avgProfit: total ? (range.trades.reduce((a, t) => a + t.profit, 0) / total).toFixed(2) : 0
-      };
+      });
     }).filter(r => r.total > 0);
 
     const breakevenTrades = trades.filter(t => Math.abs(t.profit) < 5);
@@ -712,10 +726,10 @@ exports.getTradeQuality = async (req, res) => {
 };
 
 // 6. Drawdown Analysis
-exports.getDrawdownAnalysis = async (req, res) => {
+exports.getDrawdownAnalysis = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .sort({ createdAt: 1 })
       .select("profit createdAt")
       .lean()
@@ -772,15 +786,15 @@ exports.getDrawdownAnalysis = async (req, res) => {
       drawdownPeriods: []
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
 // 7. AI Insights (Enhanced with Session) - OPTIMIZED
-exports.getAIInsights = async (req, res) => {
+exports.getAIInsights = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .select("profit entryPrice stopLoss takeProfit session pair createdAt entryBasis strategy riskRewardRatio riskRewardCustom lotSize mistakeTag lesson")
       .lean()
       .limit(10000);
@@ -804,7 +818,7 @@ exports.getAIInsights = async (req, res) => {
       weeklyPlan: {},
       strategyStats: {},
       mistakeTagStats: {}
-    };
+    });
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     let totalProfit = 0;
@@ -1104,10 +1118,10 @@ exports.getAIInsights = async (req, res) => {
 };
 
 // 8. Advanced Analytics (all-in-one) - OPTIMIZED
-exports.getAdvancedAnalytics = async (req, res) => {
+exports.getAdvancedAnalytics = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query)
+    const trades = await Trade.find(query).lean()
       .sort({ createdAt: 1 })
       .select("profit commission swap entryPrice stopLoss takeProfit riskRewardRatio pair type createdAt balance")
       .lean()
@@ -1188,18 +1202,18 @@ exports.getAdvancedAnalytics = async (req, res) => {
       recentTrades: trades.slice(-10).reverse().map(t => ({ pair: t.pair, type: t.type, profit: t.profit, createdAt: t.createdAt }))
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
 // ============================================
 // PSYCHOLOGY ANALYTICS
 // ============================================
 
-exports.getPsychologyAnalytics = async (req, res) => {
+exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
   try {
     const query = forexQuery(req);
-    const trades = await Trade.find(query).sort({ createdAt: 1 });
+    const trades = await Trade.find(query).lean().sort({ createdAt: 1 });
 
     if (trades.length === 0) {
       return res.json({
@@ -1210,7 +1224,7 @@ exports.getPsychologyAnalytics = async (req, res) => {
     }
 
     // 1) Mood Analysis (1–5)
-    const moodBuckets = {};
+    const moodBuckets = {});
     trades.forEach(t => {
       if (t.mood != null && t.mood >= 1 && t.mood <= 5) {
         if (!moodBuckets[t.mood]) moodBuckets[t.mood] = { trades: 0, wins: 0, losses: 0, pnl: 0 };

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { loginUser, googleLogin, testConnection as apiTestConnection } from "@/services/api";
+import { loginUser, googleLogin } from "@/services/api";
 import {
   signInWithFirebaseGoogle,
   handleGoogleRedirectResult,
@@ -165,14 +165,6 @@ export function useLogin() {
     googleMutation.mutate();
   };
 
-  const testConnection = async () => {
-    try {
-      await apiTestConnection();
-      alert("Connection test SUCCESS");
-    } catch (err) {
-      alert("Connection test ERROR: " + err.message);
-    }
-  };
 
   return {
     form, handleChange,
@@ -185,6 +177,5 @@ export function useLogin() {
     authDebugInfo,
     handleSubmit,
     handleGoogleSignIn,
-    testConnection,
   };
 }

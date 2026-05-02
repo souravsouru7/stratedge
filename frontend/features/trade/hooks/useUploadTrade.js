@@ -514,7 +514,8 @@ export function useUploadTrade() {
         "error"
       );
     }
-  }, [jobStatusQuery.data]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobStatusQuery.data?.status]);
 
   // Stop polling and surface error when status request itself fails (e.g. 404)
   useEffect(() => {
@@ -528,6 +529,7 @@ export function useUploadTrade() {
       }
       addToast(msg, "error");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobStatusQuery.error]);
 
   const loading = uploadJobMutation.isPending || !!jobId;
@@ -654,7 +656,11 @@ export function useUploadTrade() {
     saveAllTrades: async () => {
       for (let i = 0; i < trades.length; i++) {
         if (!savedTrades[i] && canSaveTrade(trades[i])) {
-          await saveTradeMutation.mutateAsync({ idx: i });
+          try {
+            await saveTradeMutation.mutateAsync({ idx: i });
+          } catch (err) {
+            addToast(`Trade ${i + 1} failed to save: ${err?.message || "Unknown error"}`, "error");
+          }
         }
       }
     },

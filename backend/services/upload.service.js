@@ -23,7 +23,7 @@ async function cleanupFailedUpload({ tradeId, uploadedImage, userId, error }) {
       status: "failed",
       error: error.message,
       processedAt: new Date(),
-    }).catch(() => {});
+    }).catch((err) => logger.error("cleanupFailedUpload DB error", { error: err.message, tradeId }));
   }
 
   logger.error("Upload enqueue error", {
@@ -85,17 +85,25 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
       userId: user._id,
     });
 
-    const trade = await tradeRepository.createTrade({
-      user: user._id,
-      screenshot: uploadedImage.imageUrl,
-      imageUrl: uploadedImage.imageUrl,
-      marketType,
-      tradeSubType,
-      broker: brokerOverride || "",
-      status: "pending",
-      queuedAt: new Date(),
-      error: null,
-    });
+    let trade;
+    try {
+      trade = await tradeRepository.createTrade({
+        user: user._id,
+        screenshot: uploadedImage.imageUrl,
+        imageUrl: uploadedImage.imageUrl,
+        marketType,
+        tradeSubType,
+        broker: brokerOverride || "",
+        status: "pending",
+        queuedAt: new Date(),
+        error: null,
+      });
+    } catch (createError) {
+      if (uploadedImage?.publicId) {
+        await cloudinary.uploader.destroy(uploadedImage.publicId, { resource_type: "image" }).catch(() => {});
+      }
+      throw createError;
+    }
 
     tradeId = trade._id.toString();
 

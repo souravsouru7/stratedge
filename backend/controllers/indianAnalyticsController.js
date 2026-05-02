@@ -1,4 +1,6 @@
 const IndianTrade = require("../models/IndianTrade");
+const ApiError = require("../utils/ApiError");
+const { asyncHandler } = require("../middleware/errorHandler");
 const toNum = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -12,14 +14,17 @@ const fixed = (value, digits = 2) => toNum(value).toFixed(digits);
 
 const userQuery = (req) => {
   const instrumentType = (req.query.instrumentType || "OPTION").toUpperCase();
+  if (!["OPTION", "EQUITY"].includes(instrumentType)) {
+    throw new ApiError(400, "Invalid instrumentType");
+  }
   return { user: req.user._id, instrumentType };
 };
 
 // ========== BASIC ANALYTICS ==========
 
-exports.getSummary = async (req, res) => {
+exports.getSummary = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: -1 });
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: -1 });
 
     const totalTrades = trades.length;
     const totalProfit = trades.reduce((acc, t) => acc + toNum(t.profit), 0);
@@ -58,14 +63,14 @@ exports.getSummary = async (req, res) => {
       avgSetupScore: avgSetupScore.toFixed(1)
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
-exports.getWeeklyStats = async (req, res) => {
+exports.getWeeklyStats = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
-    const weekly = {};
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
+    const weekly = {});
     
     trades.forEach(trade => {
       const date = new Date(trade.createdAt);
@@ -90,11 +95,11 @@ exports.getWeeklyStats = async (req, res) => {
  * NEW: getPnLBreakdown
  * Returns daily, weekly, and monthly P&L series for charts.
  */
-exports.getPnLBreakdown = async (req, res) => {
+exports.getPnLBreakdown = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
     
-    const dailyMap = {};
+    const dailyMap = {});
     const weeklyMap = {};
     const monthlyMap = {};
 
@@ -134,9 +139,9 @@ exports.getPnLBreakdown = async (req, res) => {
 
 // ========== ADVANCED ANALYTICS ==========
 
-exports.getRiskRewardAnalysis = async (req, res) => {
+exports.getRiskRewardAnalysis = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req));
+    const trades = await IndianTrade.find(userQuery(req)).lean();
     const tradesWithRR = trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice);
 
     const winningTrades = trades.filter(t => t.profit > 0);
@@ -221,15 +226,15 @@ exports.getRiskRewardAnalysis = async (req, res) => {
       winRate: winRate.toFixed(1)
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
-exports.getTradeDistribution = async (req, res) => {
+exports.getTradeDistribution = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req));
+    const trades = await IndianTrade.find(userQuery(req)).lean();
 
-    const byPair = {};
+    const byPair = {});
     trades.forEach(t => {
       if (!byPair[t.pair]) byPair[t.pair] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byPair[t.pair].total++;
@@ -406,9 +411,9 @@ exports.getTradeDistribution = async (req, res) => {
   }
 };
 
-exports.getPerformanceMetrics = async (req, res) => {
+exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
 
     const winningTrades = trades.filter(t => t.profit > 0);
     const losingTrades = trades.filter(t => t.profit < 0);
@@ -461,16 +466,16 @@ exports.getPerformanceMetrics = async (req, res) => {
       recoveryFactor,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
-exports.getTimeAnalysis = async (req, res) => {
+exports.getTimeAnalysis = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req));
+    const trades = await IndianTrade.find(userQuery(req)).lean();
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const byMonth = {};
+    const byMonth = {});
     const byDate = {};
     trades.forEach(t => {
       const date = new Date(t.createdAt);
@@ -626,9 +631,9 @@ exports.getTimeAnalysis = async (req, res) => {
   }
 };
 
-exports.getTradeQuality = async (req, res) => {
+exports.getTradeQuality = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req));
+    const trades = await IndianTrade.find(userQuery(req)).lean();
 
     const rrRanges = [
       { label: "0-0.5R", min: 0, max: 0.5, trades: [] },
@@ -687,13 +692,13 @@ exports.getTradeQuality = async (req, res) => {
       tradesWithRR: trades.filter(t => t.stopLoss && t.takeProfit && t.entryPrice).length
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
-exports.getDrawdownAnalysis = async (req, res) => {
+exports.getDrawdownAnalysis = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
 
     if (trades.length === 0) {
       return res.json({
@@ -746,13 +751,13 @@ exports.getDrawdownAnalysis = async (req, res) => {
       drawdownPeriods: []
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
-exports.getAIInsights = async (req, res) => {
+exports.getAIInsights = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req));
+    const trades = await IndianTrade.find(userQuery(req)).lean();
 
     if (trades.length < 5) {
       return res.json({
@@ -786,7 +791,7 @@ exports.getAIInsights = async (req, res) => {
     if (totalProfit > 0) insights.push(`Total P&L: ${currency}${totalProfit.toFixed(2)} — Keep up the good work!`);
     else insights.push(`Currently in drawdown — Stay disciplined and follow your rules`);
 
-    const bySession = {};
+    const bySession = {});
     trades.forEach(t => {
       const session = t.session || "Unspecified";
       if (!bySession[session]) bySession[session] = { profit: 0, wins: 0, total: 0 };
@@ -1047,9 +1052,9 @@ exports.getAIInsights = async (req, res) => {
   }
 };
 
-exports.getAdvancedAnalytics = async (req, res) => {
+exports.getAdvancedAnalytics = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
 
     const totalTrades = trades.length;
     const totalProfit = trades.reduce((acc, t) => acc + (t.profit || 0), 0);
@@ -1122,17 +1127,17 @@ exports.getAdvancedAnalytics = async (req, res) => {
       recentTrades: trades.slice(-10).reverse().map(t => ({ pair: t.pair, type: t.type, profit: t.profit, createdAt: t.createdAt }))
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    throw new ApiError(500, error.message);
   }
-};
+});
 
 // ============================================
 // PSYCHOLOGY ANALYTICS
 // ============================================
 
-exports.getPsychologyAnalytics = async (req, res) => {
+exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
   try {
-    const trades = await IndianTrade.find(userQuery(req)).sort({ createdAt: 1 });
+    const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
 
     if (trades.length === 0) {
       return res.json({
@@ -1143,7 +1148,7 @@ exports.getPsychologyAnalytics = async (req, res) => {
     }
 
     // 1) Mood Analysis (1–5)
-    const moodBuckets = {};
+    const moodBuckets = {});
     trades.forEach(t => {
       if (t.mood != null && t.mood >= 1 && t.mood <= 5) {
         if (!moodBuckets[t.mood]) moodBuckets[t.mood] = { trades: 0, wins: 0, losses: 0, pnl: 0 };

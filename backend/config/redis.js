@@ -31,7 +31,17 @@ const connectRedis = async () => {
   }
 };
 
-const isRedisReady = () => client.status === "ready";
+let _redisAvailable = false;
+
+client.on("ready", () => {
+  _redisAvailable = true;
+});
+
+client.on("end", () => {
+  _redisAvailable = false;
+});
+
+const isRedisReady = () => _redisAvailable && client.status === "ready";
 
 module.exports = {
   client,

@@ -140,13 +140,11 @@ async function rejectNonTradeImage(tradeId, trade, userMessage) {
 
 function safeParseTrade(text) {
   try {
-    return parseTrade(text || "");
+    const result = parseTrade(text || "");
+    return { data: result, error: null };
   } catch (error) {
-    logger.error("Safe parseTrade failed", {
-      error: error.message,
-      stack: error.stack,
-    });
-    return {};
+    logger.warn("Trade parse error", { error: error.message });
+    return { data: null, error: error.message };
   }
 }
 
@@ -730,7 +728,13 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         parsedTrade = safeParseIndianTrade(cleanedText, { broker });
         parsedTrades = safeParseTradesFromOCR(cleanedText, { broker });
       } else if (!weakOcr) {
-        parsedTrade = safeParseTrade(cleanedText);
+        const { data: parsed, error: parseError } = safeParseTrade(cleanedText);
+        if (parseError || !parsed) {
+          logger.warn("OCR parse error or empty result", { parseError });
+          parsedTrade = {};
+        } else {
+          parsedTrade = parsed;
+        }
         parsedTrades = safeParseForexTradesFromOCR(cleanedText);
       } else {
         logger.warn(`Weak OCR detected | tradeId=${tradeId} | switching to text AI fallback`, {

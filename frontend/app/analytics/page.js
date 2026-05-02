@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Link from "next/link";
 import CandlestickBackground from "@/features/shared/components/CandlestickBackground";
 import TickerTape            from "@/features/shared/components/TickerTape";
@@ -769,5 +770,9 @@ function AnalyticsContent() {
 }
 
 export default function AnalyticsPage() {
-  return <Suspense><AnalyticsContent /></Suspense>;
+  return (
+    <ErrorBoundary fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Analytics failed to load. Please refresh.</div>}>
+      <Suspense><AnalyticsContent /></Suspense>
+    </ErrorBoundary>
+  );
 }
