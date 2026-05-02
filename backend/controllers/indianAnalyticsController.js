@@ -1,6 +1,6 @@
 const IndianTrade = require("../models/IndianTrade");
 const ApiError = require("../utils/ApiError");
-const { asyncHandler } = require("../middleware/errorHandler");
+const asyncHandler = require("../utils/asyncHandler");
 const toNum = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
