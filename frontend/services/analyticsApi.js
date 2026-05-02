@@ -1,5 +1,19 @@
 import { API_URL as BASE_URL } from "@/config/api";
 
+const DEFAULT_MARKET = "Forex";
+const VALID_MARKETS = new Set(["Forex", "Crypto", "Commodities", "Indices", "Stocks", "Indian_Market"]);
+
+const normalizeMarketType = (marketType) => {
+  if (typeof marketType !== "string") return DEFAULT_MARKET;
+  const trimmed = marketType.trim();
+  return VALID_MARKETS.has(trimmed) ? trimmed : DEFAULT_MARKET;
+};
+
+const normalizeTextParam = (value, fallback = "") => {
+  if (typeof value !== "string") return fallback;
+  return value.trim() || fallback;
+};
+
 // Helper to get base URL based on market
 const getBaseUrl = (marketType) => {
   if (marketType === 'Indian_Market') {
@@ -99,67 +113,65 @@ const fetchWithRateLimitRetry = async (url, options, maxRetries = 4) => {
   return null;
 };
 
-const itParam = (instrumentType) => instrumentType ? `&instrumentType=${instrumentType}` : '';
+const buildAnalyticsUrl = (marketType, path, params = {}) => {
+  const safeMarketType = normalizeMarketType(marketType);
+  const searchParams = new URLSearchParams({ marketType: safeMarketType });
+
+  Object.entries(params).forEach(([key, value]) => {
+    const safeValue = normalizeTextParam(value);
+    if (safeValue) searchParams.set(key, safeValue);
+  });
+
+  return `${getBaseUrl(safeMarketType)}${path}?${searchParams.toString()}`;
+};
 
 // Basic Analytics
 export const getSummary = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/summary?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/summary", { instrumentType }), getAuthHeaders());
 };
 
 export const getWeeklyStats = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/weekly?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/weekly", { instrumentType }), getAuthHeaders());
 };
 
 // Advanced Analytics
 export const getRiskRewardAnalysis = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/risk-reward?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/risk-reward", { instrumentType }), getAuthHeaders());
 };
 
 export const getTradeDistribution = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/distribution?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/distribution", { instrumentType }), getAuthHeaders());
 };
 
 export const getPerformanceMetrics = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/performance?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/performance", { instrumentType }), getAuthHeaders());
 };
 
 export const getTimeAnalysis = async (marketType = 'Forex', range = 'all', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/time-analysis?marketType=${marketType}&range=${encodeURIComponent(range)}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/time-analysis", { range: normalizeTextParam(range, "all"), instrumentType }), getAuthHeaders());
 };
 
 export const getTradeQuality = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/quality?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/quality", { instrumentType }), getAuthHeaders());
 };
 
 export const getDrawdownAnalysis = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/drawdown?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/drawdown", { instrumentType }), getAuthHeaders());
 };
 
 export const getAIInsights = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/ai-insights?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/ai-insights", { instrumentType }), getAuthHeaders());
 };
 
 // All-in-one advanced analytics
 export const getAdvancedAnalytics = async (marketType = 'Forex') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/advanced?marketType=${marketType}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/advanced"), getAuthHeaders());
 };
 
 export const getPnLBreakdown = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/pnl-breakdown?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/pnl-breakdown", { instrumentType }), getAuthHeaders());
 };
 
 export const getPsychologyAnalytics = async (marketType = 'Forex', instrumentType = '') => {
-  const baseUrl = getBaseUrl(marketType);
-  return fetchWithRateLimitRetry(`${baseUrl}/analytics/psychology?marketType=${marketType}${itParam(instrumentType)}`, getAuthHeaders());
+  return fetchWithRateLimitRetry(buildAnalyticsUrl(marketType, "/analytics/psychology", { instrumentType }), getAuthHeaders());
 };

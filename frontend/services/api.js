@@ -1,5 +1,7 @@
 import apiClient from "./apiClient";
 
+let welcomeGuideSeenRequest = null;
+
 export const registerUser = async (data) => {
   return await apiClient.post(`/auth/register`, data);
 };
@@ -53,11 +55,19 @@ export const testConnection = async () => {
 
 // ── Welcome guide preference ──────────────────────────────────────────────────
 export const getWelcomeGuideSeen = async () => {
-  return await apiClient.get('/auth/me/preferences');
+  if (!welcomeGuideSeenRequest) {
+    welcomeGuideSeenRequest = apiClient
+      .get('/auth/me/preferences', { skipRateLimitRetry: true })
+      .finally(() => {
+        welcomeGuideSeenRequest = null;
+      });
+  }
+
+  return await welcomeGuideSeenRequest;
 };
 
 export const markWelcomeGuideSeen = async () => {
-  return await apiClient.patch('/auth/me/preferences', { hasSeenWelcomeGuide: true });
+  return await apiClient.patch('/auth/me/preferences', { hasSeenWelcomeGuide: true }, { skipRateLimitRetry: true });
 };
 
 // ── Terms & Privacy Policy acceptance ────────────────────────────────────────

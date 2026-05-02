@@ -33,7 +33,7 @@ apiClient.interceptors.response.use(
 
     if (error.response) {
       // Enhanced 429 retry: Respect Retry-After header precisely
-      if (error.response.status === 429) {
+      if (error.response.status === 429 && !config?.skipRateLimitRetry) {
         config._retryCount = (config._retryCount || 0) + 1;
         if (config._retryCount > 3) return Promise.reject(error); // Max 3 retries
 
