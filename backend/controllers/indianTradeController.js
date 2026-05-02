@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const IndianTrade = require("../models/IndianTrade");
 const { clearUserCache } = require("../utils/cacheUtils");
 const ApiError = require("../utils/ApiError");
@@ -9,10 +10,6 @@ function normalizeTradeDate(tradeDate) {
     throw new ApiError(400, "Trade date is invalid", "VALIDATION_ERROR");
   }
   return parsed;
-}
-
-function getEffectiveTradeTime(trade) {
-  return new Date(trade.tradeDate || trade.createdAt || 0).getTime();
 }
 
 function getPeriodStart(period) {
@@ -49,6 +46,18 @@ function parseFiniteNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
+
+// Fields that may be written by the client — excludes user, _id, timestamps
+const ALLOWED_TRADE_FIELDS = [
+  "underlying", "optionType", "entryPrice", "exitPrice", "stopLoss", "takeProfit", "profit",
+  "strategy", "session", "notes", "riskRewardRatio", "riskRewardCustom", "screenshot",
+  "stockSymbol", "exchange", "sharesQty", "sector", "strikePrice", "expiryDate",
+  "quantity", "lotSize", "tradeType", "brokerage", "sttTaxes", "entryBasis", "entryBasisCustom",
+  "setup", "mistakeTag", "lesson", "setupRules", "setupScore", "mood", "confidence",
+  "emotionalTags", "wouldRetake",
+];
+
+const ALLOWED_UPDATE_FIELDS = ["pair", ...ALLOWED_TRADE_FIELDS];
 
 exports.createTrade = asyncHandler(async (req, res) => {
   const { pair, type, underlying, strikePrice, optionType, tradeDate, instrumentType, stockSymbol, sharesQty } = req.body;
@@ -98,13 +107,15 @@ exports.createTrade = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Trade date is required", "VALIDATION_ERROR");
   }
 
-  const tradeData = {
-    ...req.body,
-    pair: symbol,
-    type: type.toUpperCase(),
-    tradeDate: normalizeTradeDate(tradeDate),
-    user: req.user._id,
-  };
+  const tradeData = {};
+  for (const field of ALLOWED_TRADE_FIELDS) {
+    if (req.body[field] !== undefined) tradeData[field] = req.body[field];
+  }
+  tradeData.pair = symbol;
+  tradeData.type = type.toUpperCase();
+  tradeData.tradeDate = normalizeTradeDate(tradeDate);
+  tradeData.user = req.user._id;
+
   if (!isEquity) {
     tradeData.optionType = ot;
     tradeData.instrumentType = "OPTION";
@@ -126,22 +137,32 @@ exports.getTrades = asyncHandler(async (req, res) => {
   const period = String(req.query.period || "all").toLowerCase();
   const query = { user: req.user._id };
   const periodStart = getPeriodStart(period);
+
+  if (periodStart) {
+    query.$or = [
+      { tradeDate: { $gte: periodStart } },
+      { tradeDate: null, createdAt: { $gte: periodStart } },
+    ];
+  }
+
   const trades = await IndianTrade.find(query)
     .select(
       "pair underlying type optionType quantity lotSize entryPrice exitPrice profit strategy session entryBasis entryBasisCustom createdAt tradeDate instrumentType segment tradeType stockSymbol sharesQty exchange sector strikePrice"
     )
+    .sort({ tradeDate: -1, createdAt: -1 })
     .lean();
-  res.json(
-    trades
-      .filter((trade) => !periodStart || getEffectiveTradeTime(trade) >= periodStart.getTime())
-      .sort((a, b) => getEffectiveTradeTime(b) - getEffectiveTradeTime(a))
-  );
+
+  res.json(trades);
 });
 
 exports.getTrade = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");
+  }
+
   const trade = await IndianTrade.findOne({
     _id: req.params.id,
-    user: req.user._id
+    user: req.user._id,
   });
 
   if (!trade) {
@@ -152,26 +173,48 @@ exports.getTrade = asyncHandler(async (req, res) => {
 });
 
 exports.updateTrade = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");
+  }
+
   const { type, tradeDate } = req.body;
 
-  const validTypes = ["BUY", "SELL"];
-  if (type && !validTypes.includes(type.toUpperCase())) {
-    throw new ApiError(400, "Type must be BUY or SELL", "VALIDATION_ERROR");
+  if (type) {
+    const validTypes = ["BUY", "SELL"];
+    if (!validTypes.includes(type.toUpperCase())) {
+      throw new ApiError(400, "Type must be BUY or SELL", "VALIDATION_ERROR");
+    }
+  }
+
+  const updates = {};
+  for (const field of ALLOWED_UPDATE_FIELDS) {
+    if (req.body[field] !== undefined) updates[field] = req.body[field];
+  }
+  if (type) updates.type = type.toUpperCase();
+  if (tradeDate) updates.tradeDate = normalizeTradeDate(tradeDate);
+
+  // Re-build pair symbol when component fields change on an OPTION trade
+  if (updates.underlying !== undefined || updates.strikePrice !== undefined || updates.optionType !== undefined) {
+    const existing = await IndianTrade.findOne({ _id: id, user: req.user._id }).lean();
+    if (!existing) {
+      throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");
+    }
+    if (existing.instrumentType !== "EQUITY") {
+      const newUnderlying = updates.underlying !== undefined ? updates.underlying : existing.underlying;
+      const newStrike = updates.strikePrice !== undefined ? updates.strikePrice : existing.strikePrice;
+      const newOT = updates.optionType !== undefined ? updates.optionType : existing.optionType;
+      if (newUnderlying && newStrike != null) {
+        updates.pair = `${String(newUnderlying).trim()} ${newStrike} ${newOT || "CE"}`;
+      }
+    }
   }
 
   const trade = await IndianTrade.findOneAndUpdate(
-    { _id: req.params.id, user: req.user._id },
-    {
-      ...req.body,
-      ...(tradeDate && { tradeDate: normalizeTradeDate(tradeDate) }),
-      ...(type && { type: type.toUpperCase() }),
-    },
-    {
-      returnDocument: "after",
-      upsert: true,
-      runValidators: true,
-      setDefaultsOnInsert: true
-    }
+    { _id: id, user: req.user._id },
+    updates,
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!trade) {
@@ -184,9 +227,13 @@ exports.updateTrade = asyncHandler(async (req, res) => {
 });
 
 exports.deleteTrade = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");
+  }
+
   const trade = await IndianTrade.findOneAndDelete({
     _id: req.params.id,
-    user: req.user._id
+    user: req.user._id,
   });
 
   if (!trade) {

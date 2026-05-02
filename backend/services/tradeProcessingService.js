@@ -31,6 +31,13 @@ const CONFIDENCE_ZONES = {
   rejectMax: 9,
   reviewMax: 59,
 };
+const MAX_OCR_TEXT_LENGTH = 50_000;
+const MAX_AI_RESPONSE_LENGTH = 50_000;
+
+function truncateField(value, maxLength) {
+  const s = String(value || "");
+  return s.length > maxLength ? s.slice(0, maxLength) : s;
+}
 
 function logExtractedTrades({ tradeId, stage, parsedTrade, parsedTrades }) {
   const multiTrades = Array.isArray(parsedTrades) ? parsedTrades.filter(Boolean) : [];
@@ -510,9 +517,9 @@ function buildTradeUpdate({
     sharesQty: parsedTrade?.sharesQty ?? trade.sharesQty ?? undefined,
     sector: parsedTrade?.sector || trade.sector || undefined,
     tradeSubType: trade.tradeSubType || undefined,
-    extractedText,
-    rawOCRText: extractedText,
-    aiRawResponse: aiRawResponse || "",
+    extractedText: truncateField(extractedText, MAX_OCR_TEXT_LENGTH),
+    rawOCRText: truncateField(extractedText, MAX_OCR_TEXT_LENGTH),
+    aiRawResponse: truncateField(aiRawResponse, MAX_AI_RESPONSE_LENGTH),
     extractionConfidence: confidenceScore ?? 0,
     isValid,
     needsReview,
@@ -964,9 +971,9 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         tradeId,
         {
           status: "completed",
-          extractedText: cleanedText,
-          rawOCRText: cleanedText,
-          aiRawResponse: aiRawResponse || "",
+          extractedText: truncateField(cleanedText, MAX_OCR_TEXT_LENGTH),
+          rawOCRText: truncateField(cleanedText, MAX_OCR_TEXT_LENGTH),
+          aiRawResponse: truncateField(aiRawResponse, MAX_AI_RESPONSE_LENGTH),
           extractionConfidence: quality.score ?? 0,
           isValid: true,
           needsReview: false,

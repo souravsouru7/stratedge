@@ -15,13 +15,14 @@ const {
 } = require("../controllers/authController");
 
 const { protect } = require("../middleware/authMiddleware");
+const { authRateLimiter } = require("../middleware/rateLimiter");
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
-router.post("/google", googleLogin);
-router.post("/forgot-password", forgotPassword);
-router.post("/verify-otp", verifyOTP);
-router.post("/reset-password", resetPassword);
+router.post("/register", authRateLimiter, registerUser);
+router.post("/login", authRateLimiter, loginUser);
+router.post("/google", authRateLimiter, googleLogin);
+router.post("/forgot-password", authRateLimiter, forgotPassword);
+router.post("/verify-otp", authRateLimiter, verifyOTP);
+router.post("/reset-password", authRateLimiter, resetPassword);
 
 // Terms acceptance (requires valid token — user must be authenticated)
 router.post("/accept-terms", protect, acceptTerms);

@@ -4,7 +4,7 @@ A complete map of every functional area in this codebase.
 
 ---
 
-## 1. Authentication
+<!-- ## 1. Authentication
 
 **What it does:** User registration, login, Firebase + JWT flow, OTP verification, password reset, terms acceptance.
 
@@ -32,7 +32,7 @@ A complete map of every functional area in this codebase.
 | Frontend pages | `frontend/app/upload-trade/`, `upload/` |
 | Frontend hooks | `frontend/features/trade/hooks/useUploadTrade.js` |
 
----
+--- -->
 
 ## 3. Trade Management (Forex / Global)
 

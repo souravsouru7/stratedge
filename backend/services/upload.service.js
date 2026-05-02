@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const ApiError = require("../utils/ApiError");
 const { enqueueOcrJob, getOcrJobSnapshot } = require("../queues/ocrQueue");
@@ -5,6 +6,8 @@ const { clearUserCache } = require("../utils/cacheUtils");
 const tradeRepository = require("../repositories/trade.repository");
 const userRepository = require("../repositories/user.repository");
 const { logger } = require("../utils/logger");
+
+const BROKER_MAX_LENGTH = 50;
 
 async function cleanupFailedUpload({ tradeId, uploadedImage, userId, error }) {
   if (!tradeId && uploadedImage?.publicId) {
@@ -71,7 +74,10 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
     const tradeSubTypeRaw = String(body.tradeSubType || query.tradeSubType || "").trim().toUpperCase();
     const tradeSubType = (marketType === "Indian_Market" && tradeSubTypeRaw === "EQUITY") ? "EQUITY" : "OPTION";
 
-    const brokerOverrideRaw = String(body.broker || query.broker || "").trim();
+    const brokerOverrideRaw = String(body.broker || query.broker || "")
+      .trim()
+      .replace(/[^\w\s\-.()/]/g, "")
+      .slice(0, BROKER_MAX_LENGTH);
     const brokerOverride =
       brokerOverrideRaw && brokerOverrideRaw.toUpperCase() !== "AUTO"
         ? brokerOverrideRaw
@@ -124,7 +130,17 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
     });
 
     if (!isSubscribed) {
-      await userRepository.markFreeUploadUsed(user._id);
+      try {
+        await userRepository.markFreeUploadUsed(user._id);
+      } catch (flagErr) {
+        // Non-fatal: job is already queued and will process normally.
+        // Log so the free upload count can be corrected manually if needed.
+        logger.error("Failed to mark free upload used — job still processing", {
+          userId: user._id,
+          tradeId,
+          error: flagErr.message,
+        });
+      }
     }
 
     await clearUserCache(user._id);
@@ -146,6 +162,10 @@ async function submitTradeUpload({ user, body, query, uploadedImage, file }) {
 }
 
 async function getUploadJobStatus(userId, tradeId) {
+  if (!mongoose.Types.ObjectId.isValid(tradeId)) {
+    throw new ApiError(404, "Job not found or unauthorized", "NOT_FOUND");
+  }
+
   const trade = await tradeRepository.findTradeByIdAndUser(tradeId, userId);
   if (!trade) {
     throw new ApiError(404, "Job not found or unauthorized", "NOT_FOUND");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMarket, MARKETS } from "@/context/MarketContext";
@@ -338,6 +338,7 @@ export function useUploadTrade() {
   const [setupRules, setSetupRules]           = useState(DEFAULT_SETUP_RULES);
   const [extractedText, setExtractedText]     = useState("");
   const [activeToastId, setActiveToastId]     = useState(null);
+  const saveAllInProgress                     = useRef(false);
 
   // 3. Authenticity check
   useEffect(() => {
@@ -582,8 +583,13 @@ export function useUploadTrade() {
   });
 
   // 8. Actions
+  const ALLOWED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
   const handleUpload = () => {
     if (!file) return setError("Select file");
+    if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
+      return setError("Invalid file type. Only JPEG, PNG, and WEBP images are allowed.");
+    }
     if (isInd && broker === "AUTO") return setError("Select broker");
     uploadJobMutation.mutate(file);
   };
@@ -654,14 +660,20 @@ export function useUploadTrade() {
       saveTradeMutation.mutate({ idx });
     },
     saveAllTrades: async () => {
-      for (let i = 0; i < trades.length; i++) {
-        if (!savedTrades[i] && canSaveTrade(trades[i])) {
-          try {
-            await saveTradeMutation.mutateAsync({ idx: i });
-          } catch (err) {
-            addToast(`Trade ${i + 1} failed to save: ${err?.message || "Unknown error"}`, "error");
+      if (saveAllInProgress.current) return;
+      saveAllInProgress.current = true;
+      try {
+        for (let i = 0; i < trades.length; i++) {
+          if (!savedTrades[i] && canSaveTrade(trades[i])) {
+            try {
+              await saveTradeMutation.mutateAsync({ idx: i });
+            } catch (err) {
+              addToast(`Trade ${i + 1} failed to save: ${err?.message || "Unknown error"}`, "error");
+            }
           }
         }
+      } finally {
+        saveAllInProgress.current = false;
       }
     },
     toggleSetupRule: id => setSetupRules(p => p.map(r => r.id === id ? { ...r, followed: !r.followed } : r)),

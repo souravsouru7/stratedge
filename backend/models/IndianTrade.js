@@ -91,12 +91,18 @@ const indianTradeSchema = new mongoose.Schema(
     lesson: { type: String, default: "" },
 
     // Per-trade setup checklist: rules and how many were followed
-    setupRules: [
-      {
-        label: { type: String, trim: true },
-        followed: { type: Boolean, default: false }
-      }
-    ],
+    setupRules: {
+      type: [
+        {
+          label: { type: String, trim: true, maxlength: 100 },
+          followed: { type: Boolean, default: false },
+        },
+      ],
+      validate: {
+        validator(arr) { return arr.length <= 20; },
+        message: "setupRules cannot have more than 20 items",
+      },
+    },
 
     setupScore: {
       // 0–100 percentage of rules followed for this trade
@@ -121,7 +127,13 @@ const indianTradeSchema = new mongoose.Schema(
 
     emotionalTags: {
       type: [String],
-      default: []
+      default: [],
+      validate: {
+        validator(arr) {
+          return arr.length <= 10 && arr.every(tag => typeof tag === "string" && tag.length <= 50);
+        },
+        message: "emotionalTags must have at most 10 items, each at most 50 characters",
+      },
     },
 
     wouldRetake: {

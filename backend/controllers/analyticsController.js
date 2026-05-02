@@ -360,7 +360,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // 3. Performance Metrics
 exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
@@ -447,7 +447,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
 
     // By Month
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const byMonth = {});
+    const byMonth = {};
     const byDate = {};
 
     trades.forEach(t => {
@@ -651,7 +651,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // 5. Trade Quality
 exports.getTradeQuality = asyncHandler(async (req, res) => {

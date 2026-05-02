@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const ApiError = require("../utils/ApiError");
 const { buildCacheKey, getCache, rememberCache } = require("../utils/cache");
 const { clearUserCache } = require("../utils/cacheUtils");
@@ -119,6 +120,10 @@ async function getTrade(userId, tradeId) {
 }
 
 async function getTradeStatus(userId, tradeId) {
+  if (!mongoose.Types.ObjectId.isValid(tradeId)) {
+    throw new ApiError(404, "Trade not found or unauthorized", "NOT_FOUND");
+  }
+
   const key = buildCacheKey("trades", userId, "status", tradeId);
   const startedAt = Date.now();
   const { data: trade } = await rememberCache(key, TRADE_STATUS_TTL_SECONDS, () =>
@@ -140,6 +145,15 @@ async function getTradeStatus(userId, tradeId) {
   }
 
   if (trade?.parsedData?.multiTradeGhost === true) {
+    const parsedTrades = trade.parsedData?.parsedTrades || [];
+    if (parsedTrades.length === 0) {
+      return {
+        jobId: trade.ocrJobId || trade._id.toString(),
+        status: "failed",
+        error: "Trade data was lost. Please re-upload the screenshot.",
+        data: null,
+      };
+    }
     return {
       jobId: trade.ocrJobId || trade._id.toString(),
       status: "completed",
@@ -147,7 +161,7 @@ async function getTradeStatus(userId, tradeId) {
       data: {
         parsedData: trade.parsedData,
         parsedTrade: trade.parsedData?.parsedTrade || null,
-        parsedTrades: trade.parsedData?.parsedTrades || [],
+        parsedTrades,
         imageUrl: trade.imageUrl || trade.screenshot || "",
         screenshot: trade.screenshot || trade.imageUrl || "",
         extractedText: trade.extractedText || "",

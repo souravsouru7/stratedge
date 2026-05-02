@@ -7,6 +7,10 @@ const { logger } = require("../utils/logger");
 
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+function sanitizeFilename(name) {
+  return String(name || "").replace(/[^\x20-\x7E]/g, "?").slice(0, 255);
+}
+
 // Magic byte signatures for allowed image types.
 // Checks the actual file content — not the client-supplied filename or Content-Type header.
 const MAGIC_BYTES = [
@@ -98,7 +102,7 @@ function createCloudinaryStorage(folderName) {
             publicId: result.public_id,
             bytes: result.bytes,
             format: result.format,
-            originalname: file.originalname,
+            originalname: sanitizeFilename(file.originalname),
             mimetype: file.mimetype,
           });
         }
@@ -174,6 +178,7 @@ function createUploadMiddleware({ fieldName, folderName, required = true }) {
         method: req.method,
         error: error.message,
         code: error.code,
+        filename: sanitizeFilename(req.file?.originalname || ""),
       });
 
       return res.status(400).json({

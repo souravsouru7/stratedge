@@ -12,6 +12,10 @@ const asyncHandler = require("../utils/asyncHandler");
 // Any user whose stored termsVersion doesn't match will be forced to re-accept.
 const CURRENT_TERMS_VERSION = "v1.0";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const NAME_MAX_LENGTH = 100;
+const PASSWORD_MIN_LENGTH = 8;
+
 const generateToken = (id, role, tokenVersion = 0) =>
   jwt.sign({ id, role, tokenVersion }, appConfig.jwt.secret, {
     expiresIn: appConfig.jwt.expiresIn,
@@ -77,11 +81,23 @@ exports.registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required (name, email, password)", "VALIDATION_ERROR");
   }
 
+  if (String(name).trim().length > NAME_MAX_LENGTH) {
+    throw new ApiError(400, `Name must be ${NAME_MAX_LENGTH} characters or fewer`, "VALIDATION_ERROR");
+  }
+
+  if (!EMAIL_REGEX.test(String(email).trim())) {
+    throw new ApiError(400, "Invalid email address", "VALIDATION_ERROR");
+  }
+
+  if (String(password).length < PASSWORD_MIN_LENGTH) {
+    throw new ApiError(400, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`, "VALIDATION_ERROR");
+  }
+
   if (!acceptedTerms || !acceptedPrivacy) {
     throw new ApiError(400, "You must accept the Terms & Privacy Policy to continue", "TERMS_NOT_ACCEPTED");
   }
 
-  const userExists = await User.findOne({ email });
+  const userExists = await User.findOne({ email: String(email).trim().toLowerCase() });
   if (userExists) {
     throw new ApiError(400, "User already exists", "VALIDATION_ERROR");
   }
@@ -308,6 +324,10 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is required", "VALIDATION_ERROR");
   }
 
+  if (!EMAIL_REGEX.test(String(email).trim())) {
+    return res.json({ message: "If that email is registered, an OTP has been sent." });
+  }
+
   const user = await User.findOne({ email });
 
   // Always return the same response regardless of whether the email exists
@@ -391,13 +411,27 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required", "VALIDATION_ERROR");
   }
 
-  const user = await User.findOne({
-    email,
-    resetPasswordOTP: otp,
-    resetPasswordOTPExpires: { $gt: Date.now() },
-  });
+  if (String(password).length < PASSWORD_MIN_LENGTH) {
+    throw new ApiError(400, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`, "VALIDATION_ERROR");
+  }
 
-  if (!user) {
+  const user = await User.findOne({ email });
+
+  if (!user || user.authProvider === "google") {
+    throw new ApiError(400, "Invalid or expired OTP", "VALIDATION_ERROR");
+  }
+
+  if (user.otpLockUntil && user.otpLockUntil > new Date()) {
+    const retryAfterMin = Math.ceil((user.otpLockUntil - Date.now()) / 60000);
+    throw new ApiError(429, `Too many failed attempts. Try again in ${retryAfterMin} minute(s).`, "OTP_LOCKED");
+  }
+
+  const isValid =
+    timingSafeOtpEquals(user.resetPasswordOTP, otp) &&
+    user.resetPasswordOTPExpires &&
+    user.resetPasswordOTPExpires > new Date();
+
+  if (!isValid) {
     throw new ApiError(400, "Invalid or expired OTP", "VALIDATION_ERROR");
   }
 

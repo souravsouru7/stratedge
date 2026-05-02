@@ -259,22 +259,61 @@ async function cleanOldImages(stats) {
   });
 }
 
+const STUCK_PROCESSING_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+/**
+ * Finds trades stuck in "processing" for longer than the threshold and marks
+ * them failed. This recovers from server crashes between job enqueue and pickup.
+ */
+async function cleanStuckProcessingTrades(stats) {
+  const cutoff = new Date(Date.now() - STUCK_PROCESSING_THRESHOLD_MS);
+
+  try {
+    const result = await Trade.updateMany(
+      {
+        status: "processing",
+        processingStartedAt: { $lt: cutoff },
+      },
+      {
+        $set: {
+          status: "failed",
+          error: "Processing timed out — please re-upload the screenshot.",
+          processedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.modifiedCount > 0) {
+      logger.warn("Stuck processing trades cleaned up", {
+        count: result.modifiedCount,
+        cutoff: cutoff.toISOString(),
+      });
+    }
+  } catch (error) {
+    logger.error("Failed to clean stuck processing trades", { error: error.message });
+    stats.errors.push(`Stuck trade cleanup failed: ${error.message}`);
+  }
+}
+
 /**
  * Main cleanup job - runs all cleanup tasks
  */
 async function runDataCleanupJob() {
   const stats = new CleanupStats();
-  
+
   logger.info("=== DATA CLEANUP JOB STARTED ===", {
     policy: RETENTION_POLICY,
     startTime: new Date().toISOString(),
   });
 
   try {
-    // Step 1: Clean old OCR and AI data
+    // Step 1: Recover trades stuck in processing (server crash / Redis loss)
+    await cleanStuckProcessingTrades(stats);
+
+    // Step 2: Clean old OCR and AI data
     await cleanOldTradeData(stats);
-    
-    // Step 2: Optionally clean old images
+
+    // Step 3: Optionally clean old images
     if (RETENTION_POLICY.imageCleanupDays > 0) {
       await cleanOldImages(stats);
     }
