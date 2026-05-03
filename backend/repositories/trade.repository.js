@@ -71,7 +71,7 @@ async function createTrade(data) {
 }
 
 async function findForexTradesByUser(userId, { page, limit } = {}) {
-  const query = { user: userId, marketType: "Forex" };
+  const query = { user: userId, marketType: "Forex", status: "completed" };
   const cursor = Trade.find(query)
     .sort({ createdAt: -1 })
     .select(TRADE_LIST_PROJECTION)

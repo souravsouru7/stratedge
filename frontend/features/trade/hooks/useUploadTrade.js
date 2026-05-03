@@ -628,6 +628,23 @@ export function useUploadTrade() {
       addToast("Trade date is required before saving", "info");
       return false;
     }
+    if (!tradeToSave?.session) {
+      addToast("Session is required before saving", "info");
+      return false;
+    }
+    if (!tradeToSave?.entryBasis) {
+      addToast("Entry basis is required before saving", "info");
+      return false;
+    }
+    const rr = tradeToSave?.riskRewardRatio;
+    if (!rr) {
+      addToast("Risk/Reward ratio is required before saving", "info");
+      return false;
+    }
+    if (rr === "custom" && !tradeToSave?.riskRewardCustom) {
+      addToast("Custom Risk/Reward value is required before saving", "info");
+      return false;
+    }
     if (isInd && tradeToSave?.instrumentType === "EQUITY") {
       const sharesQty = parseOptionalNumber(tradeToSave?.sharesQty);
       if (sharesQty == null || sharesQty <= 0) {
