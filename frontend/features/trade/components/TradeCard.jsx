@@ -5,7 +5,7 @@ import Link from "next/link";
 /**
  * TradeCard — mobile card view for a single trade.
  */
-export default function TradeCard({ trade, onDelete, idx }) {
+export default function TradeCard({ trade, onDelete, idx, isDeleting }) {
   const bull = parseFloat(trade.profit) >= 0;
   const tradeDate = new Date(trade.tradeDate || trade.createdAt);
   return (
@@ -13,8 +13,9 @@ export default function TradeCard({ trade, onDelete, idx }) {
       background: "#FFFFFF", border: "1px solid #E2E8F0",
       borderRadius: 8, padding: "16px", marginBottom: 10,
       borderLeft: `3px solid ${bull ? "#0D9E6E" : "#D63B3B"}`,
-      animation: `fadeUp 0.4s ease ${idx * 0.06}s both`,
+      animation: isDeleting ? "tradeExit 0.28s ease forwards" : `fadeUp 0.4s ease ${idx * 0.06}s both`,
       boxShadow: "0 2px 8px rgba(15,25,35,0.05)",
+      pointerEvents: isDeleting ? "none" : "auto",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>

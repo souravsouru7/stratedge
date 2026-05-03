@@ -13,6 +13,7 @@ export function useTrades() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingId, setDeletingId]     = useState(null);
   const [filter, setFilter]             = useState("ALL");
   const [period, setPeriod]             = useState("1m");
   const [search, setSearch]             = useState("");
@@ -33,14 +34,23 @@ export function useTrades() {
   // 2. Data Deletion via useMutation
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteTrade(id),
-    onSuccess: () => {
-      // Automatically refresh the trades list
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["trades", period] });
+      const previous = queryClient.getQueryData(["trades", period]);
+      queryClient.setQueryData(["trades", period], (old) =>
+        Array.isArray(old) ? old.filter(t => t._id !== id) : []
+      );
+      return { previous };
+    },
+    onError: (err, id, context) => {
+      queryClient.setQueryData(["trades", period], context?.previous);
+      setDeleteTarget(null);
+      setDeletingId(null);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["trades"] });
       setDeleteTarget(null);
-    },
-    onError: (err) => {
-      console.error("useTrades: delete failed", err);
-      setDeleteTarget(null);
+      setDeletingId(null);
     },
   });
 
@@ -56,7 +66,9 @@ export function useTrades() {
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
-    deleteMutation.mutate(deleteTarget._id);
+    const id = deleteTarget._id;
+    setDeletingId(id);
+    setTimeout(() => deleteMutation.mutate(id), 280);
   };
 
   const cancelDelete = () => setDeleteTarget(null);
@@ -87,6 +99,7 @@ export function useTrades() {
     filtered,
     loading: loading || deleteMutation.isPending,
     deleteTarget,
+    deletingId,
     filter,
     period,
     search,

@@ -21,7 +21,7 @@ const PERIOD_OPTIONS = [
 
 function TradesContent() {
   const {
-    filtered, loading, deleteTarget, filter, search,
+    filtered, loading, deleteTarget, deletingId, filter, search,
     period,
     summaryStats, mounted,
     handlers: { setFilter, setPeriod, setSearch, setDeleteTarget, confirmDelete, cancelDelete },
@@ -89,7 +89,7 @@ function TradesContent() {
           {filtered.length === 0 && !loading ? (
             <EmptyState />
           ) : (
-            <TradeTable trades={filtered} loading={loading} onDelete={setDeleteTarget} />
+            <TradeTable trades={filtered} loading={loading} onDelete={setDeleteTarget} deletingId={deletingId} />
           )}
 
           {/* Footer count */}

@@ -11,7 +11,7 @@ const TABLE_HEADERS = ["DATE", "PAIR", "TYPE", "BASIS", "P&L", "ACTIONS"];
  * Renders the full trades list — desktop table + mobile card stack.
  * Features skeleton loading states for better UX.
  */
-export default function TradeTable({ trades, loading, onDelete }) {
+export default function TradeTable({ trades, loading, onDelete, deletingId }) {
   const skeletonCount = 5;
 
   return (
@@ -80,7 +80,7 @@ export default function TradeTable({ trades, loading, onDelete }) {
               </thead>
               <tbody>
                 {trades.map((trade, idx) => (
-                  <TradeRow key={trade._id} trade={trade} onDelete={onDelete} idx={idx} />
+                  <TradeRow key={trade._id} trade={trade} onDelete={onDelete} idx={idx} isDeleting={trade._id === deletingId} />
                 ))}
               </tbody>
             </table>
@@ -89,7 +89,7 @@ export default function TradeTable({ trades, loading, onDelete }) {
           {/* Mobile cards */}
           <div className="show-mobile" style={{ padding: "14px", display: "flex", flexDirection: "column", gap: 12 }}>
             {trades.map((trade, idx) => (
-              <TradeCard key={trade._id} trade={trade} onDelete={onDelete} idx={idx} />
+              <TradeCard key={trade._id} trade={trade} onDelete={onDelete} idx={idx} isDeleting={trade._id === deletingId} />
             ))}
           </div>
         </>
@@ -98,6 +98,10 @@ export default function TradeTable({ trades, loading, onDelete }) {
       <style jsx>{`
         .trade-table-container {
           transition: all 0.3s ease;
+        }
+        @keyframes tradeExit {
+          0%   { opacity: 1; transform: translateX(0); }
+          100% { opacity: 0; transform: translateX(40px); }
         }
         @media (max-width: 640px) {
           .hidden-mobile { display: none !important; }

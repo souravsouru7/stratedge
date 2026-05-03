@@ -5,12 +5,12 @@ import Link from "next/link";
 /**
  * TradeRow — desktop table row for a single trade.
  */
-export default function TradeRow({ trade, onDelete, idx }) {
+export default function TradeRow({ trade, onDelete, idx, isDeleting }) {
   const bull = parseFloat(trade.profit) >= 0;
   const tradeDate = new Date(trade.tradeDate || trade.createdAt);
   return (
     <tr
-      style={{ borderBottom: "1px solid #E2E8F0", animation: `fadeUp 0.4s ease ${idx * 0.05}s both`, transition: "background 0.2s" }}
+      style={{ borderBottom: "1px solid #E2E8F0", animation: isDeleting ? "tradeExit 0.28s ease forwards" : `fadeUp 0.4s ease ${idx * 0.05}s both`, transition: "background 0.2s", pointerEvents: isDeleting ? "none" : "auto" }}
       onMouseEnter={e => e.currentTarget.style.background = "#F8F6F2"}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
     >
