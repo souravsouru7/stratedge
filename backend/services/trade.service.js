@@ -50,6 +50,23 @@ function getPeriodStart(period) {
   }
 }
 
+function removeBlankUpdateValues(payload) {
+  const update = {};
+  const keepBlankStrings = new Set([
+    "notes",
+    "entryBasisCustom",
+    "riskRewardCustom",
+  ]);
+
+  Object.entries(payload || {}).forEach(([key, value]) => {
+    if (value === undefined) return;
+    if (value === "" && !keepBlankStrings.has(key)) return;
+    update[key] = value;
+  });
+
+  return update;
+}
+
 async function createTrade(userId, payload) {
   if (!payload.pair) {
     throw new ApiError(400, "Pair is required", "VALIDATION_ERROR");
@@ -182,7 +199,7 @@ async function getTradeStatus(userId, tradeId) {
 }
 
 async function updateTrade(userId, tradeId, payload) {
-  const update = { ...payload };
+  const update = removeBlankUpdateValues(payload);
   if (payload.type) {
     update.type = normalizeTradeType(payload.type);
   }

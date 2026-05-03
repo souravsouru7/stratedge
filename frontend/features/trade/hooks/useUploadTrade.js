@@ -384,7 +384,7 @@ export function useUploadTrade() {
 
   // ─ apply parsed data helper ─
   const applyProcessedTradeData = (payload) => {
-    const p = payload?.parsedData?.parsedTrade || payload?.parsedTrade || {};
+    const p = payload?.parsedData?.parsedTrade || payload?.parsedTrade || payload || {};
     const parsedTradesPayload = dedupeParsedTrades(
       payload?.parsedData?.parsedTrades || payload?.parsedTrades || []
     );

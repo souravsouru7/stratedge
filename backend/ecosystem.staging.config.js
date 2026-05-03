@@ -11,6 +11,8 @@ module.exports = {
         NODE_ENV: "production",
         PORT: 4000,
         ENABLE_EMBEDDED_OCR_WORKER: "false",
+        OCR_QUEUE_NAME: "ocrQueue-staging",
+        OCR_SERVICE_TIMEOUT_MS: "180000",
       },
       error_file: "./logs/pm2-staging-api-error.log",
       out_file: "./logs/pm2-staging-api-out.log",
@@ -27,6 +29,8 @@ module.exports = {
       max_memory_restart: "1G",
       env: {
         NODE_ENV: "production",
+        OCR_QUEUE_NAME: "ocrQueue-staging",
+        OCR_SERVICE_TIMEOUT_MS: "180000",
       },
       error_file: "./logs/pm2-staging-worker-error.log",
       out_file: "./logs/pm2-staging-worker-out.log",

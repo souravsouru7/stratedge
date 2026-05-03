@@ -3,7 +3,7 @@ const { appConfig } = require("../config");
 const { bullmqConnection } = require("../config/redis");
 const { logger } = require("../utils/logger");
 
-const OCR_QUEUE_NAME = "ocrQueue";
+const OCR_QUEUE_NAME = appConfig.ocrQueue.name;
 const OCR_JOB_NAME = "processTrade";
 const ocrQueue = new Queue(OCR_QUEUE_NAME, {
   connection: bullmqConnection,

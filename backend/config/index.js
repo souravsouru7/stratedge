@@ -75,6 +75,7 @@ const appConfig = {
     url: process.env.REDIS_URL || "redis://localhost:6379",
   },
   ocrQueue: {
+    name: process.env.OCR_QUEUE_NAME || "ocrQueue",
     attempts: readNumber("OCR_JOB_ATTEMPTS", 3),
     backoffMs: readNumber("OCR_JOB_BACKOFF_MS", 5000),
     initialDelayMs: readNumber("OCR_JOB_INITIAL_DELAY_MS", 2000),
