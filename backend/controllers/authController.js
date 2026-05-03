@@ -155,6 +155,8 @@ exports.loginUser = asyncHandler(async (req, res) => {
 });
 
 exports.googleLogin = asyncHandler(async (req, res) => {
+  req.timeoutConfig?.extendTimeout(35000);
+
   const { idToken, credential } = req.body || {};
   const authToken = idToken || credential;
 
