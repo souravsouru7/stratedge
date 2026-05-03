@@ -502,6 +502,7 @@ export default function IndianTradesPage() {
   const [trades, setTrades]           = useState([]);
   const [loading, setLoading]         = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingId, setDeletingId]    = useState(null);
   const [deleting, setDeleting]       = useState(false);
   const [filter, setFilter]           = useState("all");
   const [period, setPeriod]           = useState("1m");
@@ -521,13 +522,17 @@ export default function IndianTradesPage() {
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget || deleting) return;
+    const id = deleteTarget._id;
+    setDeletingId(id);
+    setDeleteTarget(null);
+    await new Promise(r => setTimeout(r, 280));
     setDeleting(true);
     try {
-      await deleteTrade(deleteTarget._id, MARKETS.INDIAN_MARKET);
-      setTrades(t => t.filter(x => x._id !== deleteTarget._id));
+      await deleteTrade(id, MARKETS.INDIAN_MARKET);
+      setTrades(t => t.filter(x => x._id !== id));
     } finally {
       setDeleting(false);
-      setDeleteTarget(null);
+      setDeletingId(null);
     }
   };
 
@@ -633,7 +638,12 @@ export default function IndianTradesPage() {
                   key={trade._id}
                   trade={trade}
                   onDelete={setDeleteTarget}
-                  style={{ animation: `fadeUp 0.35s ease ${Math.min(idx, 8) * 0.05}s both` }}
+                  style={{
+                    animation: deletingId === trade._id
+                      ? "tradeExit 0.28s ease forwards"
+                      : `fadeUp 0.35s ease ${Math.min(idx, 8) * 0.05}s both`,
+                    pointerEvents: deletingId === trade._id ? "none" : "auto",
+                  }}
                 />
               ))}
             </div>
@@ -649,9 +659,10 @@ export default function IndianTradesPage() {
       />
 
       <style>{`
-        @keyframes ticker  { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        @keyframes fadeUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes spin    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes ticker    { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        @keyframes fadeUp    { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes tradeExit { 0%{opacity:1;transform:translateX(0)} 100%{opacity:0;transform:translateX(40px)} }
         * { box-sizing: border-box; }
         input::placeholder { color: #CBD5E1; }
 
