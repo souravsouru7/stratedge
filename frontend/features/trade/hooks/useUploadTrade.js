@@ -547,8 +547,10 @@ export function useUploadTrade() {
 
       const isMultiTrade = trades.length > 0;
 
-      if (!forceCreate && !isMultiTrade && idx === null && uploadedTradeId) {
-        // Single-trade: update the ghost trade in-place (backend kept it)
+      if (!isInd && !forceCreate && !isMultiTrade && idx === null && uploadedTradeId) {
+        // Forex single-trade uploads keep a Trade record that can be updated in-place.
+        // Indian uploads use a separate IndianTrade collection, so reviewed OCR data
+        // must be created through /api/indian/trades instead of updating the upload tracker.
         return updateTrade(uploadedTradeId, tradeData, marketType);
       }
 
@@ -628,7 +630,7 @@ export function useUploadTrade() {
       addToast("Trade date is required before saving", "info");
       return false;
     }
-    if (!tradeToSave?.session) {
+    if (!isInd && !tradeToSave?.session) {
       addToast("Session is required before saving", "info");
       return false;
     }
@@ -636,14 +638,16 @@ export function useUploadTrade() {
       addToast("Entry basis is required before saving", "info");
       return false;
     }
-    const rr = tradeToSave?.riskRewardRatio;
-    if (!rr) {
-      addToast("Risk/Reward ratio is required before saving", "info");
-      return false;
-    }
-    if (rr === "custom" && !tradeToSave?.riskRewardCustom) {
-      addToast("Custom Risk/Reward value is required before saving", "info");
-      return false;
+    if (!isInd) {
+      const rr = tradeToSave?.riskRewardRatio;
+      if (!rr) {
+        addToast("Risk/Reward ratio is required before saving", "info");
+        return false;
+      }
+      if (rr === "custom" && !tradeToSave?.riskRewardCustom) {
+        addToast("Custom Risk/Reward value is required before saving", "info");
+        return false;
+      }
     }
     if (isInd && tradeToSave?.instrumentType === "EQUITY") {
       const sharesQty = parseOptionalNumber(tradeToSave?.sharesQty);
@@ -651,6 +655,22 @@ export function useUploadTrade() {
         addToast("Shares quantity is required for equity trades", "info");
         return false;
       }
+    }
+    if (!tradeToSave?.mood) {
+      addToast("Select your emotional state (mood) before saving", "info");
+      return false;
+    }
+    if (!tradeToSave?.confidence) {
+      addToast("Select your confidence level before saving", "info");
+      return false;
+    }
+    if (!Array.isArray(tradeToSave?.emotionalTags) || tradeToSave.emotionalTags.length === 0) {
+      addToast("Select at least one emotional tag before saving", "info");
+      return false;
+    }
+    if (!tradeToSave?.wouldRetake) {
+      addToast("Select whether you would retake this trade", "info");
+      return false;
     }
     return true;
   };

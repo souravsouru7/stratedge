@@ -7,7 +7,5 @@ export const uploadTradeImage = async ({ file, marketType, broker, tradeSubType 
   if (broker) formData.append("broker", broker);
   if (tradeSubType) formData.append("tradeSubType", tradeSubType);
 
-  return await apiClient.post(`/upload?marketType=${marketType}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  return await apiClient.post(`/upload?marketType=${marketType}`, formData);
 };

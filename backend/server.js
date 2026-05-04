@@ -17,6 +17,17 @@ if (process.env.SENTRY_DSN) {
   });
 }
 
+process.on("uncaughtException", (err) => {
+  // Use console here — logger may not be initialized yet at this point
+  console.error("[FATAL] Uncaught exception:", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled promise rejection:", reason);
+  process.exit(1);
+});
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -39,23 +50,6 @@ const { startWeeklyReportsCron } = require("./jobs/weeklyReportsCron");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
 const { startOcrWorker } = require("./workers/ocrWorker");
 
-connectDB();
-connectRedis();
-
-// In local/dev environments, start the OCR worker in-process so uploads do not
-// remain stuck in "processing" when only the API server is running.
-if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !== "false") {
-  startOcrWorker({ initializeConnections: false, mode: "embedded" }).catch((error) => {
-    logger.error("Failed to start embedded OCR worker", {
-      error: error.message,
-      stack: error.stack,
-    });
-  });
-}
-
-// Start scheduled cron jobs
-startWeeklyReportsCron();
-startDataCleanupCron();
 
 const app = express();
 
@@ -231,33 +225,57 @@ app.use(errorHandler);
 
 const PORT = appConfig.port;
 
-const server = app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  console.log(`Server running on port ${PORT}`);
-});
+async function startServer() {
+  // Wait for DB and Redis before opening the HTTP port.
+  // If either throws, the unhandledRejection handler above will log and exit.
+  await connectDB();
+  await connectRedis();
 
-// Graceful shutdown
-const shutdown = async (signal) => {
-  logger.info(`${signal} received — shutting down gracefully`);
-  server.close(async () => {
-    logger.info("HTTP server closed");
-    try {
-      const mongoose = require("mongoose");
-      await mongoose.connection.close();
-      const { client } = require("./config/redis");
-      await client.quit();
-    } catch (e) {
-      logger.error("Shutdown cleanup error", { error: e.message });
-    }
-    process.exit(0);
+  // In local/dev environments, start the OCR worker in-process so uploads do not
+  // remain stuck in "processing" when only the API server is running.
+  if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !== "false") {
+    await startOcrWorker({ initializeConnections: false, mode: "embedded" }).catch((error) => {
+      logger.error("Failed to start embedded OCR worker", {
+        error: error.message,
+        stack: error.stack,
+      });
+    });
+  }
+
+  // Start scheduled cron jobs
+  startWeeklyReportsCron();
+  startDataCleanupCron();
+
+  const server = app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 
-  // Force exit after 15s if graceful close hangs
-  setTimeout(() => {
-    logger.error("Forced shutdown after timeout");
-    process.exit(1);
-  }, 15_000);
-};
+  // Graceful shutdown
+  const shutdown = async (signal) => {
+    logger.info(`${signal} received — shutting down gracefully`);
+    server.close(async () => {
+      logger.info("HTTP server closed");
+      try {
+        const mongoose = require("mongoose");
+        await mongoose.connection.close();
+        const { client } = require("./config/redis");
+        await client.quit();
+      } catch (e) {
+        logger.error("Shutdown cleanup error", { error: e.message });
+      }
+      process.exit(0);
+    });
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+    // Force exit after 15s if graceful close hangs
+    setTimeout(() => {
+      logger.error("Forced shutdown after timeout");
+      process.exit(1);
+    }, 15_000);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+startServer();

@@ -153,7 +153,8 @@ function IndianEditTradeContent() {
       alert("Trade date is required.");
       return;
     }
-    if (!formData.riskRewardRatio) {
+    const isEquityTrade = formData?.instrumentType === "EQUITY";
+    if (!isEquityTrade && !formData.riskRewardRatio) {
       alert("Select risk : reward ratio.");
       return;
     }
@@ -231,6 +232,8 @@ function IndianEditTradeContent() {
     );
   }
 
+  const isEquityTrade = formData?.instrumentType === "EQUITY";
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: C.sans, color: C.ink }}>
       <IndianMarketHeader />
@@ -296,10 +299,12 @@ function IndianEditTradeContent() {
               <InputField label="TRADING SETUP" name="strategy" value={formData.strategy} onChange={handleChange} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <InputField label="RISK : REWARD" name="riskRewardRatio" value={formData.riskRewardRatio} onChange={handleChange} options={[{ value: "", label: "Select…" }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]} required />
-              <InputField label="CUSTOM R:R" name="riskRewardCustom" value={formData.riskRewardCustom} onChange={handleChange} />
-            </div>
+            {!isEquityTrade && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <InputField label="RISK : REWARD" name="riskRewardRatio" value={formData.riskRewardRatio} onChange={handleChange} options={[{ value: "", label: "Select…" }, { value: "1:1", label: "1:1" }, { value: "1:2", label: "1:2" }, { value: "1:3", label: "1:3" }, { value: "1:4", label: "1:4" }, { value: "1:5", label: "1:5" }, { value: "custom", label: "Custom" }]} required />
+                <InputField label="CUSTOM R:R" name="riskRewardCustom" value={formData.riskRewardCustom} onChange={handleChange} />
+              </div>
+            )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <InputField label="BROKERAGE" name="brokerage" type="number" value={formData.brokerage} onChange={handleChange} />
