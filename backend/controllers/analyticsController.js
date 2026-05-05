@@ -1,6 +1,6 @@
 const Trade = require("../models/Trade");
 const ApiError = require("../utils/ApiError");
-const { asyncHandler } = require("../middleware/errorHandler");
+const asyncHandler = require("../utils/asyncHandler");
 const { appConfig } = require("../config");
 
 const forexQuery = (req) => {
@@ -134,7 +134,7 @@ exports.getWeeklyStats = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // ============================================
 // ADVANCED ANALYTICS
@@ -272,7 +272,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
       .limit(10000);
 
     // By Currency Pair
-    const byPair = {});
+    const byPair = {};
     trades.forEach(t => {
       if (!byPair[t.pair]) byPair[t.pair] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byPair[t.pair].total++;
@@ -360,7 +360,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // 3. Performance Metrics
 exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
@@ -447,7 +447,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
 
     // By Month
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const byMonth = {});
+    const byMonth = {};
     const byDate = {};
 
     trades.forEach(t => {
@@ -651,7 +651,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // 5. Trade Quality
 exports.getTradeQuality = asyncHandler(async (req, res) => {
@@ -692,7 +692,7 @@ exports.getTradeQuality = asyncHandler(async (req, res) => {
         losses: total - wins,
         winRate: total ? ((wins / total) * 100).toFixed(1) : 0,
         avgProfit: total ? (range.trades.reduce((a, t) => a + t.profit, 0) / total).toFixed(2) : 0
-      });
+      };
     }).filter(r => r.total > 0);
 
     const breakevenTrades = trades.filter(t => Math.abs(t.profit) < 5);
@@ -723,7 +723,7 @@ exports.getTradeQuality = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // 6. Drawdown Analysis
 exports.getDrawdownAnalysis = asyncHandler(async (req, res) => {
@@ -818,7 +818,7 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
       weeklyPlan: {},
       strategyStats: {},
       mistakeTagStats: {}
-    });
+    };
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     let totalProfit = 0;
@@ -1115,7 +1115,7 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // 8. Advanced Analytics (all-in-one) - OPTIMIZED
 exports.getAdvancedAnalytics = asyncHandler(async (req, res) => {
@@ -1224,7 +1224,7 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
     }
 
     // 1) Mood Analysis (1–5)
-    const moodBuckets = {});
+    const moodBuckets = {};
     trades.forEach(t => {
       if (t.mood != null && t.mood >= 1 && t.mood <= 5) {
         if (!moodBuckets[t.mood]) moodBuckets[t.mood] = { trades: 0, wins: 0, losses: 0, pnl: 0 };
@@ -1367,5 +1367,5 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
