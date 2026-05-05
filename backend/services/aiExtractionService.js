@@ -32,36 +32,41 @@ CRITICAL RULES:
 3. Convert option names exactly:
    - "Call" => "CE"
    - "Put" => "PE"
-4. Example row mappings:
-   - "NIFTY 28 Apr 24450 Call" => pair="NIFTY 24450 CE", underlying="NIFTY", strikePrice=24450, optionType="CE"
-   - "NIFTY 28 Apr 24450 Put" => pair="NIFTY 24450 PE", underlying="NIFTY", strikePrice=24450, optionType="PE"
-5. EVERY VISIBLE ROW = ONE SEPARATE TRADE. Do not collapse or merge rows. Even if the same instrument (e.g. "NIFTY 24200 CE") appears multiple times, each row is a distinct trade.
-6. SAME INSTRUMENT, DIFFERENT PRODUCT TYPE = TWO SEPARATE TRADES. Zerodha and other brokers show the same option twice when it was traded under different product types (e.g. "Overnight" and "Intraday-BO", or "CNC" and "MIS"). These are ALWAYS separate trades with their own P&L. Extract both.
-7. Count the visible rows carefully. If you see 4 rows, return 4 items in "trades". Never return fewer entries than rows visible.
+4. EVERY VISIBLE ROW = ONE SEPARATE TRADE. Do not collapse or merge rows. If you see 4 rows, return exactly 4 items in "trades".
+5. SAME INSTRUMENT + DIFFERENT PRODUCT TYPE = TWO SEPARATE TRADES. Example: "NIFTY 24200 CE" appearing once as "Overnight" and once as "Intraday-BO" = 2 trades, each with its own P&L.
+6. LTP (Last Traded Price) is the CURRENT MARKET PRICE — it is NOT the entry price and NOT the exit price. NEVER put LTP into entryPrice or exitPrice. entryPrice comes only from "Avg", "Avg Price", "Buy Avg", "Entry". exitPrice comes only from "Sell Avg", "Exit Price", "Close Price".
+7. When "Avg" or "Avg Price" shows "0", "0.00", or "₹0.00" — the position is fully closed. Set entryPrice = null and exitPrice = null for that row.
+8. P&L sign: GREEN color or "+" prefix = positive number. RED color or "-" prefix = negative number. Extract the P&L for EACH ROW INDEPENDENTLY — never copy P&L from one row to another.
 
 FIELD EXTRACTION RULES:
-- pair: full instrument name including expiry and strike (e.g. "NIFTY 26000 PE 25JAN", "BANKNIFTY 48000 CE").
-- underlying: index or stock name only (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, or stock ticker like RELIANCE, TCS).
-- optionType: exactly "CE" or "PE". CE = Call = bullish. PE = Put = bearish.
-- strikePrice: strike price number only (e.g. 26000, 48000).
-- quantity: number of lots or units traded.
-- entryPrice: avg buy price. Look for: "Avg. Price", "Avg Price", "Buy Avg", "Entry", "Buy Price". If the value shows "0", "0.00", or "₹0.00" (closed position), set to null. NEVER use LTP as entryPrice.
-- exitPrice: avg sell price. Look for: "Sell Avg", "Exit Price", "Close Price" only. NEVER use LTP — LTP is the current market price, not the exit price. If exit price is not explicitly shown, set to null.
-- profit: net realized P&L for THAT SPECIFIC ROW only. Look for: "P&L", "Net P&L", "Realized P&L".
-  CRITICAL: Each row has its own P&L value. Do NOT sum or share P&L across rows.
-  Negative profit shown as "-₹500", "₹-500", "(500)", red color, or with minus sign.
-  Indian rupee: ₹ symbol, or "Rs.", or "INR". Strip the symbol, return just the number.
-  Indian lakh format: "1,23,456" = 123456. Remove all commas, parse as plain number.
-- productType: trade product type visible in the row. Map as follows:
-  "Overnight" or "NRML" or "CNC" or "Delivery" => "DELIVERY"
-  "Intraday" or "Intraday-BO" or "MIS" or "BO" or "CO" => "INTRADAY"
-  If not visible, default to "INTRADAY".
-- broker: platform name from logo/title.
+- pair: instrument name with strike (e.g. "NIFTY 24200 CE", "BANKNIFTY 48000 PE").
+- underlying: index name only (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, or stock ticker).
+- optionType: "CE" or "PE".
+- strikePrice: the numeric strike price only.
+- quantity: Qty shown in the row (may be 0 for closed positions).
+- entryPrice: null if Avg=0/0.00 or not shown. Otherwise the Avg/Buy Avg value. NEVER LTP.
+- exitPrice: null unless "Sell Avg" or "Exit Price" or "Close Price" is explicitly shown. NEVER LTP.
+- profit: the P&L value of THIS row only. Strip ₹, commas. Negative if red/minus. Indian lakh format "1,23,456" = 123456.
+- productType: "Overnight"/"NRML"/"CNC"/"Delivery" => "DELIVERY". "Intraday"/"Intraday-BO"/"MIS"/"BO"/"CO" => "INTRADAY". Default "INTRADAY".
+- broker: app/platform name from logo or title bar.
 
-If MULTIPLE trades are visible (positions list, trade history), extract ALL of them into "trades" array.
-Set top-level fields to the first/main/most recent trade.
+FYERS / ZERODHA POSITIONS PAGE EXAMPLE:
+Row 1: NIFTY 24200 CE  +₹520.00 | LTP 79.70 | Qty 0 | Overnight | Avg 0.00
+Row 2: NIFTY 24200 CE  +₹338.00 | LTP 79.70 | Qty 0 | Intraday-BO | Avg 0.00
+Row 3: NIFTY 24300 CE  +₹334.75 | LTP 48.25 | Qty 0 | Overnight | Avg 0.00
+Row 4: NIFTY 24300 CE  -₹1072.50 | LTP 48.25 | Qty 0 | Intraday-BO | Avg 0.00
 
-JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"productType":"INTRADAY","broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"productType":"INTRADAY","broker":"Zerodha"}]}`;
+Correct output for above:
+{"trades":[
+  {"pair":"NIFTY 24200 CE","underlying":"NIFTY","strikePrice":24200,"optionType":"CE","quantity":0,"entryPrice":null,"exitPrice":null,"profit":520.00,"productType":"DELIVERY"},
+  {"pair":"NIFTY 24200 CE","underlying":"NIFTY","strikePrice":24200,"optionType":"CE","quantity":0,"entryPrice":null,"exitPrice":null,"profit":338.00,"productType":"INTRADAY"},
+  {"pair":"NIFTY 24300 CE","underlying":"NIFTY","strikePrice":24300,"optionType":"CE","quantity":0,"entryPrice":null,"exitPrice":null,"profit":334.75,"productType":"DELIVERY"},
+  {"pair":"NIFTY 24300 CE","underlying":"NIFTY","strikePrice":24300,"optionType":"CE","quantity":0,"entryPrice":null,"exitPrice":null,"profit":-1072.50,"productType":"INTRADAY"}
+]}
+
+Extract ALL rows into "trades" array. Set top-level fields to the first trade.
+
+JSON: {"pair":"NIFTY 24200 CE","optionType":"CE","strikePrice":24200,"underlying":"NIFTY","quantity":0,"entryPrice":null,"exitPrice":null,"profit":520.00,"productType":"DELIVERY","broker":"Fyers","trades":[{"pair":"NIFTY 24200 CE","optionType":"CE","strikePrice":24200,"underlying":"NIFTY","quantity":0,"entryPrice":null,"exitPrice":null,"profit":520.00,"productType":"DELIVERY"},{"pair":"NIFTY 24200 CE","optionType":"CE","strikePrice":24200,"underlying":"NIFTY","quantity":0,"entryPrice":null,"exitPrice":null,"profit":338.00,"productType":"INTRADAY"}]}`;
 
 const INDIAN_EQUITY_VISION_PROMPT = `You are a trading data extraction specialist analyzing an Indian broker app screenshot showing INTRADAY EQUITY (stock) trades — NOT options/F&O.
 Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
