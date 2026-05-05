@@ -35,7 +35,9 @@ CRITICAL RULES:
 4. Example row mappings:
    - "NIFTY 28 Apr 24450 Call" => pair="NIFTY 24450 CE", underlying="NIFTY", strikePrice=24450, optionType="CE"
    - "NIFTY 28 Apr 24450 Put" => pair="NIFTY 24450 PE", underlying="NIFTY", strikePrice=24450, optionType="PE"
-5. If multiple option rows are visible, return ALL of them in "trades". Do not collapse them into one trade.
+5. EVERY VISIBLE ROW = ONE SEPARATE TRADE. Do not collapse or merge rows. Even if the same instrument (e.g. "NIFTY 24200 CE") appears multiple times, each row is a distinct trade.
+6. SAME INSTRUMENT, DIFFERENT PRODUCT TYPE = TWO SEPARATE TRADES. Zerodha and other brokers show the same option twice when it was traded under different product types (e.g. "Overnight" and "Intraday-BO", or "CNC" and "MIS"). These are ALWAYS separate trades with their own P&L. Extract both.
+7. Count the visible rows carefully. If you see 4 rows, return 4 items in "trades". Never return fewer entries than rows visible.
 
 FIELD EXTRACTION RULES:
 - pair: full instrument name including expiry and strike (e.g. "NIFTY 26000 PE 25JAN", "BANKNIFTY 48000 CE").
@@ -45,16 +47,21 @@ FIELD EXTRACTION RULES:
 - quantity: number of lots or units traded.
 - entryPrice: avg buy price. Look for: "Avg. Price", "Avg Price", "Buy Avg", "Entry", "Buy Price".
 - exitPrice: avg sell price. Look for: "Sell Avg", "Exit Price", "LTP" (if closed), "Close".
-- profit: net realized P&L. Look for: "P&L", "Net P&L", "Realized P&L", "Total P&L".
-  CRITICAL: negative profit shown as "-₹500", "₹-500", "(500)", red color, or with minus sign.
+- profit: net realized P&L for THAT SPECIFIC ROW only. Look for: "P&L", "Net P&L", "Realized P&L".
+  CRITICAL: Each row has its own P&L value. Do NOT sum or share P&L across rows.
+  Negative profit shown as "-₹500", "₹-500", "(500)", red color, or with minus sign.
   Indian rupee: ₹ symbol, or "Rs.", or "INR". Strip the symbol, return just the number.
   Indian lakh format: "1,23,456" = 123456. Remove all commas, parse as plain number.
+- productType: trade product type visible in the row. Map as follows:
+  "Overnight" or "NRML" or "CNC" or "Delivery" => "DELIVERY"
+  "Intraday" or "Intraday-BO" or "MIS" or "BO" or "CO" => "INTRADAY"
+  If not visible, default to "INTRADAY".
 - broker: platform name from logo/title.
 
 If MULTIPLE trades are visible (positions list, trade history), extract ALL of them into "trades" array.
 Set top-level fields to the first/main/most recent trade.
 
-JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"broker":"Zerodha"}]}`;
+JSON: {"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"productType":"INTRADAY","broker":"Zerodha","trades":[{"pair":"NIFTY 26000 PE","optionType":"PE","strikePrice":26000,"underlying":"NIFTY","quantity":1,"entryPrice":150.00,"exitPrice":200.00,"profit":2500.00,"productType":"INTRADAY","broker":"Zerodha"}]}`;
 
 const INDIAN_EQUITY_VISION_PROMPT = `You are a trading data extraction specialist analyzing an Indian broker app screenshot showing INTRADAY EQUITY (stock) trades — NOT options/F&O.
 Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
@@ -166,6 +173,7 @@ async function extractTradeWithGeminiVision(imageUrl, options = {}) {
         entryPrice: toNumberOrNull(item.entryPrice),
         exitPrice: toNumberOrNull(item.exitPrice),
         broker: item.broker ?? null,
+        productType: item.productType === "DELIVERY" ? "DELIVERY" : "INTRADAY",
       });
       const main = mapOne(parsed);
       const trades = Array.isArray(parsed.trades) ? parsed.trades.map(mapOne) : [];
