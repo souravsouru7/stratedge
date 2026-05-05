@@ -126,16 +126,23 @@ async function startOcrWorker({ initializeConnections = true, mode = "standalone
     });
   });
 
-  workerInstance.on("failed", (job, error) => {
-    logger.error(`Job failed event fired | id=${job?.id} | tradeId=${job?.data?.tradeId}`,
-      {
+  workerInstance.on("failed", (job, err) => {
+    if (job && job.attemptsMade >= job.opts.attempts) {
+      logger.error("OCR job permanently failed — all retries exhausted", {
+        tradeId: job?.data?.tradeId,
+        jobId: job?.id,
+        attempts: job.attemptsMade,
+        error: err?.message,
+      });
+    } else {
+      logger.error(`Job failed event fired | id=${job?.id} | tradeId=${job?.data?.tradeId}`, {
         jobId: job?.id,
         tradeId: job?.data?.tradeId,
-        error: error?.message,
-        stack: error?.stack,
+        error: err?.message,
+        stack: err?.stack,
         timestamp: new Date().toISOString(),
-      }
-    );
+      });
+    }
   });
 
   workerInstance.on("stalled", (jobId) => {

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import {
   BookOpen, BarChart2, Cpu, CheckSquare, Target, FileText,
 } from "lucide-react";
@@ -367,5 +368,9 @@ export default function DashboardPage() {
     return null;
   }
 
-  return <Suspense><DashboardContent /></Suspense>;
+  return (
+    <ErrorBoundary fallback={<div style={{ padding: "2rem", textAlign: "center" }}>Dashboard failed to load. Please refresh.</div>}>
+      <Suspense><DashboardContent /></Suspense>
+    </ErrorBoundary>
+  );
 }

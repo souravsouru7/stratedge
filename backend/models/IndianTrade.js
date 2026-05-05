@@ -136,5 +136,8 @@ const indianTradeSchema = new mongoose.Schema(
 indianTradeSchema.index({ user: 1, createdAt: -1 });
 indianTradeSchema.index({ user: 1, tradeDate: -1 });
 indianTradeSchema.index({ user: 1, strategy: 1, createdAt: -1 });
+indianTradeSchema.index({ user: 1, instrumentType: 1, createdAt: -1 });
+indianTradeSchema.index({ user: 1, instrumentType: 1, tradeDate: -1 });
+indianTradeSchema.index({ user: 1, instrumentType: 1, strategy: 1, createdAt: -1 });
 
 module.exports = mongoose.model("IndianTrade", indianTradeSchema);

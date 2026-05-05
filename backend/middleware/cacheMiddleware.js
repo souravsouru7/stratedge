@@ -1,4 +1,5 @@
 const { buildCacheKey, getCache, setCache } = require("../utils/cache");
+const { isRedisReady } = require("../config/redis");
 
 function stableQuerySuffix(query = {}) {
   const keys = Object.keys(query).sort();
@@ -17,6 +18,11 @@ const cacheMiddleware = (options = {}) => async (req, res, next) => {
   const normalizedOptions = typeof options === "number"
     ? { ttlSeconds: options * 60 }
     : options;
+
+  // Bypass cache entirely if Redis is not available
+  if (!isRedisReady()) {
+    return next();
+  }
 
   const ttlSeconds = normalizedOptions.ttlSeconds || 60;
   const namespace = resolveNamespace(normalizedOptions.namespace, req) || "response";

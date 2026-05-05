@@ -152,11 +152,7 @@ export default function LoginForm({
           )}
         </button>
 
-        <div style={{ textAlign: "center", marginTop: 10 }}>
-          <button type="button" onClick={testConnection} style={{ fontSize: 10, color: "#94A3B8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-            Test Backend Connection
-          </button>
-        </div>
+
 
         <div style={{ textAlign: "center", marginTop: 20, fontSize: 12, color: "#94A3B8", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
           New to Edgecipline?{" "}

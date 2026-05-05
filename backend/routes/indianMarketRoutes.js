@@ -11,9 +11,10 @@ const {
 
 const { protect } = require("../middleware/authMiddleware");
 const cacheMiddleware = require("../middleware/cacheMiddleware");
+const { validateNumbers } = require("../middleware/validateNumbers");
 
 // Indian Market only — uses IndianTrade model, no shared Forex logic
-router.post("/", protect, createTrade);
+router.post("/", protect, validateNumbers, createTrade);
 router.get(
   "/",
   protect,
@@ -25,7 +26,7 @@ router.get(
   getTrades
 );
 router.get("/:id", protect, getTrade);
-router.put("/:id", protect, updateTrade);
+router.put("/:id", protect, validateNumbers, updateTrade);
 router.delete("/:id", protect, deleteTrade);
 
 module.exports = router;
