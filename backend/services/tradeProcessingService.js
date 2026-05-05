@@ -368,6 +368,7 @@ function mergeIndianAiTrades(parsedTrades = [], aiTrades = [], broker = "") {
       entryPrice: trade.entryPrice ?? null,
       pnl: trade.profit ?? null,
       broker: trade.broker || broker || "",
+      tradeType: trade.productType === "DELIVERY" ? "DELIVERY" : "INTRADAY",
     }));
   }
 
@@ -390,6 +391,7 @@ function mergeIndianAiTrades(parsedTrades = [], aiTrades = [], broker = "") {
       entryPrice: (aiTrade.entryPrice != null && aiTrade.entryPrice > 0) ? aiTrade.entryPrice : trade.entryPrice ?? null,
       pnl: aiTrade.profit ?? trade.pnl ?? null,
       broker: aiTrade.broker || trade.broker || broker || "",
+      tradeType: aiTrade.productType === "DELIVERY" ? "DELIVERY" : (trade.tradeType || "INTRADAY"),
     };
   });
 }
@@ -407,6 +409,7 @@ function buildIndianTradeFromParsedRow(row = {}, fallbackBroker = "") {
     entryPrice: row.entryPrice ?? null,
     profit: row.pnl ?? null,
     broker: row.broker || fallbackBroker || "",
+    tradeType: row.tradeType || "INTRADAY",
   };
 }
 
@@ -509,6 +512,7 @@ function buildTradeUpdate({
     exchange: parsedTrade?.exchange || trade.exchange || undefined,
     sharesQty: parsedTrade?.sharesQty ?? trade.sharesQty ?? undefined,
     sector: parsedTrade?.sector || trade.sector || undefined,
+    tradeType: parsedTrade?.tradeType || trade.tradeType || undefined,
     tradeSubType: trade.tradeSubType || undefined,
     extractedText,
     rawOCRText: extractedText,

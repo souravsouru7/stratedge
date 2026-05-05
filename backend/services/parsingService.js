@@ -618,8 +618,8 @@ function normalizeBrokerLabels(text) {
     .replace(/([=~-])%/g, "-₹")
     // Fix OCR typos where decimal dot becomes colon `1313:00`
     .replace(/(\d):(\d{2})(?!\d)/g, "$1.$2")
-    // Strip percentage changes (e.g. "(-53.71%)" or "+1.5%") to prevent them from being parsed as P&L
-    .replace(/\(?\s*[+\-]?\s*[\d,]+\.\d*\s*%\s*\)?/g, " ");
+    // Strip percentage changes (e.g. "(-53.71%)", "(-4112%)", "+1.5%") to prevent them from being parsed as P&L
+    .replace(/\(?\s*[+\-]?\s*[\d,]+\.?\d*\s*%\s*\)?/g, " ");
 }
 
 exports.parseIndianTrade = (text, opts = {}) => {
@@ -935,10 +935,7 @@ function parsePositionRowsFromJoinedText(normalizedText, broker = "") {
       pnl = pnlCandidates.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
     }
 
-    const marketMatch = segment.match(/(?:Mkt|LTP)\s*₹?\s*([\d,]+\.\d{2})/i);
-    if (marketMatch) {
-      entryPrice = parseFloat(marketMatch[1].replace(/,/g, ""));
-    }
+    // LTP is current market price — never use as entry price
 
     const qtyMatch = segment.match(/(?:Qty\.?|Quantity|Lots?)\s*[:\s]*(\d[\d,]*)/i);
     if (qtyMatch) {
@@ -1167,7 +1164,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       strike,
       optionType: rawType,
       quantity,
-      entryPrice: entryPrice !== null && entryPrice !== 0 ? entryPrice : ltpPrice,
+      entryPrice: entryPrice != null && entryPrice > 0 ? entryPrice : null,
       pnl,
       _pnlHasRupee: pnlHasRupee,
     };
