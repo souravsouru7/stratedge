@@ -1054,6 +1054,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
     let ltpPrice = null;   // Fallback
     let pnl = null;
     let pnlHasRupee = false;
+    let pnlFromHeader = false;
 
     // P&L on header line: "+₹8,164.00" or "+₹1,15,943.75" (Indian lakh) or "NIFTY ... Put  +₹1,15,943.75 B>"
     const headerPnlMatch = block.headerLine.match(/([+\-]\s*₹?\s*[\d,\s]+\.?\d*)/);
@@ -1062,6 +1063,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       if (val != null && Math.abs(val) >= 1) {
         pnl = val;
         pnlHasRupee = headerPnlMatch[0].includes("₹");
+        pnlFromHeader = true;
       }
     } else if (broker === "Dhan") {
       // Dhan can show pnl without "+" at the end of the instrument line (e.g. "1,000.00")
@@ -1167,6 +1169,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
       entryPrice: entryPrice != null && entryPrice > 0 ? entryPrice : null,
       pnl,
       _pnlHasRupee: pnlHasRupee,
+      _pnlFromHeader: pnlFromHeader,
     };
   });
 
@@ -1191,9 +1194,11 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
 
   // If trade pnl is suspiciously small (< 500) but we do have a strong ₹ candidate elsewhere,
   // override it (this is the "232.19" issue).
+  // Skip trades where pnl came directly from the contract header line — those are reliable.
   if (broker !== "Dhan" && globalBestRupeePnl != null) {
     for (const t of trades) {
       if (t._pnlHasRupee) continue;
+      if (t._pnlFromHeader) continue;
       if (t.pnl != null && Math.abs(t.pnl) > 0 && Math.abs(t.pnl) < 500) {
         t.pnl = globalBestRupeePnl;
         t._pnlHasRupee = true;
@@ -1203,7 +1208,7 @@ exports.parseTradesFromOCR = (text, opts = {}) => {
 
   const finalizedTrades = trades.map((t) => {
     // eslint-disable-next-line no-unused-vars
-    const { _pnlHasRupee, ...rest } = t;
+    const { _pnlHasRupee, _pnlFromHeader, ...rest } = t;
     return {
       ...rest,
       ...(broker && { broker }),
