@@ -45,8 +45,8 @@ FIELD EXTRACTION RULES:
 - optionType: exactly "CE" or "PE". CE = Call = bullish. PE = Put = bearish.
 - strikePrice: strike price number only (e.g. 26000, 48000).
 - quantity: number of lots or units traded.
-- entryPrice: avg buy price. Look for: "Avg. Price", "Avg Price", "Buy Avg", "Entry", "Buy Price".
-- exitPrice: avg sell price. Look for: "Sell Avg", "Exit Price", "LTP" (if closed), "Close".
+- entryPrice: avg buy price. Look for: "Avg. Price", "Avg Price", "Buy Avg", "Entry", "Buy Price". If the value shows "0", "0.00", or "₹0.00" (closed position), set to null. NEVER use LTP as entryPrice.
+- exitPrice: avg sell price. Look for: "Sell Avg", "Exit Price", "Close Price" only. NEVER use LTP — LTP is the current market price, not the exit price. If exit price is not explicitly shown, set to null.
 - profit: net realized P&L for THAT SPECIFIC ROW only. Look for: "P&L", "Net P&L", "Realized P&L".
   CRITICAL: Each row has its own P&L value. Do NOT sum or share P&L across rows.
   Negative profit shown as "-₹500", "₹-500", "(500)", red color, or with minus sign.
