@@ -1,6 +1,6 @@
-const IndianTrade = require("../models/IndianTrade");
+﻿const IndianTrade = require("../models/IndianTrade");
 const ApiError = require("../utils/ApiError");
-const { asyncHandler } = require("../middleware/errorHandler");
+const asyncHandler = require("../utils/asyncHandler");
 const toNum = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -70,7 +70,7 @@ exports.getSummary = asyncHandler(async (req, res) => {
 exports.getWeeklyStats = asyncHandler(async (req, res) => {
   try {
     const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
-    const weekly = {});
+    const weekly = {};
     
     trades.forEach(trade => {
       const date = new Date(trade.createdAt);
@@ -89,7 +89,7 @@ exports.getWeeklyStats = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 /**
  * NEW: getPnLBreakdown
@@ -99,7 +99,7 @@ exports.getPnLBreakdown = asyncHandler(async (req, res) => {
   try {
     const trades = await IndianTrade.find(userQuery(req)).lean().sort({ createdAt: 1 });
     
-    const dailyMap = {});
+    const dailyMap = {};
     const weeklyMap = {};
     const monthlyMap = {};
 
@@ -135,7 +135,7 @@ exports.getPnLBreakdown = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 // ========== ADVANCED ANALYTICS ==========
 
@@ -234,7 +234,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
   try {
     const trades = await IndianTrade.find(userQuery(req)).lean();
 
-    const byPair = {});
+    const byPair = {};
     trades.forEach(t => {
       if (!byPair[t.pair]) byPair[t.pair] = { total: 0, wins: 0, losses: 0, profit: 0 };
       byPair[t.pair].total++;
@@ -267,8 +267,8 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
     Object.keys(byStrategy).forEach(strat => (byStrategy[strat].winRate = ((byStrategy[strat].wins / byStrategy[strat].total) * 100).toFixed(1)));
 
     // Indian market sessions in IST (UTC+5:30)
-    // Opening Bell: 9:15–11:00 IST | Mid-Session: 11:00–13:30 IST
-    // Post-Lunch:  13:30–15:00 IST | Closing:      15:00–15:30 IST
+    // Opening Bell: 9:15â€“11:00 IST | Mid-Session: 11:00â€“13:30 IST
+    // Post-Lunch:  13:30â€“15:00 IST | Closing:      15:00â€“15:30 IST
     const bySession = {
       "Opening Bell": { total: 0, wins: 0, losses: 0, profit: 0 },
       "Mid-Session":  { total: 0, wins: 0, losses: 0, profit: 0 },
@@ -284,10 +284,10 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
         // Convert UTC timestamp to IST minute-of-day
         const d = new Date(t.createdAt);
         const istMinutes = (d.getUTCHours() * 60 + d.getUTCMinutes() + 330) % 1440;
-        if (istMinutes >= 555 && istMinutes < 660)       session = "Opening Bell"; // 9:15–11:00
-        else if (istMinutes >= 660 && istMinutes < 810)  session = "Mid-Session";  // 11:00–13:30
-        else if (istMinutes >= 810 && istMinutes < 900)  session = "Post-Lunch";   // 13:30–15:00
-        else if (istMinutes >= 900 && istMinutes < 930)  session = "Closing";      // 15:00–15:30
+        if (istMinutes >= 555 && istMinutes < 660)       session = "Opening Bell"; // 9:15â€“11:00
+        else if (istMinutes >= 660 && istMinutes < 810)  session = "Mid-Session";  // 11:00â€“13:30
+        else if (istMinutes >= 810 && istMinutes < 900)  session = "Post-Lunch";   // 13:30â€“15:00
+        else if (istMinutes >= 900 && istMinutes < 930)  session = "Closing";      // 15:00â€“15:30
         else                                              session = "Outside Market";
       }
       bySession[session].total++;
@@ -409,7 +409,7 @@ exports.getTradeDistribution = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
   try {
@@ -447,7 +447,7 @@ exports.getPerformanceMetrics = asyncHandler(async (req, res) => {
       if (dd > maxDD) maxDD = dd;
     });
     const netProfit = totalWins - totalLosses;
-    const recoveryFactor = maxDD > 0 ? (netProfit / maxDD).toFixed(2) : netProfit > 0 ? "∞" : "0.00";
+    const recoveryFactor = maxDD > 0 ? (netProfit / maxDD).toFixed(2) : netProfit > 0 ? "âˆž" : "0.00";
 
     res.json({
       largestWin: fixed(largestWin),
@@ -475,7 +475,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
     const trades = await IndianTrade.find(userQuery(req)).lean();
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const byMonth = {});
+    const byMonth = {};
     const byDate = {};
     trades.forEach(t => {
       const date = new Date(t.createdAt);
@@ -526,7 +526,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
       byDay[day].avgProfit = byDay[day].total ? (byDay[day].profit / byDay[day].total).toFixed(2) : 0;
     });
 
-    // All hours in IST (UTC+5:30) — Indian market only trades 9:15–15:30 IST
+    // All hours in IST (UTC+5:30) â€” Indian market only trades 9:15â€“15:30 IST
     const byHour = {};
     for (let i = 0; i < 24; i++) byHour[i] = { total: 0, wins: 0, losses: 0, profit: 0, winRate: 0, avgProfit: 0 };
     trades.forEach(t => {
@@ -629,7 +629,7 @@ exports.getTimeAnalysis = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 exports.getTradeQuality = asyncHandler(async (req, res) => {
   try {
@@ -776,22 +776,22 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
 
     const insights = [];
     const recommendations = [];
-    const currency = "₹";
+    const currency = "â‚¹";
 
-    if (winRate >= 60) insights.push(`Excellent win rate of ${winRate.toFixed(1)}% — Your strategy has a strong edge!`);
-    else if (winRate >= 50) insights.push(`Good win rate of ${winRate.toFixed(1)}% — You're above breakeven`);
-    else if (winRate < 40) insights.push(`Win rate of ${winRate.toFixed(1)}% is below optimal — Consider reviewing your entries`);
+    if (winRate >= 60) insights.push(`Excellent win rate of ${winRate.toFixed(1)}% â€” Your strategy has a strong edge!`);
+    else if (winRate >= 50) insights.push(`Good win rate of ${winRate.toFixed(1)}% â€” You're above breakeven`);
+    else if (winRate < 40) insights.push(`Win rate of ${winRate.toFixed(1)}% is below optimal â€” Consider reviewing your entries`);
 
     if (avgWin > 0 && avgLoss > 0) {
       const rr = avgWin / avgLoss;
-      if (rr >= 2) insights.push(`Great risk-reward ratio of 1:${rr.toFixed(1)} — You need fewer wins to be profitable`);
-      else if (rr < 1) insights.push(`Risk-reward ratio of 1:${rr.toFixed(1)} is unfavorable — Aim for at least 1:1.5`);
+      if (rr >= 2) insights.push(`Great risk-reward ratio of 1:${rr.toFixed(1)} â€” You need fewer wins to be profitable`);
+      else if (rr < 1) insights.push(`Risk-reward ratio of 1:${rr.toFixed(1)} is unfavorable â€” Aim for at least 1:1.5`);
     }
 
-    if (totalProfit > 0) insights.push(`Total P&L: ${currency}${totalProfit.toFixed(2)} — Keep up the good work!`);
-    else insights.push(`Currently in drawdown — Stay disciplined and follow your rules`);
+    if (totalProfit > 0) insights.push(`Total P&L: ${currency}${totalProfit.toFixed(2)} â€” Keep up the good work!`);
+    else insights.push(`Currently in drawdown â€” Stay disciplined and follow your rules`);
 
-    const bySession = {});
+    const bySession = {};
     trades.forEach(t => {
       const session = t.session || "Unspecified";
       if (!bySession[session]) bySession[session] = { profit: 0, wins: 0, total: 0 };
@@ -811,7 +811,7 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
       }
       insights.push(`Highest win rate: ${bestSessionWinRateEntry[0]} (${((bestSessionWinRateEntry[1].wins / bestSessionWinRateEntry[1].total) * 100).toFixed(1)}%)`);
       if (bestSessionEntry[0] !== "London (08-16 UTC)" && bestSessionEntry[0] !== "Overlap (13-16 UTC)") {
-        recommendations.push(`Consider trading during ${bestSessionEntry[0]} — your most profitable session`);
+        recommendations.push(`Consider trading during ${bestSessionEntry[0]} â€” your most profitable session`);
       }
     }
 
@@ -832,7 +832,7 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
       .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit));
 
     if (pairs.length > 0 && parseFloat(pairs[0].profit) > 0) insights.push(`Best performing symbol: ${pairs[0].name} (${currency}${pairs[0].profit})`);
-    if (pairs.length > 2) recommendations.push(`Focus on: ${pairs.slice(0, 2).map(p => p.name).join(", ")} — your top performers`);
+    if (pairs.length > 2) recommendations.push(`Focus on: ${pairs.slice(0, 2).map(p => p.name).join(", ")} â€” your top performers`);
 
     const dayStats = { Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0 };
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -843,11 +843,11 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
     const bestDay = Object.entries(dayStats).reduce((a, b) => (a[1] > b[1] ? a : b));
     if (bestDay[1] > 0) {
       insights.push(`Most profitable day: ${bestDay[0]} (${currency}${bestDay[1].toFixed(2)})`);
-      recommendations.push(`Focus your trading on ${bestDay[0]} — your best performing day`);
+      recommendations.push(`Focus your trading on ${bestDay[0]} â€” your best performing day`);
     }
     const worstDay = Object.entries(dayStats).reduce((a, b) => (a[1] < b[1] ? a : b));
     if (worstDay[1] < -50) {
-      recommendations.push(`Avoid or reduce size on ${worstDay[0]} — your least profitable day`);
+      recommendations.push(`Avoid or reduce size on ${worstDay[0]} â€” your least profitable day`);
     }
 
     const behaviorBuckets = { Plan: { count: 0, pnl: 0 }, Emotion: { count: 0, pnl: 0 }, Impulsive: { count: 0, pnl: 0 }, Other: { count: 0, pnl: 0 } };
@@ -1013,7 +1013,7 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
     if (nextWeekChecklist.length === 0) nextWeekChecklist.push("Keep following your current process; maintain discipline and journaling.");
 
     const tradesWithSL = trades.filter(t => t.stopLoss).length;
-    if (tradesWithSL / trades.length < 0.5) recommendations.push(`Use stop losses on more trades — only ${((tradesWithSL / trades.length) * 100).toFixed(0)}% have SL set`);
+    if (tradesWithSL / trades.length < 0.5) recommendations.push(`Use stop losses on more trades â€” only ${((tradesWithSL / trades.length) * 100).toFixed(0)}% have SL set`);
 
     let score = 50;
     score += Math.min(20, winRate - 40);
@@ -1044,13 +1044,13 @@ exports.getAIInsights = asyncHandler(async (req, res) => {
         winRate: winRate.toFixed(1),
         avgWin: avgWin.toFixed(2),
         avgLoss: avgLoss.toFixed(2),
-        profitFactor: avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : avgWin > 0 ? "∞" : "0.00"
+        profitFactor: avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : avgWin > 0 ? "âˆž" : "0.00"
       }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
 
 exports.getAdvancedAnalytics = asyncHandler(async (req, res) => {
   try {
@@ -1086,7 +1086,7 @@ exports.getAdvancedAnalytics = asyncHandler(async (req, res) => {
 
     const totalWins = winningTrades.reduce((acc, t) => acc + t.profit, 0);
     const totalLosses = Math.abs(losingTrades.reduce((acc, t) => acc + t.profit, 0));
-    const profitFactor = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
+    const profitFactor = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "âˆž" : "0.00";
 
     let totalRR = 0, rrCount = 0;
     trades.forEach(t => {
@@ -1147,8 +1147,8 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
       });
     }
 
-    // 1) Mood Analysis (1–5)
-    const moodBuckets = {});
+    // 1) Mood Analysis (1â€“5)
+    const moodBuckets = {};
     trades.forEach(t => {
       if (t.mood != null && t.mood >= 1 && t.mood <= 5) {
         if (!moodBuckets[t.mood]) moodBuckets[t.mood] = { trades: 0, wins: 0, losses: 0, pnl: 0 };
@@ -1159,7 +1159,7 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
       }
     });
 
-    const moodLabels = { 1: "😰 Stressed", 2: "😟 Anxious", 3: "😐 Neutral", 4: "😊 Good", 5: "🔥 Peak" };
+    const moodLabels = { 1: "ðŸ˜° Stressed", 2: "ðŸ˜Ÿ Anxious", 3: "ðŸ˜ Neutral", 4: "ðŸ˜Š Good", 5: "ðŸ”¥ Peak" };
     const moodAnalysis = Object.entries(moodBuckets).map(([level, s]) => ({
       level: parseInt(level),
       label: moodLabels[level] || `Mood ${level}`,
@@ -1206,7 +1206,7 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
       }
     });
 
-    const tagEmojis = { FOMO: "😨", Revenge: "😡", Fear: "😰", Greed: "🤑", Calm: "🧘", Bored: "😴", Focused: "🎯", Frustrated: "😤" };
+    const tagEmojis = { FOMO: "ðŸ˜¨", Revenge: "ðŸ˜¡", Fear: "ðŸ˜°", Greed: "ðŸ¤‘", Calm: "ðŸ§˜", Bored: "ðŸ˜´", Focused: "ðŸŽ¯", Frustrated: "ðŸ˜¤" };
     const emotionalTagImpact = Object.entries(tagBuckets)
       .map(([tag, s]) => ({
         tag, emoji: tagEmojis[tag] || "", trades: s.trades, wins: s.wins, losses: s.losses,
@@ -1216,7 +1216,7 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
       }))
       .sort((a, b) => b.trades - a.trades);
 
-    // 4) Psychology Score (0–100)
+    // 4) Psychology Score (0â€“100)
     const totalTrades = trades.length;
     const planTrades = trades.filter(t => !t.entryBasis || !t.entryBasis.trim() || t.entryBasis === "Plan").length;
     const planAdherencePct = totalTrades ? (planTrades / totalTrades) * 100 : 0;
@@ -1291,4 +1291,6 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+});
+
+
