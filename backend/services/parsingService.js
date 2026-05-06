@@ -178,20 +178,33 @@ function extractForexPriceData(line) {
   if (!/^\d/.test(source) && !/^-?\d/.test(source)) return null;
   if (/^(#|S\s*\/?\s*L|T\s*\/?\s*P|TIP|Open|Swap|Commission|Balance|Profit)/i.test(source)) return null;
 
+  // Standard Forex: decimal prices like 1.08500
   const decimalMatches = source.match(/-?\d+\.\d+/g) || [];
-  if (decimalMatches.length < 2) return null;
+  if (decimalMatches.length >= 2) {
+    const entry = parseFloat(decimalMatches[0]);
+    const exit = parseFloat(decimalMatches[1]);
+    const pnl = decimalMatches.length >= 3 ? parseFloat(decimalMatches[decimalMatches.length - 1]) : null;
+    if (!Number.isNaN(entry) && !Number.isNaN(exit)) {
+      return { entryPrice: entry, exitPrice: exit, profit: Number.isNaN(pnl) ? null : pnl };
+    }
+  }
 
-  const entry = parseFloat(decimalMatches[0]);
-  const exit = parseFloat(decimalMatches[1]);
-  const pnl = decimalMatches.length >= 3 ? parseFloat(decimalMatches[decimalMatches.length - 1]) : null;
+  // Index/CFD fallback: large integer prices like "49 394 → 49 359" or "49394 49359"
+  // Remove arrow separators and collapse spaced digits (OCR splits "49 394" → "49394")
+  const cleaned = source.replace(/[→–>\-]+/g, " ").replace(/(\d)\s+(\d)/g, "$1$2");
+  const intMatches = cleaned.match(/\b\d{4,6}\b/g) || [];
+  if (intMatches.length >= 2) {
+    const entry = parseInt(intMatches[0], 10);
+    const exit = parseInt(intMatches[1], 10);
+    // P&L is usually a small signed number at the end (e.g. -35.00 or -35)
+    const pnlMatch = source.match(/([+-]?\d+(?:\.\d+)?)\s*$/);
+    const pnl = pnlMatch ? parseFloat(pnlMatch[1]) : null;
+    if (!Number.isNaN(entry) && !Number.isNaN(exit)) {
+      return { entryPrice: entry, exitPrice: exit, profit: Number.isNaN(pnl) ? null : pnl };
+    }
+  }
 
-  if (Number.isNaN(entry) || Number.isNaN(exit)) return null;
-
-  return {
-    entryPrice: entry,
-    exitPrice: exit,
-    profit: Number.isNaN(pnl) ? null : pnl,
-  };
+  return null;
 }
 
 exports.parseTrade = (text) => {
