@@ -618,6 +618,10 @@ export function useUploadTrade() {
   const tradeCount = trades.length > 1 ? trades.length : trade ? 1 : 0;
 
   const canSaveTrade = (tradeToSave) => {
+    if (!tradeToSave?.pair || !String(tradeToSave.pair).trim()) {
+      addToast(`Please enter a ${isInd ? "Symbol" : "Pair"} before saving`, "info");
+      return false;
+    }
     if (!tradeToSave?.tradeDate) {
       addToast("Trade date is required before saving", "info");
       return false;
