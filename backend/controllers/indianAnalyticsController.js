@@ -1147,7 +1147,7 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
       });
     }
 
-    // 1) Mood Analysis (1â€“5)
+    // 1) Mood Analysis (1–5)
     const moodBuckets = {};
     trades.forEach(t => {
       if (t.mood != null && t.mood >= 1 && t.mood <= 5) {
@@ -1292,5 +1292,3 @@ exports.getPsychologyAnalytics = asyncHandler(async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-
