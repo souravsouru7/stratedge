@@ -31,11 +31,20 @@ function safeSignedNumber(value) {
 }
 
 const KNOWN_FOREX_SYMBOLS = [
+  // Forex majors
   "EURUSD", "USDJPY", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
+  // Forex crosses
   "EURJPY", "GBPJPY", "EURGBP", "EURAUD", "EURCAD", "EURCHF", "EURNZD",
   "AUDJPY", "AUDCAD", "AUDCHF", "AUDNZD", "CADJPY", "CADCHF", "CHFJPY",
   "GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD", "NZDJPY", "NZDCAD", "NZDCHF",
+  // Metals & Crypto
   "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD",
+  // US Indices
+  "US30", "US100", "US500", "NAS100", "SPX500", "DOW30", "NASDAQ100",
+  // European Indices
+  "GER40", "DE30", "DAX40", "UK100", "FTSE100", "FRA40", "STOXX50", "EU50", "SPAIN35",
+  // Asia-Pacific Indices
+  "JP225", "AUS200", "HK50", "CHINA50",
 ];
 
 function normalizeForexPair(rawPair) {
@@ -52,6 +61,18 @@ function normalizeForexPair(rawPair) {
     return `${base}${suffix}`;
   }
 
+  // Try direct substring match before OCR substitution — critical for index symbols
+  // that contain digits (US30, NAS100) since 0→O substitution garbles them.
+  for (const symbol of KNOWN_FOREX_SYMBOLS) {
+    const suffixGuess = compact.includes(`${symbol}.X`) || compact.includes(`${symbol}X`) || compact.endsWith(`${symbol}X`)
+      ? ".X"
+      : suffix;
+
+    if (compact.includes(symbol) || compactAlphaNum.includes(symbol)) {
+      return `${symbol}${suffixGuess}`;
+    }
+  }
+
   const ocrFixed = compactAlphaNum
     .replace(/0/g, "O")
     .replace(/1/g, "I")
@@ -62,7 +83,7 @@ function normalizeForexPair(rawPair) {
       ? ".X"
       : suffix;
 
-    if (compact.includes(symbol) || ocrFixed.includes(symbol)) {
+    if (ocrFixed.includes(symbol)) {
       return `${symbol}${suffixGuess}`;
     }
   }
