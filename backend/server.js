@@ -17,6 +17,22 @@ if (process.env.SENTRY_DSN) {
   });
 }
 
+// Register global handlers before any module imports so that synchronous throws
+// and unhandled rejections from requires (config, DB, etc.) are captured rather
+// than silently crashing the process. Use console here because the logger module
+// hasn't been loaded yet at this point.
+process.on("uncaughtException", (error) => {
+  console.error("[FATAL] Uncaught Exception — process will exit", error.message, error.stack);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  const stack = reason instanceof Error ? reason.stack : undefined;
+  console.error("[FATAL] Unhandled Rejection — process will exit", msg, stack);
+  process.exit(1);
+});
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -34,8 +50,24 @@ const { errorHandler } = require("./middleware/errorHandler");
 const { logger, stream } = require("./utils/logger");
 const { timeoutMiddleware } = require("./middleware/timeout");
 
+// Upgrade global error handlers now that the structured logger is available.
+process.removeAllListeners("uncaughtException");
+process.removeAllListeners("unhandledRejection");
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught Exception — process will exit", { error: error.message, stack: error.stack });
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled Rejection — process will exit", {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  process.exit(1);
+});
+
 const { connectRedis } = require("./config/redis");
-const { startWeeklyReportsCron } = require("./jobs/weeklyReportsCron");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
 const { startOcrWorker } = require("./workers/ocrWorker");
 
@@ -53,8 +85,8 @@ if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !==
   });
 }
 
-// Start scheduled cron jobs
-startWeeklyReportsCron();
+// Weekly reports are generated on-demand only (user clicks Generate Report).
+// The data-cleanup cron still runs on schedule.
 startDataCleanupCron();
 
 const app = express();
