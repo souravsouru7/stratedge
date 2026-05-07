@@ -14,6 +14,9 @@ import {
 
 const isInAppBrowser = () => {
   if (typeof window === "undefined") return false;
+  // Capacitor Android uses a native WebView whose UA contains "; wv)" — but it handles
+  // Google Sign-In natively via @capacitor-firebase/authentication, so it is never blocked.
+  if (window.Capacitor) return false;
   // iOS "Add to Home Screen" / PWA standalone runs in a browser-less WebView shell.
   // Google OAuth often blocks embedded agents there (disallowed_useragent).
   const isStandalone =
