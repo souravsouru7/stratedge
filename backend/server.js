@@ -68,7 +68,6 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const { connectRedis } = require("./config/redis");
-const { startWeeklyReportsCron } = require("./jobs/weeklyReportsCron");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
 const { startOcrWorker } = require("./workers/ocrWorker");
 
@@ -86,8 +85,8 @@ if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !==
   });
 }
 
-// Start scheduled cron jobs
-startWeeklyReportsCron();
+// Weekly reports are generated on-demand only (user clicks Generate Report).
+// The data-cleanup cron still runs on schedule.
 startDataCleanupCron();
 
 const app = express();
