@@ -69,6 +69,8 @@ process.on("unhandledRejection", (reason) => {
 
 const { connectRedis } = require("./config/redis");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
+const { startDailyPnlCron } = require("./jobs/dailyPnlCron");
+const { startStreakReminderCron } = require("./jobs/streakReminderCron");
 const { startOcrWorker } = require("./workers/ocrWorker");
 
 connectDB();
@@ -88,6 +90,8 @@ if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !==
 // Weekly reports are generated on-demand only (user clicks Generate Report).
 // The data-cleanup cron still runs on schedule.
 startDataCleanupCron();
+startDailyPnlCron();
+startStreakReminderCron();
 
 const app = express();
 
@@ -239,6 +243,9 @@ app.use("/api/feedback", require("./routes/feedbackRoutes"));
 
 // Payment routes
 app.use("/api/payments", require("./routes/paymentRoutes"));
+
+// Profile routes (FCM token registration)
+app.use("/api/profile", require("./routes/profileRoutes"));
 
 // Indian Market-specific routes (completely separate workspace)
 app.use("/api/indian/trades", require("./routes/indianMarketRoutes"));
