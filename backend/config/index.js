@@ -59,7 +59,7 @@ function normalizeMongoUri(value) {
 const appConfig = {
   env: process.env.NODE_ENV || "development",
   port: readNumber("PORT", 5000),
-  logLevel: process.env.LOG_LEVEL || "warn",
+  logLevel: process.env.LOG_LEVEL || "info",
   mongoUri: normalizeMongoUri(requireEnv("MONGO_URI")),
   mongoDnsServers: readList("MONGO_DNS_SERVERS"),
   jwt: {
