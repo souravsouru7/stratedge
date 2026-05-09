@@ -1,22 +1,33 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import apiClient from "./apiClient";
 
-/**
- * Register for push notifications on Android (Capacitor only).
- * Requests permission, gets the FCM token, and sends it to the backend.
- * Safe to call on web — exits early when not running in Capacitor.
- */
 export async function registerPushNotifications() {
-  if (typeof window === "undefined" || !window.Capacitor) return;
+  if (!Capacitor.isNativePlatform()) return;
 
   try {
+    // Create the notification channel before registering — Android 8+ silently
+    // drops notifications to channels that don't exist.
+    if (Capacitor.getPlatform() === "android") {
+      await PushNotifications.createChannel({
+        id: "stratedge_alerts",
+        name: "Trading Alerts",
+        description: "Daily P&L summaries and streak reminders",
+        importance: 5,
+        visibility: 1,
+        sound: "default",
+        vibration: true,
+        lights: true,
+      });
+    }
+
     const permResult = await PushNotifications.requestPermissions();
     if (permResult.receive !== "granted") return;
 
-    await PushNotifications.register();
-
+    // Attach listeners BEFORE calling register() to avoid missing the
+    // registration event that fires immediately after register() resolves.
     PushNotifications.addListener("registration", async (token) => {
       try {
         await apiClient.post("/api/profile/fcm-token", { token: token.value });
@@ -25,25 +36,19 @@ export async function registerPushNotifications() {
       }
     });
 
-    // Foreground notification display
     PushNotifications.addListener("pushNotificationReceived", (notification) => {
-      // Capacitor shows a system notification automatically when the app is in background.
-      // When foregrounded, we can optionally handle it here (e.g. show an in-app toast).
       console.info("[Push] Received in foreground:", notification.title);
     });
 
-    // Tap on notification — navigate to relevant screen
     PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
       const type = action.notification?.data?.type;
       if (type === "daily_pnl" || type === "streak_reminder") {
-        // Navigate to journal dashboard — use replaceState so Next.js picks it up
-        if (typeof window !== "undefined") {
-          window.location.href = "/dashboard";
-        }
+        window.location.href = "/dashboard";
       }
     });
+
+    await PushNotifications.register();
   } catch (err) {
-    // Never crash the app over push setup failure
     console.warn("[Push] Registration failed:", err?.message || err);
   }
 }
