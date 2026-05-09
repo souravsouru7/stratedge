@@ -255,6 +255,13 @@ app.get("/", (_req, res) => {
   res.send("Trading Journal API Running - Forex & Indian Markets");
 });
 
+// Temporary push debug endpoint — no auth required, logs every step the app reaches
+app.post("/api/push-debug", (req, res) => {
+  const { step, value } = req.body || {};
+  console.warn(`[PUSH-DEBUG] step=${step} value=${JSON.stringify(value)}`);
+  res.json({ ok: true });
+});
+
 // Fallback 404 for unknown routes
 app.use((_req, res) => {
   res.status(404).json({ message: "Endpoint not found" });

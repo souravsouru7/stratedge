@@ -3,11 +3,25 @@
 import { PushNotifications } from "@capacitor/push-notifications";
 import apiClient from "./apiClient";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.stratedge.live";
+
+async function dbg(step, value) {
+  try {
+    await fetch(`${API_BASE}/api/push-debug`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step, value }),
+    });
+  } catch { /* ignore */ }
+}
+
 export async function registerPushNotifications() {
+  await dbg("fn_called", { hasWindow: typeof window !== "undefined", hasCapacitor: typeof window !== "undefined" && !!window.Capacitor });
+
   if (typeof window === "undefined" || !window.Capacitor) return;
 
-  // Create channel in its own try/catch — a failure here must not
-  // prevent token registration from running.
+  await dbg("passed_capacitor_check", { platform: window.Capacitor.getPlatform?.() });
+
   if (window.Capacitor.getPlatform?.() === "android") {
     try {
       await PushNotifications.createChannel({
@@ -20,30 +34,30 @@ export async function registerPushNotifications() {
         vibration: true,
         lights: true,
       });
+      await dbg("channel_created", {});
     } catch (err) {
-      console.warn("[Push] createChannel failed:", err?.message || err);
+      await dbg("channel_error", { error: err?.message });
     }
   }
 
   try {
     const permResult = await PushNotifications.requestPermissions();
-    if (permResult.receive !== "granted") {
-      console.warn("[Push] Permission not granted:", permResult.receive);
-      return;
-    }
+    await dbg("permission_result", { receive: permResult.receive });
 
-    // Attach listeners BEFORE calling register() to avoid missing the
-    // registration event that fires immediately after register() resolves.
+    if (permResult.receive !== "granted") return;
+
     PushNotifications.addListener("registration", async (token) => {
+      await dbg("token_received", { tokenPreview: token.value?.slice(0, 20) });
       try {
         await apiClient.post("/api/profile/fcm-token", { token: token.value });
+        await dbg("token_saved", {});
       } catch (err) {
-        console.warn("[Push] Failed to save token to backend:", err?.message || err);
+        await dbg("token_save_error", { error: err?.message });
       }
     });
 
-    PushNotifications.addListener("registrationError", (err) => {
-      console.warn("[Push] Registration error from FCM:", JSON.stringify(err));
+    PushNotifications.addListener("registrationError", async (err) => {
+      await dbg("registration_error", { error: JSON.stringify(err) });
     });
 
     PushNotifications.addListener("pushNotificationReceived", (notification) => {
@@ -57,9 +71,11 @@ export async function registerPushNotifications() {
       }
     });
 
+    await dbg("calling_register", {});
     await PushNotifications.register();
+    await dbg("register_called", {});
   } catch (err) {
-    console.warn("[Push] Registration failed:", err?.message || err);
+    await dbg("fatal_error", { error: err?.message });
   }
 }
 
