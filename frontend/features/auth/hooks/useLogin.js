@@ -103,7 +103,7 @@ export function useLogin() {
 
   /** Shared post-auth redirect: if backend signals terms not yet accepted,
    *  store the token and go to /accept-terms; otherwise go straight to dashboard. */
-  const handleAuthSuccess = (data) => {
+  const handleAuthSuccess = async (data) => {
     if (!data.token) {
       triggerShake();
       alert(data.message || "Login failed");
@@ -111,8 +111,9 @@ export function useLogin() {
     }
     localStorage.setItem("token", data.token);
     queryClient.clear();
-    // Token is now in localStorage — safe to register FCM and save to backend
-    registerPushNotifications();
+    // Await so Capacitor finishes registering and saving the FCM token
+    // before navigation tears down the current context.
+    await registerPushNotifications();
     if (data.requiresTermsAcceptance) {
       router.push("/accept-terms");
     } else {
