@@ -3,24 +3,22 @@
 import { PushNotifications } from "@capacitor/push-notifications";
 import apiClient from "./apiClient";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.stratedge.live";
-
 async function dbg(step, value) {
+  console.info(`[Push] ${step}:`, value);
   try {
-    await fetch(`${API_BASE}/api/push-debug`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ step, value }),
-    });
-  } catch { /* ignore */ }
+    // Send to backend debug endpoint so we can see mobile steps in server logs
+    await apiClient.post("/api/push-debug", { step, value });
+  } catch {
+    // Ignore errors for debug logs
+  }
 }
 
 export async function registerPushNotifications() {
-  await dbg("fn_called", { hasWindow: typeof window !== "undefined", hasCapacitor: typeof window !== "undefined" && !!window.Capacitor });
+  await dbg("fn_called", { hasCapacitor: typeof window !== "undefined" && !!window.Capacitor });
 
   if (typeof window === "undefined" || !window.Capacitor) return;
 
-  await dbg("passed_capacitor_check", { platform: window.Capacitor.getPlatform?.() });
+  await dbg("passed_check", { platform: window.Capacitor.getPlatform?.() });
 
   if (window.Capacitor.getPlatform?.() === "android") {
     try {
@@ -34,30 +32,30 @@ export async function registerPushNotifications() {
         vibration: true,
         lights: true,
       });
-      await dbg("channel_created", {});
+      await dbg("channel_ok", {});
     } catch (err) {
-      await dbg("channel_error", { error: err?.message });
+      await dbg("channel_err", { error: err?.message });
     }
   }
 
   try {
     const permResult = await PushNotifications.requestPermissions();
-    await dbg("permission_result", { receive: permResult.receive });
+    await dbg("perm", { receive: permResult.receive });
 
     if (permResult.receive !== "granted") return;
 
     PushNotifications.addListener("registration", async (token) => {
-      await dbg("token_received", { tokenPreview: token.value?.slice(0, 20) });
+      await dbg("token", { preview: token.value?.slice(0, 20) });
       try {
         await apiClient.post("/api/profile/fcm-token", { token: token.value });
-        await dbg("token_saved", {});
+        await dbg("saved", {});
       } catch (err) {
-        await dbg("token_save_error", { error: err?.message });
+        await dbg("save_err", { error: err?.message });
       }
     });
 
     PushNotifications.addListener("registrationError", async (err) => {
-      await dbg("registration_error", { error: JSON.stringify(err) });
+      await dbg("reg_err", { error: JSON.stringify(err) });
     });
 
     PushNotifications.addListener("pushNotificationReceived", (notification) => {
@@ -71,11 +69,11 @@ export async function registerPushNotifications() {
       }
     });
 
-    await dbg("calling_register", {});
+    await dbg("registering", {});
     await PushNotifications.register();
-    await dbg("register_called", {});
+    await dbg("registered", {});
   } catch (err) {
-    await dbg("fatal_error", { error: err?.message });
+    await dbg("fatal", { error: err?.message });
   }
 }
 

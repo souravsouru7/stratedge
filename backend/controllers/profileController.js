@@ -17,11 +17,31 @@ exports.registerFcmToken = asyncHandler(async (req, res) => {
 
   const fcmToken = token.trim();
 
-  await User.findByIdAndUpdate(req.user._id, {
+  const user = await User.findByIdAndUpdate(req.user._id, {
     $addToSet: { fcmTokens: fcmToken },
-  });
+  }, { new: true });
 
-  logger.info("[FCM] Token registered", { userId: req.user._id });
+  logger.info("[FCM] Token registered", { userId: req.user._id, token: fcmToken.slice(0, 10) + "..." });
+
+  // If this is the user's first time registering a token and they haven't received a welcome notification yet, send it.
+  if (!user.welcomeNotificationSent) {
+    try {
+      const result = await sendPushToUser(req.user._id.toString(), {
+        title: "👋 Welcome to Stratedge!",
+        body: "Push notifications are now active. You'll receive daily P&L summaries and streak reminders.",
+        data: { type: "welcome" },
+      });
+
+      if (result.sent > 0) {
+        user.welcomeNotificationSent = true;
+        await user.save();
+        logger.info("[FCM] Welcome notification sent", { userId: req.user._id });
+      }
+    } catch (err) {
+      logger.error("[FCM] Failed to send welcome notification", { userId: req.user._id, error: err.message });
+    }
+  }
+
   res.json({ success: true });
 });
 
