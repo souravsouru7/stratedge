@@ -2,6 +2,7 @@ const User = require("../models/Users");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { sendPushToUser } = require("../utils/pushNotification");
+const { logger } = require("../utils/logger");
 
 /**
  * POST /api/profile/fcm-token
@@ -16,12 +17,20 @@ exports.registerFcmToken = asyncHandler(async (req, res) => {
 
   const fcmToken = token.trim();
 
-  // Upsert: add token only if not already present (avoid duplicates)
   await User.findByIdAndUpdate(req.user._id, {
     $addToSet: { fcmTokens: fcmToken },
   });
 
+  logger.info("[FCM] Token registered", { userId: req.user._id });
   res.json({ success: true });
+});
+
+exports.getPushStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select("fcmTokens").lean();
+  res.json({
+    tokenCount: user?.fcmTokens?.length || 0,
+    hasTokens: (user?.fcmTokens?.length || 0) > 0,
+  });
 });
 
 /**
