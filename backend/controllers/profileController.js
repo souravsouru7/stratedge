@@ -50,15 +50,42 @@ exports.removeFcmToken = asyncHandler(async (req, res) => {
 exports.sendTestNotification = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select("fcmTokens").lean();
 
+  // Step 1: check token exists in DB
   if (!user?.fcmTokens?.length) {
-    throw new ApiError(400, "No FCM token registered for this account. Open the app on your device and log in first.", "NO_FCM_TOKEN");
+    return res.status(400).json({
+      success: false,
+      step: "fcm_token_check",
+      error: "No FCM token in database for this account. The app did not save it after login — check that you are using the latest APK and logged in on the device.",
+    });
   }
 
+  // Step 2: check Firebase Admin is configured
+  let admin;
+  try {
+    const { getFirebaseAdmin } = require("../config/firebaseAdmin");
+    admin = getFirebaseAdmin();
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      step: "firebase_admin_init",
+      error: "Firebase Admin SDK not configured on server. Check that FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY env vars are set correctly.",
+      detail: err.message,
+    });
+  }
+
+  // Step 3: send and return full result
   const result = await sendPushToUser(req.user._id.toString(), {
     title: "👋 Welcome to Edgecipline!",
     body: "Push notifications are working. You'll get daily P&L summaries and streak reminders here.",
     data: { type: "test" },
   });
 
-  res.json({ success: true, sent: result.sent, failed: result.failed });
+  res.json({
+    success: result.sent > 0,
+    sent: result.sent,
+    failed: result.failed,
+    tokenCount: user.fcmTokens.length,
+    step: result.sent > 0 ? "done" : "fcm_send_failed",
+    error: result.sent === 0 ? "FCM rejected all tokens — they may be expired or invalid. Uninstall and reinstall the app, then log in again." : null,
+  });
 });
