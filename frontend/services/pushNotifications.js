@@ -7,10 +7,10 @@ import apiClient from "./apiClient";
 export async function registerPushNotifications() {
   if (!Capacitor.isNativePlatform()) return;
 
-  try {
-    // Create the notification channel before registering — Android 8+ silently
-    // drops notifications to channels that don't exist.
-    if (Capacitor.getPlatform() === "android") {
+  // Create channel in its own try/catch — a failure here must not
+  // prevent token registration from running.
+  if (Capacitor.getPlatform() === "android") {
+    try {
       await PushNotifications.createChannel({
         id: "stratedge_alerts",
         name: "Trading Alerts",
@@ -21,19 +21,30 @@ export async function registerPushNotifications() {
         vibration: true,
         lights: true,
       });
+    } catch (err) {
+      console.warn("[Push] createChannel failed:", err?.message || err);
     }
+  }
 
+  try {
     const permResult = await PushNotifications.requestPermissions();
-    if (permResult.receive !== "granted") return;
+    if (permResult.receive !== "granted") {
+      console.warn("[Push] Permission not granted:", permResult.receive);
+      return;
+    }
 
     // Attach listeners BEFORE calling register() to avoid missing the
     // registration event that fires immediately after register() resolves.
     PushNotifications.addListener("registration", async (token) => {
       try {
         await apiClient.post("/api/profile/fcm-token", { token: token.value });
-      } catch {
-        // Non-critical — token will be retried next app open
+      } catch (err) {
+        console.warn("[Push] Failed to save token to backend:", err?.message || err);
       }
+    });
+
+    PushNotifications.addListener("registrationError", (err) => {
+      console.warn("[Push] Registration error from FCM:", JSON.stringify(err));
     });
 
     PushNotifications.addListener("pushNotificationReceived", (notification) => {
