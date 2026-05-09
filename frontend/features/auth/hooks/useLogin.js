@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { loginUser, googleLogin } from "@/services/api";
+import { registerPushNotifications } from "@/services/pushNotifications";
 import {
   signInWithFirebaseGoogle,
   handleGoogleRedirectResult,
@@ -110,6 +111,8 @@ export function useLogin() {
     }
     localStorage.setItem("token", data.token);
     queryClient.clear();
+    // Token is now in localStorage — safe to register FCM and save to backend
+    registerPushNotifications();
     if (data.requiresTermsAcceptance) {
       router.push("/accept-terms");
     } else {

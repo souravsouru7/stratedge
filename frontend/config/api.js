@@ -19,8 +19,7 @@ function normalizeApiBaseUrl(value) {
   const hasScheme = raw.startsWith("http://") || raw.startsWith("https://");
   const isExplicitLocalhost = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleaned);
 
-  // If the env var is a bare host (no scheme), default to https for production safety.
-  // Mobile browsers will often block mixed content if the app is served over https.
+
   const normalized = hasScheme
     ? raw.replace(/\/+$/, "")
     : `${isExplicitLocalhost ? "http" : "https"}://${cleaned}`;
