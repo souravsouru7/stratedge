@@ -1,15 +1,14 @@
 "use client";
 
-import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import apiClient from "./apiClient";
 
 export async function registerPushNotifications() {
-  if (!Capacitor.isNativePlatform()) return;
+  if (typeof window === "undefined" || !window.Capacitor) return;
 
   // Create channel in its own try/catch — a failure here must not
   // prevent token registration from running.
-  if (Capacitor.getPlatform() === "android") {
+  if (window.Capacitor.getPlatform?.() === "android") {
     try {
       await PushNotifications.createChannel({
         id: "stratedge_alerts",
