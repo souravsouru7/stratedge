@@ -9,12 +9,11 @@ import { registerPushNotifications } from "@/services/pushNotifications";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Only register if already logged in — on first install the user hasn't
-    // authenticated yet so the token save would fail with 401. The login
-    // handler calls registerPushNotifications() after auth succeeds.
-    if (typeof window !== "undefined" && localStorage.getItem("token")) {
-      registerPushNotifications();
-    }
+    // Always attempt registration on app open — shows the permission dialog
+    // on first install and re-syncs the token on subsequent opens.
+    // If the user isn't logged in yet the token save will fail silently;
+    // handleAuthSuccess re-runs this after login to guarantee the save.
+    registerPushNotifications();
   }, []);
 
   // We Create the QueryClient inside the state to ensure it is only initialized once
