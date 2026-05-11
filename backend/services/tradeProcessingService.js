@@ -704,6 +704,9 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
           parsedTrades = mergeIndianAiTrades([], aiData?.trades || [], broker || aiData.broker || "");
         } else {
           parsedTrade = mergeGenericAiData({}, aiData);
+          parsedTrades = Array.isArray(aiData?.trades) && aiData.trades.length > 0
+            ? aiData.trades.map((t) => mergeGenericAiData({}, t))
+            : [];
         }
 
         logExtractedTrades({ tradeId, stage: "Gemini Vision extraction", parsedTrade, parsedTrades });

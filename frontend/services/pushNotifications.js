@@ -3,6 +3,9 @@
 import { PushNotifications } from "@capacitor/push-notifications";
 import apiClient from "./apiClient";
 
+const PUSH_PROMPT_KEY = "edgecpline_notifications_prompt_shown";
+let listenersInstalled = false;
+
 async function dbg(step, value) {
   console.info(`[Push] ${step}:`, value);
   try {
@@ -13,61 +16,120 @@ async function dbg(step, value) {
   }
 }
 
-export async function registerPushNotifications() {
-  await dbg("fn_called", { hasCapacitor: typeof window !== "undefined" && !!window.Capacitor });
+function isCapacitorApp() {
+  return typeof window !== "undefined" && !!window.Capacitor;
+}
 
-  if (typeof window === "undefined" || !window.Capacitor) return;
+function hasSeenNotificationPrompt() {
+  return typeof window !== "undefined" && localStorage.getItem(PUSH_PROMPT_KEY) === "true";
+}
+
+function markNotificationPromptSeen() {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(PUSH_PROMPT_KEY, "true");
+  }
+}
+
+function installPushListeners() {
+  if (listenersInstalled) return;
+
+  PushNotifications.addListener("registration", async (token) => {
+    await dbg("token", { preview: token.value?.slice(0, 20) });
+    try {
+      await apiClient.post("/api/profile/fcm-token", { token: token.value });
+      await dbg("saved", {});
+    } catch (err) {
+      await dbg("save_err", { error: err?.message });
+    }
+  });
+
+  PushNotifications.addListener("registrationError", async (err) => {
+    await dbg("reg_err", { error: JSON.stringify(err) });
+  });
+
+  PushNotifications.addListener("pushNotificationReceived", (notification) => {
+    console.info("[Push] Received in foreground:", notification.title);
+  });
+
+  PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+    const type = action.notification?.data?.type;
+    if (type === "daily_pnl" || type === "streak_reminder") {
+      window.location.href = "/dashboard";
+    }
+  });
+
+  listenersInstalled = true;
+}
+
+async function createAndroidChannel() {
+  try {
+    await PushNotifications.createChannel({
+      id: "stratedge_alerts",
+      name: "Trading Alerts",
+      description: "Daily P&L summaries and streak reminders",
+      importance: 5,
+      visibility: 1,
+      sound: "default",
+      vibration: true,
+      lights: true,
+    });
+    await dbg("channel_ok", {});
+  } catch (err) {
+    await dbg("channel_err", { error: err?.message });
+  }
+}
+
+export async function registerPushNotifications({ promptOnFirstLogin = false } = {}) {
+  await dbg("fn_called", { hasCapacitor: isCapacitorApp() });
+
+  if (!isCapacitorApp()) return;
 
   await dbg("passed_check", { platform: window.Capacitor.getPlatform?.() });
 
+  const currentPermissions = await PushNotifications.checkPermissions();
+  await dbg("current_permissions", currentPermissions);
+
+  if (currentPermissions.receive === "denied") {
+    await dbg("perm_denied", {});
+    return;
+  }
+
   if (window.Capacitor.getPlatform?.() === "android") {
-    try {
-      await PushNotifications.createChannel({
-        id: "stratedge_alerts",
-        name: "Trading Alerts",
-        description: "Daily P&L summaries and streak reminders",
-        importance: 5,
-        visibility: 1,
-        sound: "default",
-        vibration: true,
-        lights: true,
-      });
-      await dbg("channel_ok", {});
-    } catch (err) {
-      await dbg("channel_err", { error: err?.message });
+    await createAndroidChannel();
+  }
+
+  if (currentPermissions.receive === "prompt") {
+    if (!promptOnFirstLogin) {
+      // Skip the first-time native prompt on app open if the user is not yet authenticated.
+      return;
+    }
+
+    if (hasSeenNotificationPrompt()) {
+      await dbg("prompt_already_seen", {});
+      return;
+    }
+
+    markNotificationPromptSeen();
+    const allowNotifications = window.confirm(
+      "Edgecipline can send you trading alerts, daily P&L reminders, and streak notifications.\n\nPlease allow notifications so the app can keep you updated even when you are away."
+    );
+
+    if (!allowNotifications) {
+      await dbg("prompt_declined", {});
+      return;
     }
   }
+
+  installPushListeners();
 
   try {
     const permResult = await PushNotifications.requestPermissions();
     await dbg("perm", { receive: permResult.receive });
 
-    if (permResult.receive !== "granted") return;
-
-    PushNotifications.addListener("registration", async (token) => {
-      await dbg("token", { preview: token.value?.slice(0, 20) });
-      try {
-        await apiClient.post("/api/profile/fcm-token", { token: token.value });
-        await dbg("saved", {});
-      } catch (err) {
-        await dbg("save_err", { error: err?.message });
-      }
-    });
-
-    PushNotifications.addListener("registrationError", async (err) => {
-      await dbg("reg_err", { error: JSON.stringify(err) });
-    });
-
-    PushNotifications.addListener("pushNotificationReceived", (notification) => {
-      console.info("[Push] Received in foreground:", notification.title);
-    });
-
-    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-      const type = action.notification?.data?.type;
-      if (type === "daily_pnl" || type === "streak_reminder") {
-        window.location.href = "/dashboard";
-      }
-    });
+    if (permResult.receive !== "granted") {
+      await dbg("perm_not_granted", {});
+      return;
+    }
 
     await dbg("registering", {});
     await PushNotifications.register();
@@ -82,7 +144,7 @@ export async function registerPushNotifications() {
  * Call this after clearing the auth token.
  */
 export async function deregisterPushNotifications() {
-  if (typeof window === "undefined" || !window.Capacitor) return;
+  if (!isCapacitorApp()) return;
 
   try {
     const token = await PushNotifications.checkPermissions().then(() =>
