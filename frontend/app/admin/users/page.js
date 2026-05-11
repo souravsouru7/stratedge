@@ -119,7 +119,7 @@ export default function UserManagementPage() {
         sendToAll,
         userIds: sendToAll ? [] : selectedUserIds,
       });
-      setSuccess(`Notification sent to ${result.sent || 0} of ${result.targeted || 0} users`);
+      setSuccess(`Notification created for ${result.created || 0} users. Delivered to ${result.delivered || 0}. No device token: ${result.noDeviceToken || 0}.`);
       setCustomTitle("");
       setCustomBody("");
       setSendToAll(false);

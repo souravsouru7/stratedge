@@ -73,7 +73,7 @@ async function sendPushToUser(userId, notification) {
     .lean();
 
   if (!tokens.length) {
-    return { successCount: 0, failureCount: 0, invalidTokens: [] };
+    return { successCount: 0, failureCount: 0, invalidTokens: [], noTokens: true };
   }
 
   const admin = getFirebaseAdmin();
@@ -154,19 +154,21 @@ async function notifyUser(userId, payload) {
       ...payload,
       ...notification.toObject(),
     });
-    const status = delivery.failureCount > 0 && delivery.successCount > 0
+    const status = delivery.noTokens
+      ? "skipped"
+      : delivery.failureCount > 0 && delivery.successCount > 0
       ? "partial"
       : delivery.failureCount > 0 && delivery.successCount === 0
       ? "failed"
       : "sent";
 
-    await NotificationHistory.findByIdAndUpdate(notification._id, {
+    const updatedNotification = await NotificationHistory.findByIdAndUpdate(notification._id, {
       status,
       sentAt: delivery.successCount > 0 ? new Date() : null,
       delivery,
-    });
+    }, { returnDocument: "after" });
 
-    return notification;
+    return updatedNotification || notification;
   } catch (error) {
     logger.warn("Push delivery failed", {
       userId: userId?.toString?.(),

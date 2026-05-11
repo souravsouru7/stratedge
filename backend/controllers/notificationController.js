@@ -84,7 +84,13 @@ exports.sendCustomNotification = asyncHandler(async (req, res) => {
     )
   );
 
-  const sent = results.filter((item) => item.status === "fulfilled" && item.value).length;
+  const created = results.filter((item) => item.status === "fulfilled" && item.value).length;
+  const delivered = results.filter(
+    (item) => item.status === "fulfilled" && item.value?.delivery?.successCount > 0
+  ).length;
+  const noDeviceToken = results.filter(
+    (item) => item.status === "fulfilled" && item.value?.delivery?.noTokens
+  ).length;
   const skippedOrDuplicate = results.filter((item) => item.status === "fulfilled" && !item.value).length;
   const failed = results.filter((item) => item.status === "rejected").length;
 
@@ -92,7 +98,9 @@ exports.sendCustomNotification = asyncHandler(async (req, res) => {
     success: true,
     batchId,
     targeted: users.length,
-    sent,
+    created,
+    delivered,
+    noDeviceToken,
     skippedOrDuplicate,
     failed,
   });
