@@ -19,6 +19,7 @@ const NotificationHistorySchema = new mongoose.Schema(
         "mood_risk",
         "no_stop_loss",
         "weekly_ai_insight",
+        "weekly_report_reminder",
         "payment",
         "feedback",
         "system",

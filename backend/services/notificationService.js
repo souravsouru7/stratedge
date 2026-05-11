@@ -13,6 +13,7 @@ const SMART_TYPE_TO_PREF = {
   mood_risk: "moodRisk",
   no_stop_loss: "noStopLoss",
   weekly_ai_insight: "weeklyInsight",
+  weekly_report_reminder: "weeklyInsight",
 };
 
 const INVALID_TOKEN_CODES = new Set([
@@ -93,6 +94,8 @@ async function sendPushToUser(userId, notification) {
       priority: notification.priority === "high" ? "high" : "normal",
       notification: {
         channelId: notification.channelId || "smart_coach",
+        icon: "ic_stat_edgecipline",
+        color: "#0D9E6E",
         sound: "default",
         clickAction: "OPEN_APP",
       },

@@ -1,11 +1,19 @@
 const cron = require("node-cron");
 const { appConfig } = require("../config");
 const userRepository = require("../repositories/user.repository");
-const weeklyReportRepository = require("../repositories/weeklyReport.repository");
-const { generateRolling7dReportForUser } = require("../services/weeklyReport.service");
+const notificationService = require("../services/notificationService");
 const { logger } = require("../utils/logger");
 
 let isRunning = false;
+
+function getWeeklyReminderKey(date = new Date()) {
+  const start = new Date(date);
+  start.setUTCHours(0, 0, 0, 0);
+  const day = start.getUTCDay();
+  const diff = day === 0 ? 6 : day - 1;
+  start.setUTCDate(start.getUTCDate() - diff);
+  return start.toISOString().slice(0, 10);
+}
 
 async function runWeeklyReportsJob() {
   if (isRunning) return;
@@ -21,23 +29,26 @@ async function runWeeklyReportsJob() {
 
   try {
     const marketTypes = ["Forex", "Indian_Market"];
-    const cooldownMs = 7 * 24 * 60 * 60 * 1000;
+    const weekKey = getWeeklyReminderKey();
 
     for (const u of users) {
       for (const marketType of marketTypes) {
         try {
-          const since = new Date(Date.now() - cooldownMs);
-          const recentlyGenerated = await weeklyReportRepository.findRecentlyGeneratedWeeklyReport(
-            u._id,
-            marketType,
-            since
-          );
-
-          if (!recentlyGenerated) {
-            await generateRolling7dReportForUser({ userId: u._id, marketType });
-          }
+          await notificationService.notifyUser(u._id, {
+            type: "weekly_report_reminder",
+            title: "Weekly review is ready",
+            body: "Your weekly trading review is ready. Generate it when you want AI feedback.",
+            sourceType: "cron",
+            dedupeKey: `weekly-report-reminder:${u._id}:${marketType}:${weekKey}`,
+            deepLink: `/weekly-reports?marketType=${encodeURIComponent(marketType)}`,
+            data: {
+              screen: "weekly-report",
+              marketType,
+              action: "generate_on_demand",
+            },
+          });
         } catch (e) {
-          logger.error("[weeklyReportsCron] report generation failed for user", {
+          logger.error("[weeklyReportsCron] reminder notification failed for user", {
             userId: u._id?.toString?.(),
             marketType,
             error: e?.message,
@@ -46,7 +57,7 @@ async function runWeeklyReportsJob() {
       }
     }
 
-    logger.info(`[weeklyReportsCron] completed for ${users.length} users`);
+    logger.info(`[weeklyReportsCron] reminder job completed for ${users.length} users`);
   } finally {
     isRunning = false;
   }
@@ -59,7 +70,7 @@ function startWeeklyReportsCron() {
     return;
   }
 
-  // Daily run (server time). It only generates if last generation was >7 days ago.
+  // Reminder-only job. It does not generate AI reports; users generate them on demand.
   // You can override schedule with WEEKLY_REPORTS_CRON, e.g. "0 9 * * *"
   const schedule = appConfig.weeklyReports.schedule;
 
