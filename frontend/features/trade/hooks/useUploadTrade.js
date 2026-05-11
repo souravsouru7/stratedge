@@ -5,7 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMarket, MARKETS } from "@/context/MarketContext";
 import { uploadTradeImage } from "@/services/uploadApi";
-import { createTrade, getTradeStatus, updateTrade } from "@/services/tradeApi";
+import { createTrade, getTradeStatus, updateTrade, deleteTrade } from "@/services/tradeApi";
 import { useSetups } from "./useSetups";
 import { useToast } from "@/features/shared/components/ui/Toast";
 
@@ -544,14 +544,14 @@ export function useUploadTrade() {
       const rules = idx !== null ? (t.setupRules || []) : setupRules;
       const tradeData = buildTradePayload(t, isInd, rules);
 
-      const isMultiTrade = trades.length > 0;
+      // >1 means genuinely multi-trade; ==1 means user deleted down to a single trade
+      // and the ghost should be updated in-place rather than a new doc created.
+      const isMultiTrade = trades.length > 1;
 
       if (!forceCreate && !isMultiTrade && idx === null && uploadedTradeId) {
-        // Single-trade: update the ghost trade in-place (backend kept it)
         return updateTrade(uploadedTradeId, tradeData, marketType);
       }
 
-      // Multi-trade: backend already deleted the ghost — just create fresh trades
       return createTrade(tradeData, marketType);
     },
     onSuccess: (res, variables) => {
@@ -658,6 +658,15 @@ export function useUploadTrade() {
       saveTradeMutation.mutate({ idx });
     },
     saveAllTrades: async () => {
+      // Delete the ghost trade first so it never appears in the journal,
+      // regardless of which individual trades the user chose to keep.
+      if (uploadedTradeId) {
+        try {
+          await deleteTrade(uploadedTradeId, marketType);
+        } catch (_) {
+          // Ghost may already be gone — not a blocking error
+        }
+      }
       for (let i = 0; i < trades.length; i++) {
         if (!savedTrades[i] && canSaveTrade(trades[i])) {
           try {
