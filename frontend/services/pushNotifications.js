@@ -62,6 +62,21 @@ export async function initializePushNotifications() {
     return;
   }
 
+  try {
+    await PushNotifications.createChannel({
+      id: "edgecipline",
+      name: "Edgecipline",
+      description: "Trading discipline, psychology, and admin notifications",
+      importance: 5,
+      visibility: 1,
+      sound: "default",
+      lights: true,
+      vibration: true,
+    });
+  } catch (error) {
+    console.warn("Notification channel setup skipped", error);
+  }
+
   PushNotifications.addListener("registration", async ({ value }) => {
     try {
       await registerDeviceToken({
