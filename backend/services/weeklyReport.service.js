@@ -4,6 +4,7 @@ const { generateWeeklyFeedback } = require("./geminiService");
 const tradeRepository = require("../repositories/trade.repository");
 const indianTradeRepository = require("../repositories/indianTrade.repository");
 const weeklyReportRepository = require("../repositories/weeklyReport.repository");
+const { notifyWeeklyInsight } = require("./smartNotificationEvaluator");
 
 function getLocalShiftMs() {
   const offsetHours = appConfig.timezoneOffsetHours;
@@ -373,10 +374,12 @@ async function generateRolling7dReportForUser({ userId, marketType }) {
   }
 
   const { model, feedback } = await generateWeeklyFeedback({ snapshot, weekLabel });
-  return weeklyReportRepository.updateWeeklyReportById(report._id, {
+  const updatedReport = await weeklyReportRepository.updateWeeklyReportById(report._id, {
     aiFeedback: feedback,
     aiModel: model,
   });
+  await notifyWeeklyInsight({ userId, report: updatedReport, marketType });
+  return updatedReport;
 }
 
 async function generateNowOnce(userId, marketType = "Forex") {

@@ -6,7 +6,8 @@ import {
   getAllAdminUsers, 
   deleteAdminUser, 
   toggleAdminUserStatus, 
-  extendAdminUserPlan 
+  extendAdminUserPlan,
+  sendAdminCustomNotification
 } from "@/services/adminApi";
 
 import AdminHeader from "@/components/AdminHeader";
@@ -23,6 +24,12 @@ export default function UserManagementPage() {
   const [mounted, setMounted] = useState(false);
   const [extendingId, setExtendingId] = useState(null);
   const [extensionDays, setExtensionDays] = useState(30);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [sendToAll, setSendToAll] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customBody, setCustomBody] = useState("");
+  const [customDeepLink, setCustomDeepLink] = useState("/notifications");
+  const [sendingNotification, setSendingNotification] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -77,6 +84,53 @@ export default function UserManagementPage() {
     }
   };
 
+  const toggleSelectedUser = (id) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (selectedUserIds.length === users.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(users.map((user) => user._id));
+    }
+  };
+
+  const handleSendCustomNotification = async () => {
+    setError("");
+    setSuccess("");
+    if (!customTitle.trim() || !customBody.trim()) {
+      setError("Notification title and message are required");
+      return;
+    }
+    if (!sendToAll && selectedUserIds.length === 0) {
+      setError("Select at least one user or enable send to all");
+      return;
+    }
+
+    try {
+      setSendingNotification(true);
+      const result = await sendAdminCustomNotification({
+        title: customTitle,
+        body: customBody,
+        deepLink: customDeepLink || "/notifications",
+        sendToAll,
+        userIds: sendToAll ? [] : selectedUserIds,
+      });
+      setSuccess(`Notification sent to ${result.sent || 0} of ${result.targeted || 0} users`);
+      setCustomTitle("");
+      setCustomBody("");
+      setSendToAll(false);
+      setSelectedUserIds([]);
+    } catch (err) {
+      setError(err.message || "Failed to send notification");
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "active": return "#0D9E6E";
@@ -114,17 +168,95 @@ export default function UserManagementPage() {
 
         <div style={{
           background: "white", borderRadius: 16, border: "1px solid #E2E8F0",
+          boxShadow: "0 1px 6px rgba(0,0,0,0.05)", padding: 24, marginBottom: 24
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 18 }}>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0F1923", margin: 0 }}>Custom User Notification</h2>
+              <p style={{ margin: "6px 0 0", color: "#64748B", fontSize: 13 }}>
+                Send a push and in-app notification to selected users or every user.
+              </p>
+            </div>
+            <div style={{ color: "#94A3B8", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}>
+              {sendToAll ? "ALL USERS" : `${selectedUserIds.length} SELECTED`}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <input
+              value={customTitle}
+              onChange={(e) => setCustomTitle(e.target.value)}
+              placeholder="Notification title"
+              maxLength={120}
+              style={{ padding: "12px", border: "1px solid #CBD5E1", borderRadius: 8, fontSize: 13 }}
+            />
+            <input
+              value={customDeepLink}
+              onChange={(e) => setCustomDeepLink(e.target.value)}
+              placeholder="/notifications"
+              style={{ padding: "12px", border: "1px solid #CBD5E1", borderRadius: 8, fontSize: 13 }}
+            />
+          </div>
+
+          <textarea
+            value={customBody}
+            onChange={(e) => setCustomBody(e.target.value)}
+            placeholder="Write the message users should receive"
+            maxLength={500}
+            rows={3}
+            style={{ width: "100%", padding: "12px", border: "1px solid #CBD5E1", borderRadius: 8, fontSize: 13, resize: "vertical", marginBottom: 14 }}
+          />
+
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#334155", fontSize: 13, fontWeight: 700 }}>
+              <input
+                type="checkbox"
+                checked={sendToAll}
+                onChange={(e) => setSendToAll(e.target.checked)}
+              />
+              Send to every user
+            </label>
+            <button
+              onClick={handleSendCustomNotification}
+              disabled={sendingNotification}
+              style={{
+                background: sendingNotification ? "#94A3B8" : "#0F1923",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                padding: "11px 16px",
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: sendingNotification ? "not-allowed" : "pointer"
+              }}
+            >
+              {sendingNotification ? "SENDING..." : "SEND NOTIFICATION"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{
+          background: "white", borderRadius: 16, border: "1px solid #E2E8F0",
           boxShadow: "0 1px 6px rgba(0,0,0,0.05)", overflow: "hidden"
         }}>
           <div style={{ padding: "24px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0F1923", margin: 0 }}>Registered Users</h2>
-            <div style={{ color: "#94A3B8", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}>{users.length} TOTAL USERS</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button
+                onClick={toggleSelectAllVisible}
+                style={{ border: "1px solid #CBD5E1", background: "white", borderRadius: 8, padding: "8px 10px", fontSize: 11, fontWeight: 800, cursor: "pointer", color: "#334155" }}
+              >
+                {selectedUserIds.length === users.length && users.length > 0 ? "CLEAR SELECTION" : "SELECT ALL"}
+              </button>
+              <div style={{ color: "#94A3B8", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}>{users.length} TOTAL USERS</div>
+            </div>
           </div>
 
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #F1F5F9", background: "#F8FAFC" }}>
+                  <th style={{ padding: "16px 12px 16px 24px", fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em" }} />
                   <th style={{ padding: "16px 24px", fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em" }}>USER</th>
                   <th style={{ padding: "16px 24px", fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em" }}>PLAN STATUS</th>
                   <th style={{ padding: "16px 24px", fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.05em" }}>SIGNUP DATE</th>
@@ -136,15 +268,24 @@ export default function UserManagementPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="6" style={{ padding: "40px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading users...</td>
+                    <td colSpan="7" style={{ padding: "40px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading users...</td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ padding: "40px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>No users found.</td>
+                    <td colSpan="7" style={{ padding: "40px", textAlign: "center", color: "#94A3B8", fontSize: 13 }}>No users found.</td>
                   </tr>
                 ) : (
                   users.map((user) => (
                     <tr key={user._id} style={{ borderBottom: "1px solid #F1F5F9", fontSize: 13, transition: "background 0.2s" }} onMouseEnter={e => e.currentTarget.style.background = "#FBFBFA"} onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                      <td style={{ padding: "16px 12px 16px 24px" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(user._id)}
+                          onChange={() => toggleSelectedUser(user._id)}
+                          disabled={sendToAll}
+                          title="Select user for custom notification"
+                        />
+                      </td>
                       <td style={{ padding: "16px 24px" }}>
                         <div style={{ fontWeight: 700, color: "#0F1923" }}>{user.name}</div>
                         <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono',monospace" }}>{user.email}</div>

@@ -224,6 +224,7 @@ app.use("/api/checklists", require("./routes/checklistRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use("/api/reports", require("./routes/weeklyReportRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
 
 // Admin routes (completely separate workspace)
 app.use("/api/admin/auth", require("./admin/routes/adminAuthRoutes"));

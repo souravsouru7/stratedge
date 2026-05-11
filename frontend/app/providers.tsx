@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MarketProvider } from "@/context/MarketContext";
 import { ToastProvider } from "@/features/shared/components/ui/Toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import PushNotificationBootstrap from "@/components/PushNotificationBootstrap";
 export default function Providers({ children }: { children: React.ReactNode }) {
   // We Create the QueryClient inside the state to ensure it is only initialized once
   const [queryClient] = useState(
@@ -25,6 +26,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <MarketProvider>
           <ToastProvider>
+            <PushNotificationBootstrap />
             {children}
           </ToastProvider>
         </MarketProvider>
