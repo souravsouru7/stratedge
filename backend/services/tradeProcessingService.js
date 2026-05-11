@@ -25,6 +25,7 @@ const {
 } = require("./extractionQualityService");
 const { logger } = require("../utils/logger");
 const { appConfig } = require("../config");
+const { evaluateSmartNotifications } = require("./smartNotificationEvaluator");
 
 const PROCESSING_TIMEOUT_MS = appConfig.timeouts.processingTimeoutMs;
 const CONFIDENCE_ZONES = {
@@ -1002,7 +1003,15 @@ async function processTradeUpload({ tradeId, imageUrl, imagePath, jobId, attempt
         validationFailures: finalValidation.failures,
       });
       update.tradeSubType = marketType === "Indian_Market" ? tradeSubType : trade.tradeSubType || "";
-      await Trade.findByIdAndUpdate(tradeId, update, { returnDocument: "after", runValidators: true });
+      const updatedTrade = await Trade.findByIdAndUpdate(tradeId, update, { returnDocument: "after", runValidators: true });
+      if (updatedTrade) {
+        await evaluateSmartNotifications({
+          userId: updatedTrade.user,
+          trade: updatedTrade,
+          marketType: updatedTrade.marketType || marketType,
+          collection: "forex",
+        });
+      }
     }
 
     await logExtraction({ trade, extractedText: cleanedText, parsedTrade, parsedTrades, aiUsed: !!aiData });
