@@ -111,9 +111,9 @@ export function useLogin() {
     }
     localStorage.setItem("token", data.token);
     queryClient.clear();
-    // Await so Capacitor finishes registering and saving the FCM token
-    // before navigation tears down the current context.
-    await registerPushNotifications();
+    // Show the first-login notification prompt before navigation so the native
+    // request permission dialog can appear while the app is still active.
+    await registerPushNotifications({ promptOnFirstLogin: true });
     if (data.requiresTermsAcceptance) {
       router.push("/accept-terms");
     } else {

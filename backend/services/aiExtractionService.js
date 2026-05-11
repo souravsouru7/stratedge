@@ -21,7 +21,13 @@ FIELD EXTRACTION RULES:
 
 NUMBER FORMAT: Return raw numbers only. Remove currency symbols ($, €, £). Profit is negative if the trade is a loss.
 
-JSON: {"pair":"EURUSD","type":"BUY","quantity":0.01,"entryPrice":1.08500,"exitPrice":1.09000,"profit":50.00,"stopLoss":1.08000,"takeProfit":1.09500,"broker":"MetaTrader 5"}`;
+MULTI-TRADE: If MULTIPLE trade rows are visible on screen, extract ALL of them into a "trades" array. Set top-level fields to the first trade. EVERY VISIBLE ROW = ONE SEPARATE TRADE — do not skip any row.
+
+SINGLE TRADE EXAMPLE:
+JSON: {"pair":"EURUSD","type":"BUY","quantity":0.01,"entryPrice":1.08500,"exitPrice":1.09000,"profit":50.00,"stopLoss":1.08000,"takeProfit":1.09500,"broker":"MetaTrader 5"}
+
+MULTI-TRADE EXAMPLE (2 rows visible):
+JSON: {"pair":"GBPUSD","type":"BUY","quantity":0.90,"entryPrice":1.35949,"exitPrice":1.35897,"profit":-46.80,"stopLoss":1.35898,"takeProfit":1.36288,"broker":"MetaTrader 5","trades":[{"pair":"GBPUSD","type":"BUY","quantity":0.90,"entryPrice":1.35949,"exitPrice":1.35897,"profit":-46.80,"stopLoss":1.35898,"takeProfit":1.36288},{"pair":"GBPUSD","type":"SELL","quantity":0.30,"entryPrice":1.35861,"exitPrice":1.35955,"profit":-28.20,"stopLoss":1.35950,"takeProfit":1.35677}]}`;
 
 const INDIAN_VISION_PROMPT = `You are a trading data extraction specialist analyzing an Indian broker screenshot (Zerodha, Upstox, Angel One, Groww, Dhan, Fyers, 5paisa, ICICI Direct, Kotak Neo, Paytm Money, Motilal Oswal, Sharekhan).
 Return ONLY a single valid JSON object. No markdown, no explanation, no extra text.
@@ -185,21 +191,23 @@ async function extractTradeWithGeminiVision(imageUrl, options = {}) {
       return { ...main, trades, rawResponse: rawText };
     }
 
-    return {
-      pair: parsed.pair ?? null,
-      type: parsed.type === "BUY" || parsed.type === "SELL" ? parsed.type : null,
-      quantity: toNumberOrNull(parsed.quantity),
-      entryPrice: toNumberOrNull(parsed.entryPrice),
-      exitPrice: toNumberOrNull(parsed.exitPrice),
-      profit: toNumberOrNull(parsed.profit),
-      stopLoss: toNumberOrNull(parsed.stopLoss),
-      takeProfit: toNumberOrNull(parsed.takeProfit),
-      broker: parsed.broker ?? null,
-      strikePrice: toNumberOrNull(parsed.strikePrice),
-      optionType: parsed.optionType === "PE" || parsed.optionType === "CE" ? parsed.optionType : null,
-      underlying: parsed.underlying ?? null,
-      rawResponse: rawText,
-    };
+    const mapOneForex = (item) => ({
+      pair: item.pair ?? null,
+      type: item.type === "BUY" || item.type === "SELL" ? item.type : null,
+      quantity: toNumberOrNull(item.quantity),
+      entryPrice: toNumberOrNull(item.entryPrice),
+      exitPrice: toNumberOrNull(item.exitPrice),
+      profit: toNumberOrNull(item.profit),
+      stopLoss: toNumberOrNull(item.stopLoss),
+      takeProfit: toNumberOrNull(item.takeProfit),
+      broker: item.broker ?? null,
+      strikePrice: toNumberOrNull(item.strikePrice),
+      optionType: item.optionType === "PE" || item.optionType === "CE" ? item.optionType : null,
+      underlying: item.underlying ?? null,
+    });
+    const mainForex = mapOneForex(parsed);
+    const forexTrades = Array.isArray(parsed.trades) ? parsed.trades.map(mapOneForex) : [];
+    return { ...mainForex, trades: forexTrades, rawResponse: rawText };
   } catch (err) {
     logger.warn("Gemini Vision extraction failed", { error: err.message, imageUrl });
     return null;
