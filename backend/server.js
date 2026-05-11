@@ -69,8 +69,6 @@ process.on("unhandledRejection", (reason) => {
 
 const { connectRedis } = require("./config/redis");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
-const { startDailyPnlCron } = require("./jobs/dailyPnlCron");
-const { startStreakReminderCron } = require("./jobs/streakReminderCron");
 const { startOcrWorker } = require("./workers/ocrWorker");
 
 connectDB();
@@ -90,8 +88,6 @@ if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !==
 // Weekly reports are generated on-demand only (user clicks Generate Report).
 // The data-cleanup cron still runs on schedule.
 startDataCleanupCron();
-startDailyPnlCron();
-startStreakReminderCron();
 
 const app = express();
 
@@ -255,12 +251,6 @@ app.get("/", (_req, res) => {
   res.send("Trading Journal API Running - Forex & Indian Markets");
 });
 
-// Temporary push debug endpoint — no auth required, logs every step the app reaches
-app.post("/api/push-debug", (req, res) => {
-  const { step, value } = req.body || {};
-  console.warn(`[PUSH-DEBUG] step=${step} value=${JSON.stringify(value)}`);
-  res.json({ ok: true });
-});
 
 // Fallback 404 for unknown routes
 app.use((_req, res) => {
