@@ -11,6 +11,7 @@ import {
   hasRedirectPending,
   clearRedirectPending,
 } from "@/services/firebaseAuth";
+import { initializePushNotifications } from "@/services/pushNotifications";
 
 const isInAppBrowser = () => {
   if (typeof window === "undefined") return false;
@@ -109,6 +110,9 @@ export function useLogin() {
       return;
     }
     localStorage.setItem("token", data.token);
+    initializePushNotifications().catch((error) => {
+      console.error("Push notification setup failed after login", error);
+    });
     queryClient.clear();
     if (data.requiresTermsAcceptance) {
       router.push("/accept-terms");
