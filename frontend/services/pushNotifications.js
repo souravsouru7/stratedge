@@ -10,11 +10,9 @@ function isNativeCapacitorRuntime() {
 }
 
 // ─── Deep-link router ─────────────────────────────────────────────────────────
-function routeFromNotification(data = {}) {
-  if (data.deepLink) {
-    window.location.href = data.deepLink;
-    return;
-  }
+export function getNotificationTarget(data = {}) {
+  if (data.deepLink) return data.deepLink;
+
   const routes = {
     "trade":             `/trades/view?id=${data.tradeId || ""}`,
     "trade-edit":        `/trades/edit?id=${data.tradeId || ""}`,
@@ -27,7 +25,14 @@ function routeFromNotification(data = {}) {
     "psychology":        "/checklist/psychology",
     "notifications":     "/notifications",
   };
-  window.location.href = routes[data.screen] || "/dashboard";
+  return routes[data.screen] || "/dashboard";
+}
+
+function routeFromNotification(data = {}) {
+  const target = getNotificationTarget(data);
+  window.dispatchEvent(
+    new CustomEvent("edgecipline:notification-route", { detail: { target } })
+  );
 }
 
 // ─── 5 premium notification channels ─────────────────────────────────────────

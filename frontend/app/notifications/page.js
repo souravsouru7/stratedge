@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell, CheckCheck, Loader2,
   Sunrise, AlertTriangle, TrendingUp,
@@ -291,6 +292,7 @@ function NotificationCard({ n, onRead }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -313,7 +315,7 @@ export default function NotificationsPage() {
         prev.map((item) => (item._id === n._id ? { ...item, isRead: true } : item))
       );
     }
-    if (n.deepLink) window.location.href = n.deepLink;
+    if (n.deepLink) router.push(n.deepLink);
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
