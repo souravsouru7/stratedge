@@ -5,15 +5,45 @@ const NotificationPreference = require("../models/NotificationPreference");
 const { getFirebaseAdmin } = require("../config/firebaseAdmin");
 const { logger } = require("../utils/logger");
 
+// ─── Channel map ──────────────────────────────────────────────────────────────
+// Each type maps to one of 5 premium channels defined in the Android app.
+// Channel IDs must match exactly what is created in pushNotifications.js.
+const TYPE_CHANNEL = {
+  revenge_trading:        "edgecipline_risk",
+  overtrading:            "edgecipline_risk",
+  no_stop_loss:           "edgecipline_risk",
+  daily_loss_warning:     "edgecipline_risk",
+  setup_discipline:       "edgecipline_discipline",
+  mood_risk:              "edgecipline_discipline",
+  repeated_mistake:       "edgecipline_insights",
+  weekly_ai_insight:      "edgecipline_insights",
+  weekly_report_reminder: "edgecipline_insights",
+  confidence_reminder:    "edgecipline_coaching",
+  session_reminder:       "edgecipline_session",
+};
+
+// Per-channel accent colours (hex) shown in the notification LED + icon tint
+const CHANNEL_COLOR = {
+  edgecipline_risk:       "#E53935", // bold red  — danger / urgency
+  edgecipline_discipline: "#F59E0B", // amber     — caution / awareness
+  edgecipline_insights:   "#0D9E6E", // green     — growth / positive
+  edgecipline_coaching:   "#3B82F6", // blue      — calm / wisdom
+  edgecipline_session:    "#8B5CF6", // purple    — focus / preparation
+};
+
+// ─── Preference gate ──────────────────────────────────────────────────────────
 const SMART_TYPE_TO_PREF = {
-  revenge_trading: "revengeTrading",
-  overtrading: "overtrading",
-  setup_discipline: "setupDiscipline",
-  repeated_mistake: "repeatedMistakes",
-  mood_risk: "moodRisk",
-  no_stop_loss: "noStopLoss",
-  weekly_ai_insight: "weeklyInsight",
+  revenge_trading:        "revengeTrading",
+  overtrading:            "overtrading",
+  setup_discipline:       "setupDiscipline",
+  repeated_mistake:       "repeatedMistakes",
+  mood_risk:              "moodRisk",
+  no_stop_loss:           "noStopLoss",
+  daily_loss_warning:     "noStopLoss",
+  weekly_ai_insight:      "weeklyInsight",
   weekly_report_reminder: "weeklyInsight",
+  confidence_reminder:    "smartCoach",
+  session_reminder:       "smartCoach",
 };
 
 const INVALID_TOKEN_CODES = new Set([
@@ -21,6 +51,7 @@ const INVALID_TOKEN_CODES = new Set([
   "messaging/invalid-registration-token",
 ]);
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function stringifyData(data = {}) {
   return Object.entries(data || {}).reduce((acc, [key, value]) => {
     if (value === undefined || value === null) return acc;
@@ -56,20 +87,38 @@ async function disableInvalidTokens(invalidTokens = []) {
   if (!invalidTokens.length) return;
   await DeviceToken.updateMany(
     { token: { $in: invalidTokens } },
-    {
-      enabled: false,
-      revokedAt: new Date(),
-      $inc: { failureCount: 1 },
-    }
+    { enabled: false, revokedAt: new Date(), $inc: { failureCount: 1 } }
   );
 }
 
+// ─── Rich FCM payload builder ─────────────────────────────────────────────────
+function buildAndroidConfig(notification) {
+  const channelId = TYPE_CHANNEL[notification.type] || "edgecipline_insights";
+  const color     = CHANNEL_COLOR[channelId] || "#0D9E6E";
+  const isUrgent  = channelId === "edgecipline_risk";
+
+  return {
+    priority: isUrgent ? "high" : "normal",
+    ttl: isUrgent ? 3600 * 1000 : 86400 * 1000, // 1h for urgent, 24h otherwise
+    notification: {
+      channelId,
+      icon:        "ic_stat_edgecipline",   // white monochrome icon in res/drawable
+      color,
+      sound:       "default",
+      clickAction: "OPEN_APP",
+      // BigText style — expands in the tray to show the full body
+      body:        notification.body,
+      // Tag deduplication: same tag replaces the previous notification of that type
+      tag:         `edgecipline_${notification.type}`,
+      // Visibility: show on lock screen for urgent alerts, private otherwise
+      visibility:  isUrgent ? "public" : "private",
+    },
+  };
+}
+
+// ─── Core push sender ─────────────────────────────────────────────────────────
 async function sendPushToUser(userId, notification) {
-  const tokens = await DeviceToken.find({
-    user: userId,
-    enabled: true,
-    revokedAt: null,
-  })
+  const tokens = await DeviceToken.find({ user: userId, enabled: true, revokedAt: null })
     .select("token")
     .lean();
 
@@ -78,34 +127,27 @@ async function sendPushToUser(userId, notification) {
   }
 
   const admin = getFirebaseAdmin();
-  const response = await admin.messaging().sendEachForMulticast({
-    tokens: tokens.map((item) => item.token),
+
+  const message = {
+    tokens: tokens.map((t) => t.token),
     notification: {
       title: notification.title,
-      body: notification.body,
+      body:  notification.body,
     },
     data: stringifyData({
-      type: notification.type,
-      deepLink: notification.deepLink,
-      notificationId: notification._id?.toString?.(),
+      type:           notification.type,
+      deepLink:       notification.deepLink || "",
+      notificationId: notification._id?.toString?.() || "",
       ...(notification.data || {}),
     }),
-    android: {
-      priority: notification.priority === "high" ? "high" : "normal",
-      notification: {
-        channelId: notification.channelId || "smart_coach",
-        icon: "ic_stat_edgecipline",
-        color: "#0D9E6E",
-        sound: "default",
-        clickAction: "OPEN_APP",
-      },
-    },
-  });
+    android: buildAndroidConfig(notification),
+  };
+
+  const response = await admin.messaging().sendEachForMulticast(message);
 
   const invalidTokens = [];
   response.responses.forEach((result, index) => {
-    const code = result.error?.code;
-    if (code && INVALID_TOKEN_CODES.has(code)) {
+    if (result.error && INVALID_TOKEN_CODES.has(result.error.code)) {
       invalidTokens.push(tokens[index].token);
     }
   });
@@ -119,31 +161,28 @@ async function sendPushToUser(userId, notification) {
   };
 }
 
+// ─── Public notifyUser ────────────────────────────────────────────────────────
 async function notifyUser(userId, payload) {
   const prefs = await getAllowedPreferences(userId, payload.type);
-  if (!prefs) {
-    return null;
-  }
+  if (!prefs) return null;
 
   const dedupeKey = payload.dedupeKey || `${payload.type}:${userId}:${payload.sourceId || Date.now()}`;
   let notification;
 
   try {
     notification = await NotificationHistory.create({
-      user: userId,
-      type: payload.type,
-      title: payload.title,
-      body: payload.body,
-      data: payload.data || {},
-      deepLink: payload.deepLink || payload.data?.deepLink || "",
+      user:       userId,
+      type:       payload.type,
+      title:      payload.title,
+      body:       payload.body,
+      data:       payload.data || {},
+      deepLink:   payload.deepLink || payload.data?.deepLink || "",
       sourceType: payload.sourceType || "system",
-      sourceId: mongoose.Types.ObjectId.isValid(payload.sourceId) ? payload.sourceId : null,
+      sourceId:   mongoose.Types.ObjectId.isValid(payload.sourceId) ? payload.sourceId : null,
       dedupeKey,
     });
   } catch (error) {
-    if (error?.code === 11000) {
-      return null;
-    }
+    if (error?.code === 11000) return null; // duplicate — already sent
     throw error;
   }
 
@@ -153,47 +192,37 @@ async function notifyUser(userId, payload) {
   }
 
   try {
-    const delivery = await sendPushToUser(userId, {
-      ...payload,
-      ...notification.toObject(),
-    });
-    const status = delivery.noTokens
-      ? "skipped"
-      : delivery.failureCount > 0 && delivery.successCount > 0
-      ? "partial"
-      : delivery.failureCount > 0 && delivery.successCount === 0
-      ? "failed"
+    const delivery = await sendPushToUser(userId, { ...payload, ...notification.toObject() });
+
+    const status = delivery.noTokens          ? "skipped"
+      : delivery.successCount > 0 && delivery.failureCount > 0 ? "partial"
+      : delivery.failureCount > 0             ? "failed"
       : "sent";
 
-    const updatedNotification = await NotificationHistory.findByIdAndUpdate(notification._id, {
-      status,
-      sentAt: delivery.successCount > 0 ? new Date() : null,
-      delivery,
-    }, { returnDocument: "after" });
+    return await NotificationHistory.findByIdAndUpdate(
+      notification._id,
+      { status, sentAt: delivery.successCount > 0 ? new Date() : null, delivery },
+      { returnDocument: "after" }
+    ) || notification;
 
-    return updatedNotification || notification;
   } catch (error) {
     logger.warn("Push delivery failed", {
       userId: userId?.toString?.(),
-      type: payload.type,
-      error: error.message,
-      code: error.code,
+      type:   payload.type,
+      error:  error.message,
+      code:   error.code,
     });
 
     await NotificationHistory.findByIdAndUpdate(notification._id, {
-      status: "failed",
-      delivery: {
-        successCount: 0,
-        failureCount: 1,
-        invalidTokens: [],
-        error: error.message,
-      },
+      status:   "failed",
+      delivery: { successCount: 0, failureCount: 1, invalidTokens: [], error: error.message },
     });
 
     return notification;
   }
 }
 
+// ─── Query helpers ────────────────────────────────────────────────────────────
 async function listUserNotifications(userId, { limit = 50, unreadOnly = false } = {}) {
   const query = { user: userId };
   if (unreadOnly) query.isRead = false;
