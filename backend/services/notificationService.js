@@ -20,6 +20,7 @@ const TYPE_CHANNEL = {
   weekly_report_reminder: "edgecipline_insights",
   confidence_reminder:    "edgecipline_coaching",
   session_reminder:       "edgecipline_session",
+  morning_mentor:         "edgecipline_coaching",
 };
 
 // Per-channel accent colours (hex) shown in the notification LED + icon tint
@@ -44,6 +45,7 @@ const SMART_TYPE_TO_PREF = {
   weekly_report_reminder: "weeklyInsight",
   confidence_reminder:    "smartCoach",
   session_reminder:       "smartCoach",
+  morning_mentor:         "morningMentor",
 };
 
 const INVALID_TOKEN_CODES = new Set([
