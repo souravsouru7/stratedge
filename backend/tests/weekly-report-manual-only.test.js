@@ -1,35 +1,35 @@
 /**
  * Tests that weekly reports are now manual-only:
- * 1. startWeeklyReportsCron is NOT imported or called from server.js
+ * 1. server.js runs the lightweight reminder cron (not AI generation)
  * 2. generateNowOnce (manual button) still works correctly
  */
 const fs = require("fs");
 const path = require("path");
 
-// ─── 1. server.js does not start the auto-generation cron ────────────────────
-describe("server.js — weekly report cron removed", () => {
+// ─── 1. server.js cron wiring ─────────────────────────────────────────────────
+// The weeklyReportsCron sends reminder notifications only — it does NOT call AI.
+// Report generation is manual: users click "Generate Report" which calls generateNowOnce.
+describe("server.js — cron wiring", () => {
   const serverSrc = fs.readFileSync(
     path.resolve(__dirname, "../server.js"),
     "utf8"
   );
 
-  test("does not import startWeeklyReportsCron", () => {
-    expect(serverSrc).not.toMatch(/startWeeklyReportsCron/);
+  test("imports and calls the reminder-only weeklyReportsCron", () => {
+    expect(serverSrc).toMatch(/startWeeklyReportsCron/);
+    expect(serverSrc).toMatch(/startWeeklyReportsCron\s*\(\s*\)/);
   });
 
-  test("does not call startWeeklyReportsCron()", () => {
-    expect(serverSrc).not.toMatch(/startWeeklyReportsCron\s*\(\s*\)/);
+  test("imports and calls the morning mentor cron", () => {
+    expect(serverSrc).toMatch(/startMorningMentorCron/);
+    expect(serverSrc).toMatch(/startMorningMentorCron\s*\(\s*\)/);
   });
 
-  test("does not require weeklyReportsCron in any form", () => {
-    expect(serverSrc).not.toMatch(/weeklyReportsCron/);
-  });
-
-  test("still registers the /api/reports route", () => {
+  test("registers the /api/reports route", () => {
     expect(serverSrc).toMatch(/['"]\/api\/reports['"]/);
   });
 
-  test("still starts the data-cleanup cron", () => {
+  test("starts the data-cleanup cron", () => {
     expect(serverSrc).toMatch(/startDataCleanupCron\s*\(\s*\)/);
   });
 });
