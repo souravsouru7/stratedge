@@ -213,22 +213,22 @@ describe("analyzeTrades — scoring thresholds", () => {
 
 function generateTradedMessage(a) {
   if (a.isRevengeTrading)
-    return { title: "Stop. Breathe. Think.", scenario: "revenge" };
+    return { title: "🛑 Stop. Breathe. Think.", scenario: "revenge" };
   if (a.noStopLossRate >= 0.5)
-    return { title: "Protect Your Capital First.", scenario: "no_stop_loss" };
+    return { title: "🛡️ Protect Your Capital First.", scenario: "no_stop_loss" };
   if (a.isOvertrading)
-    return { title: "Quality Over Quantity.", scenario: "overtrading" };
+    return { title: "🎯 Quality Over Quantity.", scenario: "overtrading" };
   if (a.emotionCount >= 2 || a.impulsiveEntries >= 2)
-    return { title: "Rules, Not Emotions.", scenario: "emotional" };
+    return { title: "🧘 Rules, Not Emotions.", scenario: "emotional" };
   if (a.avgSetupScore < 60 && a.total > 0)
-    return { title: "Your Edge Is Slipping.", scenario: "low_setup" };
+    return { title: "📉 Your Edge Is Slipping.", scenario: "low_setup" };
   if (!a.isProfitable && a.total > 0)
-    return { title: "Losses Are Part of the Process.", scenario: "loss_day" };
+    return { title: "🔄 Losses Are Part of the Process.", scenario: "loss_day" };
   if (a.isProfitable && a.avgSetupScore >= 70)
-    return { title: "Discipline Is Delivering.", scenario: "disciplined_win" };
+    return { title: "🔥 Discipline Is Delivering.", scenario: "disciplined_win" };
   if (a.isProfitable)
-    return { title: "Stay Consistent.", scenario: "profitable" };
-  return { title: "Reset. Refocus. Execute.", scenario: "reset" };
+    return { title: "✅ Stay Consistent.", scenario: "profitable" };
+  return { title: "🌅 Reset. Refocus. Execute.", scenario: "reset" };
 }
 
 const base = (overrides) => ({
@@ -240,15 +240,15 @@ const base = (overrides) => ({
 });
 
 describe("generateTradedMessage — scenario priority routing", () => {
-  it("revenge trading → title 'Stop. Breathe. Think.'", () => {
+  it("revenge trading → title '🛑 Stop. Breathe. Think.'", () => {
     const msg = generateTradedMessage(base({ isRevengeTrading: true }));
-    expect(msg.title).toBe("Stop. Breathe. Think.");
+    expect(msg.title).toBe("🛑 Stop. Breathe. Think.");
     expect(msg.scenario).toBe("revenge");
   });
 
-  it("no stop loss (rate 1.0) → 'Protect Your Capital First.'", () => {
+  it("no stop loss (rate 1.0) → '🛡️ Protect Your Capital First.'", () => {
     const msg = generateTradedMessage(base({ noStopLossCount: 3, noStopLossRate: 1 }));
-    expect(msg.title).toBe("Protect Your Capital First.");
+    expect(msg.title).toBe("🛡️ Protect Your Capital First.");
     expect(msg.scenario).toBe("no_stop_loss");
   });
 
@@ -257,15 +257,15 @@ describe("generateTradedMessage — scenario priority routing", () => {
     expect(generateTradedMessage(base({ noStopLossRate: 0.49 })).scenario).not.toBe("no_stop_loss");
   });
 
-  it("overtrading (6 trades) → 'Quality Over Quantity.'", () => {
+  it("overtrading (6 trades) → '🎯 Quality Over Quantity.'", () => {
     const msg = generateTradedMessage(base({ total: 6, isOvertrading: true }));
-    expect(msg.title).toBe("Quality Over Quantity.");
+    expect(msg.title).toBe("🎯 Quality Over Quantity.");
     expect(msg.scenario).toBe("overtrading");
   });
 
-  it("emotionCount ≥ 2 → 'Rules, Not Emotions.'", () => {
+  it("emotionCount ≥ 2 → '🧘 Rules, Not Emotions.'", () => {
     const msg = generateTradedMessage(base({ emotionCount: 2 }));
-    expect(msg.title).toBe("Rules, Not Emotions.");
+    expect(msg.title).toBe("🧘 Rules, Not Emotions.");
   });
 
   it("impulsiveEntries ≥ 2 also triggers 'Rules, Not Emotions.'", () => {
@@ -273,9 +273,9 @@ describe("generateTradedMessage — scenario priority routing", () => {
     expect(msg.scenario).toBe("emotional");
   });
 
-  it("low setup score (<60) → 'Your Edge Is Slipping.'", () => {
+  it("low setup score (<60) → '📉 Your Edge Is Slipping.'", () => {
     const msg = generateTradedMessage(base({ avgSetupScore: 45 }));
-    expect(msg.title).toBe("Your Edge Is Slipping.");
+    expect(msg.title).toBe("📉 Your Edge Is Slipping.");
     expect(msg.scenario).toBe("low_setup");
   });
 
@@ -284,20 +284,20 @@ describe("generateTradedMessage — scenario priority routing", () => {
     expect(generateTradedMessage(base({ avgSetupScore: 60 })).scenario).not.toBe("low_setup");
   });
 
-  it("losing day with good discipline → 'Losses Are Part of the Process.'", () => {
+  it("losing day with good discipline → '🔄 Losses Are Part of the Process.'", () => {
     const msg = generateTradedMessage(base({ avgSetupScore: 72, isProfitable: false }));
-    expect(msg.title).toBe("Losses Are Part of the Process.");
+    expect(msg.title).toBe("🔄 Losses Are Part of the Process.");
   });
 
-  it("profitable + setupScore ≥ 70 → 'Discipline Is Delivering.'", () => {
+  it("profitable + setupScore ≥ 70 → '🔥 Discipline Is Delivering.'", () => {
     const msg = generateTradedMessage(base({ isProfitable: true, avgSetupScore: 80 }));
-    expect(msg.title).toBe("Discipline Is Delivering.");
+    expect(msg.title).toBe("🔥 Discipline Is Delivering.");
     expect(msg.scenario).toBe("disciplined_win");
   });
 
-  it("profitable + setupScore < 70 → 'Stay Consistent.'", () => {
+  it("profitable + setupScore < 70 → '✅ Stay Consistent.'", () => {
     const msg = generateTradedMessage(base({ isProfitable: true, avgSetupScore: 65 }));
-    expect(msg.title).toBe("Stay Consistent.");
+    expect(msg.title).toBe("✅ Stay Consistent.");
     expect(msg.scenario).toBe("profitable");
   });
 
@@ -379,11 +379,11 @@ describe("sendMorningMentor — scenario routing via mocked dependencies", () =>
 
     const { title } = notifService.notifyUser.mock.calls[0][1];
     const validTitles = [
-      "No Trade Is a Trade.",
-      "Discipline Is Choosing Not to Trade.",
-      "Quality Over Activity.",
-      "Patience Protects Capital.",
-      "Waiting Is a Skill.",
+      "🧘 No Trade Is a Trade.",
+      "✅ Discipline Is Choosing Not to Trade.",
+      "🎯 Quality Over Activity.",
+      "🛡️ Patience Protects Capital.",
+      "⏳ Waiting Is a Skill.",
     ];
     expect(validTitles).toContain(title);
 
@@ -392,7 +392,7 @@ describe("sendMorningMentor — scenario routing via mocked dependencies", () =>
 
   // ── Traded ────────────────────────────────────────────────────────────────
 
-  it("3 consecutive losses → revenge scenario 'Stop. Breathe. Think.'", async () => {
+  it("3 consecutive losses → revenge scenario '🛑 Stop. Breathe. Think.'", async () => {
     jest.spyOn(Date, "now").mockReturnValue(MONDAY_TS);
     mockTrades([
       { profit: -10, tradeDate: "2026-05-03T09:00Z", createdAt: "2026-05-03T09:00Z" },
@@ -403,7 +403,7 @@ describe("sendMorningMentor — scenario routing via mocked dependencies", () =>
     await sendMorningMentor("user-revenge");
 
     const payload = notifService.notifyUser.mock.calls[0][1];
-    expect(payload.title).toBe("Stop. Breathe. Think.");
+    expect(payload.title).toBe("🛑 Stop. Breathe. Think.");
     expect(payload.data.scenario).toBe("revenge");
 
     Date.now.mockRestore();
@@ -420,7 +420,7 @@ describe("sendMorningMentor — scenario routing via mocked dependencies", () =>
     await sendMorningMentor("user-win");
 
     const payload = notifService.notifyUser.mock.calls[0][1];
-    expect(payload.title).toBe("Discipline Is Delivering.");
+    expect(payload.title).toBe("🔥 Discipline Is Delivering.");
     expect(payload.data.scenario).toBe("disciplined_win");
 
     Date.now.mockRestore();
@@ -442,7 +442,7 @@ describe("sendMorningMentor — scenario routing via mocked dependencies", () =>
     await sendMorningMentor("user-mixed");
 
     const payload = notifService.notifyUser.mock.calls[0][1];
-    expect(payload.title).toBe("Stop. Breathe. Think.");
+    expect(payload.title).toBe("🛑 Stop. Breathe. Think.");
     expect(payload.data.totalTrades).toBe(3);
 
     Date.now.mockRestore();

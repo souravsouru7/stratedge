@@ -101,6 +101,8 @@ const appConfig = {
   morningMentor: {
     enabled: readBoolean("ENABLE_MORNING_MENTOR_CRON", true),
     schedule: process.env.MORNING_MENTOR_CRON || "0 7 * * *",
+    timezone: process.env.MORNING_MENTOR_TIMEZONE || "Asia/Kolkata",
+    timezoneOffsetHours: readNumber("MORNING_MENTOR_TIMEZONE_OFFSET_HOURS", 5.5),
   },
   cors: {
     allowedOrigins: (process.env.ALLOWED_ORIGINS || "")

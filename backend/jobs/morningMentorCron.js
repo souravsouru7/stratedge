@@ -46,7 +46,7 @@ async function runMorningMentorJob() {
 }
 
 function startMorningMentorCron() {
-  const { enabled, schedule } = appConfig.morningMentor;
+  const { enabled, schedule, timezone = "Asia/Kolkata" } = appConfig.morningMentor;
 
   if (!enabled) {
     logger.info("[morningMentorCron] disabled by ENABLE_MORNING_MENTOR_CRON");
@@ -63,9 +63,9 @@ function startMorningMentorCron() {
     runMorningMentorJob().catch((e) =>
       logger.error("[morningMentorCron] job error", { error: e?.message, stack: e?.stack })
     );
-  });
+  }, { timezone });
 
-  logger.info("[morningMentorCron] scheduled", { schedule });
+  logger.info("[morningMentorCron] scheduled", { schedule, timezone });
 }
 
 module.exports = { startMorningMentorCron, runMorningMentorJob };
