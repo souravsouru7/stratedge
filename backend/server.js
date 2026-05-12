@@ -70,6 +70,7 @@ process.on("unhandledRejection", (reason) => {
 const { connectRedis } = require("./config/redis");
 const { startDataCleanupCron } = require("./jobs/dataCleanupCron");
 const { startWeeklyReportsCron } = require("./jobs/weeklyReportsCron");
+const { startMorningMentorCron } = require("./jobs/morningMentorCron");
 const { startOcrWorker } = require("./workers/ocrWorker");
 
 connectDB();
@@ -89,6 +90,7 @@ if (appConfig.env !== "production" && process.env.ENABLE_EMBEDDED_OCR_WORKER !==
 // Weekly AI reports are generated on-demand only (user clicks Generate Report).
 // This cron only sends a lightweight reminder notification; it does not call AI.
 startWeeklyReportsCron();
+startMorningMentorCron();
 startDataCleanupCron();
 
 const app = express();

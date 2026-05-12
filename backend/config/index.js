@@ -98,6 +98,10 @@ const appConfig = {
     enabled: readBoolean("ENABLE_WEEKLY_REPORTS_CRON", true),
     schedule: process.env.WEEKLY_REPORTS_CRON || "0 9 * * *",
   },
+  morningMentor: {
+    enabled: readBoolean("ENABLE_MORNING_MENTOR_CRON", true),
+    schedule: process.env.MORNING_MENTOR_CRON || "0 7 * * *",
+  },
   cors: {
     allowedOrigins: (process.env.ALLOWED_ORIGINS || "")
       .split(",")

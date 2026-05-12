@@ -58,6 +58,7 @@ exports.updateNotificationPreferences = asyncHandler(async (req, res) => {
     "moodRisk",
     "noStopLoss",
     "weeklyInsight",
+    "morningMentor",
     "quietHours",
   ];
 
