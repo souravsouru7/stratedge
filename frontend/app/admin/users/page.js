@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { 
   getAllAdminUsers, 
   deleteAdminUser, 
@@ -12,16 +11,53 @@ import {
 
 import AdminHeader from "@/components/AdminHeader";
 
+const notificationTemplates = [
+  {
+    label: "Morning Push",
+    title: "Good morning, trader ☀️",
+    body: "Fresh day, fresh discipline. Review your plan before the first trade and protect your capital. 📈",
+    deepLink: "/dashboard",
+  },
+  {
+    label: "Risk Check",
+    title: "Risk check time 🛡️",
+    body: "Pause for 30 seconds: position size, stop loss, and daily loss limit. Trade the plan, not the impulse. ⚡",
+    deepLink: "/add-trade",
+  },
+  {
+    label: "Journal Reminder",
+    title: "Log your trade 📝",
+    body: "Your edge improves when your data is complete. Add the entry, exit, screenshot, and emotion while it is fresh. ✅",
+    deepLink: "/add-trade",
+  },
+  {
+    label: "Weekly Review",
+    title: "Review your week 📊",
+    body: "Look at what worked, what hurt, and what to repeat next week. Small reviews create serious progress. 🔍",
+    deepLink: "/weekly-reports",
+  },
+  {
+    label: "Discipline Win",
+    title: "Discipline first 🎯",
+    body: "A skipped bad setup is still a winning decision. Stay selective and let quality trades come to you. 💪",
+    deepLink: "/analytics",
+  },
+  {
+    label: "Subscription",
+    title: "Keep your edge active 🚀",
+    body: "Your trading journal keeps your progress visible. Renew your plan to continue tracking every improvement. ✨",
+    deepLink: "/pricing",
+  },
+];
+
 /* ─────────────────────────────────────────
    USER MANAGEMENT PAGE – Light theme
 ───────────────────────────────────────── */
 export default function UserManagementPage() {
-  const router = useRouter();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [mounted, setMounted] = useState(false);
   const [extendingId, setExtendingId] = useState(null);
   const [extensionDays, setExtensionDays] = useState(30);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
@@ -32,7 +68,6 @@ export default function UserManagementPage() {
   const [sendingNotification, setSendingNotification] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     fetchUsers();
   }, []);
 
@@ -75,7 +110,7 @@ export default function UserManagementPage() {
 
   const handleExtend = async (id) => {
     try {
-      await extendUserPlan(id, extensionDays);
+      await extendAdminUserPlan(id, extensionDays);
       setSuccess(`Plan extended by ${extensionDays} days`);
       setExtendingId(null);
       fetchUsers();
@@ -96,6 +131,14 @@ export default function UserManagementPage() {
     } else {
       setSelectedUserIds(users.map((user) => user._id));
     }
+  };
+
+  const applyNotificationTemplate = (template) => {
+    setCustomTitle(template.title);
+    setCustomBody(template.body);
+    setCustomDeepLink(template.deepLink);
+    setError("");
+    setSuccess("");
   };
 
   const handleSendCustomNotification = async () => {
@@ -206,6 +249,34 @@ export default function UserManagementPage() {
             rows={3}
             style={{ width: "100%", padding: "12px", border: "1px solid #CBD5E1", borderRadius: 8, fontSize: 13, resize: "vertical", marginBottom: 14 }}
           />
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: "#64748B", fontSize: 11, fontWeight: 800, letterSpacing: "0.05em", marginBottom: 8 }}>
+              PRE-BUILT TEMPLATES
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {notificationTemplates.map((template) => (
+                <button
+                  key={template.label}
+                  type="button"
+                  onClick={() => applyNotificationTemplate(template)}
+                  title={`Use ${template.label} template`}
+                  style={{
+                    border: "1px solid #CBD5E1",
+                    background: "#F8FAFC",
+                    color: "#0F1923",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: "pointer"
+                  }}
+                >
+                  {template.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#334155", fontSize: 13, fontWeight: 700 }}>
